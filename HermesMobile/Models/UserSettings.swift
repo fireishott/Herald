@@ -8,7 +8,7 @@ struct AppEnvironmentPolicy: Equatable, Sendable {
     }
 
     var defaultEnvironment: AppEnvironment {
-        allowsEnvironmentOverrides ? .development : .production
+        .production
     }
 
     func sanitize(_ settings: UserSettings) -> UserSettings {

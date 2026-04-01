@@ -29,13 +29,18 @@ final class ChatStore {
     func sendMessage(_ content: String) async {
         guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
+        let optimistic = Message(sender: .user, content: content, status: .sending)
+        if conversation == nil {
+            conversation = Conversation(title: "Hermes")
+        }
+        conversation?.messages.append(optimistic)
+        conversation?.lastActivity = optimistic.timestamp
+
         let response = await hermesClient.send(message: content)
         conversation = hermesClient.currentConversation
 
         if conversation == nil && response.status == .failed {
-            if conversation == nil {
-                conversation = Conversation(title: "Hermes")
-            }
+            conversation = Conversation(title: "Hermes")
             conversation?.messages.append(response)
             conversation?.lastActivity = response.timestamp
         }

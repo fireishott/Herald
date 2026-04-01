@@ -34,6 +34,13 @@ struct ChatScreen: View {
             await hostStore.refresh()
             await chatStore.loadConversationIfNeeded()
         }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { break }
+                await hostStore.refresh()
+            }
+        }
         .onDisappear {
             chatStore.setPollingEnabled(false)
         }
@@ -102,7 +109,7 @@ struct ChatScreen: View {
         }
 
         ToolbarItem(placement: .principal) {
-            StatusIndicator(status: sessionStore.state.connectionStatus)
+            StatusIndicator(status: hostStore.isHostOnline ? .connected : .disconnected)
         }
 
         ToolbarItem(placement: .topBarTrailing) {
