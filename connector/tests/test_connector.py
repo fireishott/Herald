@@ -46,7 +46,7 @@ def test_state_store_persists_with_restricted_permissions(tmp_path):
         user_id="user-123",
         host_id="host-123",
         connector_credential="secret",
-        owner_display_name="Taylor",
+
         connector_display_name="Home Mac mini",
         enrolled_at="2026-03-31T16:00:00+00:00",
     )
@@ -79,22 +79,15 @@ def test_setup_creates_connector_state(monkeypatch, tmp_path):
 
     def fake_post(url, json=None, timeout=None, headers=None):  # noqa: ANN001
         assert url == "https://relay.example.com/v1/connector/setup"
-        assert json["ownerDisplayName"] == "Taylor"
-        assert json["hostDisplayName"] == "Home Mac mini"
+        assert "connector" in json
         return FakeResponse()
 
     monkeypatch.setattr("hermes_mobile_connector.client.httpx.post", fake_post)
 
-    state = connector.setup(
-        owner_display_name="Taylor",
-        host_display_name="Home Mac mini",
-        relay_url="https://relay.example.com/v1",
-    )
+    state = connector.setup(relay_url="https://relay.example.com/v1")
 
     assert state.user_id == "user-123"
     assert state.host_id == "host-123"
-    assert state.owner_display_name == "Taylor"
-    assert state.connector_display_name == "Home Mac mini"
 
 
 def test_pair_phone_uses_stored_connector_credential(monkeypatch, tmp_path):
@@ -106,7 +99,7 @@ def test_pair_phone_uses_stored_connector_credential(monkeypatch, tmp_path):
             user_id="user-123",
             host_id="host-123",
             connector_credential="secret-token",
-            owner_display_name="Taylor",
+    
             connector_display_name="Home Mac mini",
         )
     )
@@ -147,7 +140,7 @@ def test_status_lines_include_core_runtime_details(tmp_path):
             user_id="user-123",
             host_id="host-123",
             connector_credential="secret",
-            owner_display_name="Taylor",
+    
             connector_display_name="Home Mac mini",
             last_connected_at="2026-03-31T16:00:00+00:00",
         )

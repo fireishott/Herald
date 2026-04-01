@@ -75,26 +75,20 @@ def setup_connector_account(
     db: Session,
     *,
     settings: Settings,
-    owner_display_name: str,
-    host_display_name: str | None,
     platform: str,
     hostname: str,
     hermes_command: str,
     hermes_version: str | None,
     connector_version: str,
 ) -> tuple[User, HermesHost, str]:
-    cleaned_owner_display_name = owner_display_name.strip()
-    if not cleaned_owner_display_name:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Owner display name is required.")
-
     connector_token = generate_token()
-    user = User(display_name=cleaned_owner_display_name)
+    user = User(display_name=hostname)
     db.add(user)
     db.flush()
 
     host = HermesHost(
         user_id=user.id,
-        display_name=host_display_name.strip() if host_display_name and host_display_name.strip() else None,
+        display_name=hostname,
         platform=platform,
         hostname=hostname,
         hermes_command=hermes_command,
