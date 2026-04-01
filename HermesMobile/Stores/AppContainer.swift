@@ -12,6 +12,7 @@ final class AppContainer {
     let permissionsStore: PermissionsStore
     let settingsStore: SettingsStore
     let talkStore: TalkStore
+    let sensorUploadService: SensorUploadService?
     private var isInitialized = false
 
     init(
@@ -22,7 +23,8 @@ final class AppContainer {
         inboxStore: InboxStore,
         permissionsStore: PermissionsStore,
         settingsStore: SettingsStore,
-        talkStore: TalkStore
+        talkStore: TalkStore,
+        sensorUploadService: SensorUploadService? = nil
     ) {
         self.sessionStore = sessionStore
         self.pairingStore = pairingStore
@@ -32,6 +34,7 @@ final class AppContainer {
         self.permissionsStore = permissionsStore
         self.settingsStore = settingsStore
         self.talkStore = talkStore
+        self.sensorUploadService = sensorUploadService
     }
 
     static func makeDefault(
@@ -121,6 +124,15 @@ final class AppContainer {
             allowsFallback: { allowMockFallbacks && (activePairingStore?.isPaired != true || usesMockPairingService) }
         )
 
+        let liveLocationService = LiveLocationService()
+        let liveHealthService = LiveHealthService()
+        let sensorUploadService: SensorUploadService? = usesMockPairingService ? nil : SensorUploadService(
+            apiClient: apiClient,
+            accessTokenProvider: { await sessionStore.currentAccessToken() },
+            locationService: liveLocationService,
+            healthService: liveHealthService
+        )
+
         let container = AppContainer(
             sessionStore: sessionStore,
             pairingStore: runtimePairingStore,
@@ -133,13 +145,14 @@ final class AppContainer {
                 allowDemoFallback: allowMockFallbacks
             ),
             permissionsStore: PermissionsStore(
-                locationService: LiveLocationService(),
-                healthService: LiveHealthService(),
+                locationService: liveLocationService,
+                healthService: liveHealthService,
                 notificationService: notificationService,
                 mediaService: MockMediaService()
             ),
             settingsStore: settingsStore,
-            talkStore: TalkStore(voiceService: MockVoiceSessionService())
+            talkStore: TalkStore(voiceService: MockVoiceSessionService()),
+            sensorUploadService: sensorUploadService
         )
 
         settingsStore.onEnvironmentChanged = { [weak sessionStore, weak container] _ in
@@ -173,6 +186,7 @@ final class AppContainer {
         await hostStore.refresh()
         await chatStore.loadConversationIfNeeded()
         await inboxStore.loadInbox()
+        sensorUploadService?.start()
         isInitialized = true
     }
 
@@ -187,10 +201,14 @@ final class AppContainer {
         if notificationCapability?.status == .notDetermined {
             await permissionsStore.requestPermission(for: .notifications)
         }
+
+        // Start sensor data pipeline
+        sensorUploadService?.start()
     }
 
     private func handlePairingRemoved() async {
         isInitialized = false
+        sensorUploadService?.stop()
         router.selectedTab = .chat
         router.activeSheet = nil
         router.resetAll()

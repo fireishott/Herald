@@ -27,6 +27,8 @@ from .schemas import (
     MessageCreateRequest,
     PairingRedeemRequest,
     PhonePairingRedeemRequest,
+    SensorHealthRequest,
+    SensorLocationRequest,
     PushRegisterRequest,
     RefreshRequest,
 )
@@ -124,6 +126,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         max_attempts=settings.phone_pairing_max_attempts_per_ip,
         window_seconds=settings.phone_pairing_rate_limit_window_seconds,
     )
+    app.state.connector_sockets: dict[str, WebSocket] = {}
 
     def require_connector_host(
         authorization: str | None = Header(default=None),
@@ -346,6 +349,73 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 },
             }
         )
+
+    # ── Sensor data forwarding ─────────────────────────────────
+
+    @app.post("/v1/device/sensor/location")
+    async def sensor_location(
+        payload: SensorLocationRequest,
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        connector_ws = app.state.connector_sockets.get(auth.user_id)
+        if connector_ws is None:
+            return JSONResponse(
+                status_code=status.HTTP_202_ACCEPTED,
+                content={"data": {"forwarded": False}, "meta": _meta()},
+            )
+        try:
+            await connector_ws.send_json({
+                "type": "sensor.location",
+                "latitude": payload.latitude,
+                "longitude": payload.longitude,
+                "altitude": payload.altitude,
+                "accuracy": payload.accuracy,
+                "address": payload.address,
+                "recordedAt": payload.recordedAt,
+            })
+            return success({"forwarded": True})
+        except Exception:
+            app.state.connector_sockets.pop(auth.user_id, None)
+            return JSONResponse(
+                status_code=status.HTTP_202_ACCEPTED,
+                content={"data": {"forwarded": False}, "meta": _meta()},
+            )
+
+    @app.post("/v1/device/sensor/health")
+    async def sensor_health(
+        payload: SensorHealthRequest,
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        connector_ws = app.state.connector_sockets.get(auth.user_id)
+        if connector_ws is None:
+            return JSONResponse(
+                status_code=status.HTTP_202_ACCEPTED,
+                content={"data": {"forwarded": False}, "meta": _meta()},
+            )
+        try:
+            await connector_ws.send_json({
+                "type": "sensor.health",
+                "samples": [
+                    {
+                        "metric": s.metric,
+                        "value": s.value,
+                        "unit": s.unit,
+                        "startAt": s.startAt,
+                        "endAt": s.endAt,
+                    }
+                    for s in payload.samples
+                ],
+            })
+            return success({"forwarded": True})
+        except Exception:
+            app.state.connector_sockets.pop(auth.user_id, None)
+            return JSONResponse(
+                status_code=status.HTTP_202_ACCEPTED,
+                content={"data": {"forwarded": False}, "meta": _meta()},
+            )
+
+    def _meta() -> dict:
+        return {"requestId": str(uuid.uuid4()), "timestamp": datetime.now(timezone.utc).isoformat()}
 
     @app.post("/v1/device/register")
     def register_device(
@@ -851,6 +921,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     display_name=connector_info.get("displayName"),
                 )
                 host_id = activated_host.id
+                user_id = activated_host.user_id
+                app.state.connector_sockets[user_id] = websocket
                 ready_payload = {
                     "type": "ready",
                     "version": 1,
@@ -958,6 +1030,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return
         finally:
             if host_id is not None:
+                app.state.connector_sockets.pop(user_id, None)
                 with database.session() as db:
                     deactivate_hermes_host_connection(db, host_id=host_id, connection_nonce=connection_nonce)
 

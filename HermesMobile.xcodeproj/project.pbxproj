@@ -16,6 +16,7 @@
 		A1B2C3D4E5F60101AABB0006 /* LiveHealthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60101AABB0005 /* LiveHealthService.swift */; };
 		A1B2C3D4E5F60101AABB0004 /* LiveLocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60101AABB0003 /* LiveLocationService.swift */; };
 		A1B2C3D4E5F60101AABB0002 /* LiveNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60101AABB0001 /* LiveNotificationService.swift */; };
+		C9E5D4A3B2F168073C4A9E01 /* SensorUploadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3F7A2D1E8C4590A6D2B1F07 /* SensorUploadService.swift */; };
 		0B512CBC16260044F6C0004D /* InboxLocalState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A92C3AB68B134D4A59172990 /* InboxLocalState.swift */; };
 		0BC371DA53649A79C69D09BA /* PermissionsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64446C4449B800327AED04F1 /* PermissionsScreen.swift */; };
 		0C26C3D50AEC694EF4DB6CD8 /* LiveHermesClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6900DF147D9EF74F5EF3B1D6 /* LiveHermesClient.swift */; };
@@ -152,6 +153,7 @@
 		A1B2C3D4E5F60101AABB0005 /* LiveHealthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveHealthService.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60101AABB0003 /* LiveLocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveLocationService.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60101AABB0001 /* LiveNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveNotificationService.swift; sourceTree = "<group>"; };
+		B3F7A2D1E8C4590A6D2B1F07 /* SensorUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorUploadService.swift; sourceTree = "<group>"; };
 		300F951B7DA86D57FE83BC20 /* Design.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design.swift; sourceTree = "<group>"; };
 		31A754F555998852844790A8 /* ConnectionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatus.swift; sourceTree = "<group>"; };
 		324210CDA9855FA02403D143 /* AppTemplateUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTemplateUITests.swift; sourceTree = "<group>"; };
@@ -330,6 +332,7 @@
 				18C2AFDCFC6C6C119984318D /* LiveHermesHostService.swift */,
 				EE23CAFCDB6E64ED3FFB78BB /* LiveInboxService.swift */,
 				2A1DE23F50DFDF112A61490D /* LivePairingService.swift */,
+				B3F7A2D1E8C4590A6D2B1F07 /* SensorUploadService.swift */,
 				A1B2C3D4E5F60101AABB0005 /* LiveHealthService.swift */,
 				A1B2C3D4E5F60101AABB0003 /* LiveLocationService.swift */,
 				A1B2C3D4E5F60101AABB0001 /* LiveNotificationService.swift */,
@@ -727,6 +730,7 @@
 				CF02B513265DDFE8A1376364 /* LiveHermesHostService.swift in Sources */,
 				072CE0C8A7A668AA18B93FEA /* LiveInboxService.swift in Sources */,
 				07CBAF78A59A8936AD0CF6BE /* LivePairingService.swift in Sources */,
+				C9E5D4A3B2F168073C4A9E01 /* SensorUploadService.swift in Sources */,
 				A1B2C3D4E5F60101AABB0006 /* LiveHealthService.swift in Sources */,
 				A1B2C3D4E5F60101AABB0004 /* LiveLocationService.swift in Sources */,
 				A1B2C3D4E5F60101AABB0002 /* LiveNotificationService.swift in Sources */,

@@ -12,6 +12,7 @@ from websockets.asyncio.client import connect as websocket_connect
 
 from . import __version__
 from .hermes_runner import HermesCLIExecutor, HermesConversationMessage
+from .sensor_store import HealthSample, LocationReading, SensorStore
 from .setup_code import decode_host_setup_code
 from .state import ConnectorState, ConnectorStateStore
 
@@ -52,6 +53,13 @@ class HermesMobileConnector:
         self.executor = executor or HermesCLIExecutor()
         self.heartbeat_interval_seconds = heartbeat_interval_seconds
         self.reconnect_delay_seconds = reconnect_delay_seconds
+        self._sensor_store: SensorStore | None = None
+
+    @property
+    def sensor_store(self) -> SensorStore:
+        if self._sensor_store is None:
+            self._sensor_store = SensorStore(self.state_store.state_dir / "sensors.db")
+        return self._sensor_store
 
     def metadata(self, *, display_name: str | None = None) -> ConnectorMetadata:
         return ConnectorMetadata(
@@ -210,7 +218,40 @@ class HermesMobileConnector:
                     continue
                 if message_type == "ready":
                     continue
+                if self._handle_sensor_message(message):
+                    continue
                 raise RuntimeError(f"Unsupported relay message: {message_type}")
+
+    def _handle_sensor_message(self, message: dict) -> bool:
+        """Handle a sensor message if applicable. Returns True if handled."""
+        message_type = message.get("type", "")
+        if message_type == "sensor.location":
+            self.sensor_store.store_location(
+                LocationReading(
+                    latitude=message["latitude"],
+                    longitude=message["longitude"],
+                    altitude=message.get("altitude"),
+                    accuracy=message.get("accuracy"),
+                    address=message.get("address"),
+                    recorded_at=message.get("recordedAt"),
+                )
+            )
+            return True
+        if message_type == "sensor.health":
+            samples = [
+                HealthSample(
+                    metric=s["metric"],
+                    value=s["value"],
+                    unit=s["unit"],
+                    start_at=s["startAt"],
+                    end_at=s.get("endAt"),
+                )
+                for s in message.get("samples", [])
+            ]
+            if samples:
+                self.sensor_store.store_health_samples(samples)
+            return True
+        return False
 
     async def _handle_job(self, websocket, job: dict) -> None:
         async def execute_job() -> dict:

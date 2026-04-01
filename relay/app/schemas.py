@@ -103,6 +103,27 @@ class InboxActionRequest(BaseModel):
     actionId: str
 
 
+class SensorLocationRequest(BaseModel):
+    latitude: float
+    longitude: float
+    altitude: float | None = None
+    accuracy: float | None = None
+    address: str | None = None
+    recordedAt: str  # ISO8601
+
+
+class SensorHealthSample(BaseModel):
+    metric: str = Field(min_length=1, max_length=64)
+    value: float
+    unit: str = Field(min_length=1, max_length=32)
+    startAt: str  # ISO8601
+    endAt: str | None = None
+
+
+class SensorHealthRequest(BaseModel):
+    samples: list[SensorHealthSample] = Field(min_length=1, max_length=100)
+
+
 class InternalInboxCreateRequest(BaseModel):
     userId: UUID | None = None
     deviceId: UUID | None = None
