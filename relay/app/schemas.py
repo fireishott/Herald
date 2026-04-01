@@ -67,8 +67,6 @@ class HostConnectorInfo(BaseModel):
 
 
 class ConnectorSetupRequest(BaseModel):
-    ownerDisplayName: str = Field(min_length=1, max_length=120)
-    hostDisplayName: str | None = Field(default=None, max_length=120)
     connector: HostConnectorInfo
 
 

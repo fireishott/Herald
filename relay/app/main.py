@@ -221,8 +221,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         user, host, connector_token = setup_connector_account(
             db,
             settings=request_settings,
-            owner_display_name=payload.ownerDisplayName,
-            host_display_name=payload.hostDisplayName,
             platform=payload.connector.platform,
             hostname=payload.connector.hostname,
             hermes_command=payload.connector.hermesCommand,

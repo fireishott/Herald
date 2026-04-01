@@ -21,7 +21,6 @@ class ConnectorState:
     host_id: str
     connector_credential: str
     user_id: str | None = None
-    owner_display_name: str | None = None
     connector_display_name: str | None = None
     enrolled_at: str | None = None
     last_connected_at: str | None = None

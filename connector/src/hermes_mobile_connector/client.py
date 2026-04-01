@@ -69,11 +69,9 @@ class HermesMobileConnector:
     def setup(
         self,
         *,
-        owner_display_name: str,
-        host_display_name: str | None = None,
         relay_url: str | None = None,
     ) -> ConnectorState:
-        metadata = self.metadata(display_name=host_display_name)
+        metadata = self.metadata()
         if metadata.hermes_version is None:
             raise RuntimeError(
                 f"Hermes command not found or not runnable: {self.executor.settings.hermes_command}"
@@ -83,8 +81,6 @@ class HermesMobileConnector:
         response = httpx.post(
             f"{resolved_relay_url}/connector/setup",
             json={
-                "ownerDisplayName": owner_display_name,
-                "hostDisplayName": host_display_name,
                 "connector": {
                     "platform": metadata.platform,
                     "hostname": metadata.hostname,
@@ -103,8 +99,6 @@ class HermesMobileConnector:
             user_id=data["user"]["id"],
             host_id=data["host"]["id"],
             connector_credential=data["connectorCredential"],
-            owner_display_name=owner_display_name,
-            connector_display_name=host_display_name,
             enrolled_at=utcnow_iso(),
         )
         return self.state_store.save(state)
@@ -260,7 +254,6 @@ class HermesMobileConnector:
             f"WebSocket URL: {state.web_socket_url}",
             f"User ID: {state.user_id or 'unknown'}",
             f"Host ID: {state.host_id}",
-            f"Owner: {state.owner_display_name or 'unknown'}",
             f"Hermes command: {metadata.hermes_command}",
             f"Hermes version: {metadata.hermes_version or 'unknown'}",
             f"Last connected: {state.last_connected_at or 'never'}",

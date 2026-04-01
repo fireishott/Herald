@@ -51,9 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    setup = subparsers.add_parser("setup", help="Create a Hermes Mobile account and enroll this host.")
-    setup.add_argument("--owner-display-name", help="Display name for the relay account owner.")
-    setup.add_argument("--host-display-name", help="Optional label for this Hermes host.")
+    setup = subparsers.add_parser("setup", help="Register this machine with Hermes Mobile.")
     setup.add_argument("--relay-url", help="Relay API base URL (default: hosted relay).")
 
     enroll = subparsers.add_parser("enroll", help="(Legacy) Redeem an HC1 host setup code.")
@@ -75,8 +73,7 @@ def run_wizard(connector: HermesMobileConnector) -> int:
     # Check for existing state
     try:
         existing = connector.state_store.load()
-        print(f"This machine is already set up as \"{existing.connector_display_name or existing.host_id}\".")
-        print(f"Owner: {existing.owner_display_name or 'unknown'}")
+        print(f"This machine is already set up (host {existing.host_id[:8]}...).")
         print()
         if not confirm("Start over with a fresh setup?", default=False):
             return _wizard_post_setup(connector)
@@ -96,20 +93,11 @@ def run_wizard(connector: HermesMobileConnector) -> int:
     print(f"Command: {metadata.hermes_command}")
     print()
 
-    # Step 2: Create account
-    print_header("Step 2 of 3 — Create Your Account")
-    import socket
-    default_host = socket.gethostname()
-    owner_name = prompt("Your name")
-    host_label = prompt("Label for this machine", default=default_host, optional=True)
-
-    print()
+    # Step 2: Register
+    print_header("Step 2 of 3 — Register This Machine")
     print("Registering with relay...")
     try:
-        state = connector.setup(
-            owner_display_name=owner_name,
-            host_display_name=host_label,
-        )
+        state = connector.setup()
     except Exception as e:
         print(f"Setup failed: {e}")
         return 1
@@ -169,18 +157,8 @@ def cmd_setup(args: argparse.Namespace, connector: HermesMobileConnector) -> int
     except RuntimeError:
         pass
 
-    owner_name = args.owner_display_name or prompt("Your name")
-    host_label = args.host_display_name
-    if host_label is None:
-        import socket
-        host_label = prompt("Label for this machine", default=socket.gethostname(), optional=True)
-
-    state = connector.setup(
-        owner_display_name=owner_name,
-        host_display_name=host_label,
-        relay_url=args.relay_url,
-    )
-    print(f"Account created. Host: {state.host_id}")
+    state = connector.setup(relay_url=args.relay_url)
+    print(f"Registered. Host: {state.host_id}")
     print("\nNext: hermes-mobile pair-phone")
     return 0
 
