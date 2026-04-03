@@ -834,6 +834,25 @@ def get_or_create_current_conversation(db: Session, *, user_id: str) -> Conversa
     return conversation
 
 
+def archive_current_conversation(db: Session, *, user_id: str) -> Conversation | None:
+    conversation = db.scalar(
+        select(Conversation).where(
+            Conversation.user_id == user_id,
+            Conversation.is_archived.is_(False),
+        )
+    )
+
+    if conversation is None:
+        return None
+
+    conversation.is_archived = True
+    conversation.hermes_session_id = None
+    conversation.updated_at = utcnow()
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
 def list_conversation_messages(db: Session, *, conversation_id: str) -> list[Message]:
     return list(
         db.scalars(

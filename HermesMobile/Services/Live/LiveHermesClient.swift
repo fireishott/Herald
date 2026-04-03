@@ -118,6 +118,18 @@ final class LiveHermesClient: HermesClientProtocol {
         }
     }
 
+    func clearConversation() async throws -> Conversation {
+        let token = await accessTokenProvider()
+        let response: ConversationResponse = try await apiClient.post(
+            path: "conversations/current/clear",
+            accessToken: token
+        )
+        let conversation = mapConversation(response.conversation)
+        currentConversation = conversation
+        connectionStatus = .connected
+        return conversation
+    }
+
     private func fallbackConversation() -> Conversation {
         if allowDemoFallback {
             return DemoData.sampleConversation

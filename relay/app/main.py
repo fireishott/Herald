@@ -38,6 +38,7 @@ from .security import AuthContext, get_auth_context, get_db, get_settings, requi
 from .services import (
     activate_hermes_host_connection,
     append_message,
+    archive_current_conversation,
     authenticate_hermes_host,
     build_connector_websocket_url,
     claim_next_message_job,
@@ -1046,6 +1047,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         messages = list_conversation_messages(db, conversation_id=conversation.id)
         jobs = list_message_jobs_for_conversation(db, conversation_id=conversation.id)
         return success({"conversation": serialize_conversation(conversation, messages, jobs=jobs)})
+
+    @app.post("/v1/conversations/current/clear")
+    def clear_current_conversation(
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        archive_current_conversation(db, user_id=auth.user.id)
+        conversation = get_or_create_current_conversation(db, user_id=auth.user.id)
+        messages = list_conversation_messages(db, conversation_id=conversation.id)
+        record_audit(
+            db,
+            actor_type="user",
+            actor_id=auth.user.id,
+            action="chat.conversation.clear",
+            entity_type="conversation",
+            entity_id=conversation.id,
+        )
+        db.commit()
+        return success({"conversation": serialize_conversation(conversation, messages)})
 
     @app.post("/v1/messages")
     async def create_message(

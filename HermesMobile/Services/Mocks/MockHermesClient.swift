@@ -48,6 +48,12 @@ final class MockHermesClient: HermesClientProtocol {
         return conversation
     }
 
+    func clearConversation() async throws -> Conversation {
+        let fresh = Conversation(title: "Hermes")
+        currentConversation = fresh
+        return fresh
+    }
+
     private func generateResponse(for input: String) -> String {
         let responses = [
             "I've looked into that for you. Based on what I can see, here's what I'd suggest...",

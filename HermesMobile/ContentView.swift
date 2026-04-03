@@ -62,12 +62,6 @@ struct MainTabView: View {
     @ViewBuilder
     private func sheetDestination(_ destination: SheetDestination) -> some View {
         switch destination {
-        case .conversationList:
-            Text("Conversations")
-                .font(Design.Typography.screenTitle)
-        case .newConversation:
-            Text("New Conversation")
-                .font(Design.Typography.screenTitle)
         case .inboxItemDetail(let item):
             InboxItemDetailSheet(item: item)
         }

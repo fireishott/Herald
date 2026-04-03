@@ -193,11 +193,30 @@ class HermesCLIExecutor:
 
     def _is_metadata_line(self, line: str) -> bool:
         stripped = line.strip()
-        return (
-            not stripped
-            or stripped.startswith("↻ Resumed session ")
-            or stripped.startswith("╭─ ⚕ Hermes")
+        if not stripped:
+            return True
+        metadata_prefixes = (
+            "↻ Resumed session",
+            "╭─ ⚕ Hermes",
+            "Warning:",
+            "⚠️",
+            "⚠",
+            "🔄",
+            "⏳",
+            "🌐",
+            "📝",
+            "📋",
+            "✏️",
+            "🧠",
+            "Rate limit reached.",
+            "API call failed",
+            "Provider:",
+            "Model:",
+            "Endpoint:",
+            "Error:",
+            "Details:",
         )
+        return any(stripped.startswith(prefix) for prefix in metadata_prefixes)
 
     def _build_prompt(self, *, latest_user_message: str, history: list[HermesConversationMessage]) -> str:
         history_lines = []

@@ -116,6 +116,14 @@ final class RelayAPIClient {
         return try await send(request)
     }
 
+    func post<T: Decodable>(
+        path: String,
+        accessToken: String? = nil
+    ) async throws -> T {
+        let request = try makeRequest(path: path, method: "POST", accessToken: accessToken, body: nil)
+        return try await send(request)
+    }
+
     func post<Body: Encodable, T: Decodable>(
         path: String,
         body: Body,
