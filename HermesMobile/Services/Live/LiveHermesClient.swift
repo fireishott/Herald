@@ -1,7 +1,9 @@
 import Foundation
+import os
 
 @MainActor
 final class LiveHermesClient: HermesClientProtocol {
+    private static let logger = Logger(subsystem: "com.appfactory.HermesMobile", category: "LiveHermesClient")
     private struct ConversationResponse: Decodable {
         let conversation: RelayConversation
     }
@@ -110,6 +112,7 @@ final class LiveHermesClient: HermesClientProtocol {
             connectionStatus = .connected
             return conversation
         } catch {
+            Self.logger.warning("Failed to load conversation from relay: \(error.localizedDescription)")
             connectionStatus = .error
             return currentConversation ?? fallbackConversation()
         }

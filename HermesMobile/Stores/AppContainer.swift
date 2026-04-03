@@ -158,7 +158,7 @@ final class AppContainer {
             sessionStore: sessionStore,
             pairingStore: runtimePairingStore,
             hostStore: hostStore,
-            chatStore: ChatStore(hermesClient: hermesClient),
+            chatStore: ChatStore(hermesClient: hermesClient, persistence: persistence),
             inboxStore: InboxStore(
                 inboxService: inboxService,
                 persistence: persistence,

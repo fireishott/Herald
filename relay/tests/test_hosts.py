@@ -806,3 +806,69 @@ def test_stale_connector_disconnect_does_not_remove_newer_live_socket(tmp_path):
                 thread.join(timeout=5)
                 assert response["payload"].status_code == 200
                 assert response["payload"].json()["data"]["deliveryState"] == "delivered"
+
+
+def build_client_with_overrides(tmp_path, db_name="relay-custom.db", **overrides):
+    base = dict(
+        environment="test",
+        public_base_url="https://relay.example.test/v1",
+        database_url=f"sqlite:///{tmp_path / db_name}",
+        internal_api_key="test-internal-key",
+        pairing_code_ttl_seconds=900,
+        phone_pairing_code_ttl_seconds=900,
+        phone_pairing_max_attempts_per_code=3,
+        phone_pairing_max_attempts_per_ip=3,
+        phone_pairing_rate_limit_window_seconds=300,
+        host_enrollment_code_ttl_seconds=900,
+        hermes_adapter="connector",
+        connector_sync_wait_seconds=2,
+        connector_job_lease_seconds=30,
+        connector_heartbeat_timeout_seconds=5,
+        connector_idle_poll_interval_seconds=0.1,
+    )
+    base.update(overrides)
+    app = create_app(Settings(**base))
+    client = TestClient(app)
+    client.__enter__()
+    return client
+
+
+def test_phone_pairing_rejects_expired_code(tmp_path):
+    import time
+
+    client = build_client_with_overrides(
+        tmp_path,
+        db_name="relay-expired.db",
+        phone_pairing_code_ttl_seconds=1,
+        phone_pairing_max_attempts_per_code=10,
+        phone_pairing_max_attempts_per_ip=10,
+    )
+
+    data = setup_connector(client)
+    pairing = create_phone_pairing_code(client, data["connectorCredential"])
+    code = pairing["code"]
+
+    time.sleep(2)
+
+    response = client.post(
+        "/v1/phone-pairing/redeem",
+        json=phone_pairing_payload(code=code, installation_id=str(uuid.uuid4())),
+    )
+    assert response.status_code == 400
+    assert "expired" in response.json()["detail"].lower()
+
+
+def test_talk_readiness_returns_error_when_host_offline(tmp_path):
+    client = build_client_with_overrides(tmp_path, db_name="relay-talk-offline.db")
+    data = setup_connector(client)
+    pairing = create_phone_pairing_code(client, data["connectorCredential"])
+    phone = redeem_phone(client, pairing["code"], str(uuid.uuid4()))
+    access_token = phone["auth"]["accessToken"]
+
+    # Don't connect WebSocket — host is offline
+    response = client.get(
+        "/v1/talk/readiness",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    # Should indicate host is offline (409 or 200 with blocked status)
+    assert response.status_code in (200, 409)

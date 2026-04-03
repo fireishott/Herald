@@ -9,12 +9,17 @@ final class ChatStore {
     private var pollingTask: Task<Void, Never>?
 
     private let hermesClient: any HermesClientProtocol
+    private let persistence: any AppPersistenceStoreProtocol
 
-    init(hermesClient: any HermesClientProtocol) {
+    init(hermesClient: any HermesClientProtocol, persistence: any AppPersistenceStoreProtocol) {
         self.hermesClient = hermesClient
+        self.persistence = persistence
     }
 
     func loadConversationIfNeeded() async {
+        if conversation == nil {
+            conversation = persistence.loadConversationCache()
+        }
         guard conversation == nil else { return }
         await loadConversation()
     }
@@ -23,6 +28,9 @@ final class ChatStore {
         isLoading = true
         defer { isLoading = false }
         conversation = await hermesClient.loadConversation()
+        if let conversation {
+            persistence.saveConversationCache(conversation)
+        }
         restartPendingPollingIfNeeded()
     }
 
@@ -48,6 +56,9 @@ final class ChatStore {
             conversation?.lastActivity = response.timestamp
         }
 
+        if let conversation {
+            persistence.saveConversationCache(conversation)
+        }
         restartPendingPollingIfNeeded()
     }
 
@@ -67,6 +78,7 @@ final class ChatStore {
         isPollingEnabled = false
         conversation = nil
         isLoading = false
+        persistence.clearConversationCache()
     }
 
     private var hasPendingMessages: Bool {
@@ -97,6 +109,9 @@ final class ChatStore {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { break }
                 self.conversation = await self.hermesClient.loadConversation()
+                if let conversation = self.conversation {
+                    self.persistence.saveConversationCache(conversation)
+                }
                 if self.hasPendingMessages == false {
                     break
                 }

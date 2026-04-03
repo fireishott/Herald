@@ -16,6 +16,9 @@ protocol AppPersistenceStoreProtocol {
     func loadSensorOutboxState() -> SensorOutboxState
     func saveSensorOutboxState(_ state: SensorOutboxState)
     func clearSensorOutboxState()
+    func loadConversationCache() -> Conversation?
+    func saveConversationCache(_ conversation: Conversation)
+    func clearConversationCache()
     func loadHealthQueryAnchorData(for identifier: String) -> Data?
     func saveHealthQueryAnchorData(_ data: Data?, for identifier: String)
     func clearHealthQueryAnchorData()
