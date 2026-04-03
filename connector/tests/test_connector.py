@@ -22,6 +22,16 @@ from hermes_mobile_connector.state import (
 )
 
 
+def make_enrolled_state() -> ConnectorState:
+    return ConnectorState(
+        relay_url="https://relay.example.com/v1",
+        web_socket_url="wss://relay.example.com/v1/hosts/ws",
+        user_id="user-123",
+        host_id="host-123",
+        connector_credential="secret",
+    )
+
+
 def make_executor() -> HermesCLIExecutor:
     return HermesCLIExecutor(
         ConnectorHermesSettings(
@@ -73,7 +83,8 @@ def test_state_store_persists_with_restricted_permissions(tmp_path):
 def test_setup_creates_connector_state(monkeypatch, tmp_path):
     store = ConnectorStateStore(state_dir=tmp_path / "connector-setup")
     connector = HermesMobileConnector(state_store=store, executor=make_executor())
-    monkeypatch.setattr(connector.executor, "detect_version", lambda: "Hermes 1.2.3")
+    monkeypatch.setattr(HermesCLIExecutor, "detect_version", lambda self: "Hermes 1.2.3")
+    monkeypatch.setattr(HermesCLIExecutor, "resolved_command_path", lambda self: "/usr/local/bin/hermes")
     monkeypatch.setattr(
         "hermes_mobile_connector.client.register_native_mcp_server",
         lambda state_dir: MCPRegistrationStatus(
@@ -121,7 +132,8 @@ def test_setup_creates_connector_state(monkeypatch, tmp_path):
 def test_setup_can_skip_native_mcp_configuration(monkeypatch, tmp_path):
     store = ConnectorStateStore(state_dir=tmp_path / "connector-setup-skip")
     connector = HermesMobileConnector(state_store=store, executor=make_executor())
-    monkeypatch.setattr(connector.executor, "detect_version", lambda: "Hermes 1.2.3")
+    monkeypatch.setattr(HermesCLIExecutor, "detect_version", lambda self: "Hermes 1.2.3")
+    monkeypatch.setattr(HermesCLIExecutor, "resolved_command_path", lambda self: "/usr/local/bin/hermes")
 
     class FakeResponse:
         def raise_for_status(self) -> None:
@@ -621,3 +633,60 @@ def test_executor_detects_missing_session_and_extracts_session_id():
     )
     assert parsed.session_id == "session-123"
     assert parsed.missing_session is True
+
+
+def test_handle_sensor_message_stores_location(tmp_path):
+    store = ConnectorStateStore(state_dir=tmp_path / "connector-sensor-loc")
+    store.save(make_enrolled_state())
+    connector = HermesMobileConnector(state_store=store, executor=make_executor())
+
+    result = connector._handle_sensor_message({  # noqa: SLF001
+        "type": "sensor.location",
+        "deliveryId": "delivery-loc-1",
+        "latitude": 40.7128,
+        "longitude": -74.006,
+        "accuracy": 35.0,
+        "address": "New York, NY",
+        "recordedAt": "2026-04-01T15:00:00Z",
+    })
+
+    assert result is not None
+    assert result["type"] == "sensor.ack"
+    assert result["deliveryState"] == "delivered"
+
+    current = connector.sensor_store.get_current_location()
+    assert current is not None
+    assert current.latitude == 40.7128
+    assert current.address == "New York, NY"
+
+
+def test_handle_sensor_message_stores_health(tmp_path):
+    store = ConnectorStateStore(state_dir=tmp_path / "connector-sensor-health")
+    store.save(make_enrolled_state())
+    connector = HermesMobileConnector(state_store=store, executor=make_executor())
+
+    result = connector._handle_sensor_message({  # noqa: SLF001
+        "type": "sensor.health",
+        "deliveryId": "delivery-health-1",
+        "samples": [
+            {"metric": "steps", "value": 5000, "unit": "count", "startAt": "2026-04-01T00:00:00Z", "endAt": "2026-04-01T15:00:00Z"},
+            {"metric": "heart_rate", "value": 72, "unit": "bpm", "startAt": "2026-04-01T15:00:00Z"},
+        ],
+    })
+
+    assert result is not None
+    assert result["deliveryState"] == "delivered"
+
+    metrics = connector.sensor_store.get_latest_metrics()
+    metric_names = {m.metric for m in metrics}
+    assert "steps" in metric_names
+    assert "heart_rate" in metric_names
+
+
+def test_handle_sensor_message_returns_none_for_unknown_type(tmp_path):
+    store = ConnectorStateStore(state_dir=tmp_path / "connector-sensor-unknown")
+    store.save(make_enrolled_state())
+    connector = HermesMobileConnector(state_store=store, executor=make_executor())
+
+    result = connector._handle_sensor_message({"type": "something.else"})  # noqa: SLF001
+    assert result is None

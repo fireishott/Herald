@@ -8,6 +8,7 @@ final class UserDefaultsAppPersistenceStore: AppPersistenceStoreProtocol {
         static let inboxState = "hermes.inboxState"
         static let pairedRelayConfiguration = "hermes.pairedRelayConfiguration"
         static let sensorOutboxState = "hermes.sensorOutboxState"
+        static let conversationCache = "hermes.conversationCache"
         static let healthAnchorPrefix = "hermes.healthAnchor."
     }
 
@@ -81,6 +82,18 @@ final class UserDefaultsAppPersistenceStore: AppPersistenceStoreProtocol {
 
     func clearSensorOutboxState() {
         defaults.removeObject(forKey: Keys.sensorOutboxState)
+    }
+
+    func loadConversationCache() -> Conversation? {
+        load(Conversation.self, key: Keys.conversationCache)
+    }
+
+    func saveConversationCache(_ conversation: Conversation) {
+        save(conversation, key: Keys.conversationCache)
+    }
+
+    func clearConversationCache() {
+        defaults.removeObject(forKey: Keys.conversationCache)
     }
 
     func loadHealthQueryAnchorData(for identifier: String) -> Data? {
