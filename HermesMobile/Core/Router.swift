@@ -40,14 +40,10 @@ enum Route: Hashable {
 // MARK: - Sheet Destinations
 
 enum SheetDestination: Identifiable {
-    case conversationList
-    case newConversation
     case inboxItemDetail(InboxItem)
 
     var id: String {
         switch self {
-        case .conversationList: "conversationList"
-        case .newConversation: "newConversation"
         case .inboxItemDetail(let item): "inboxItemDetail-\(item.id)"
         }
     }

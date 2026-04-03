@@ -872,3 +872,53 @@ def test_talk_readiness_returns_error_when_host_offline(tmp_path):
     )
     # Should indicate host is offline (409 or 200 with blocked status)
     assert response.status_code in (200, 409)
+
+
+def test_clear_conversation_creates_fresh(tmp_path):
+    with build_client(tmp_path) as client:
+        connector_data = setup_connector(client)
+        pairing_code = create_phone_pairing_code(client, connector_data["connectorCredential"])
+        access_token = redeem_phone(
+            client,
+            pairing_code["displayCode"],
+            str(uuid.uuid4()),
+        )["auth"]["accessToken"]
+        auth = {"Authorization": f"Bearer {access_token}"}
+
+        # Send a message to populate conversation
+        client.post("/v1/messages", headers=auth, json={"text": "Hello"})
+
+        # Get original conversation
+        original = client.get("/v1/conversations/current", headers=auth).json()["data"]["conversation"]
+        assert len(original["messages"]) >= 1
+        original_id = original["id"]
+
+        # Clear conversation
+        clear_response = client.post("/v1/conversations/current/clear", headers=auth)
+        assert clear_response.status_code == 200
+        cleared = clear_response.json()["data"]["conversation"]
+        assert cleared["id"] != original_id
+        assert len(cleared["messages"]) == 0
+
+        # Verify GET returns the new conversation
+        current = client.get("/v1/conversations/current", headers=auth).json()["data"]["conversation"]
+        assert current["id"] == cleared["id"]
+        assert len(current["messages"]) == 0
+
+
+def test_clear_conversation_when_none_exists(tmp_path):
+    with build_client(tmp_path) as client:
+        connector_data = setup_connector(client)
+        pairing_code = create_phone_pairing_code(client, connector_data["connectorCredential"])
+        access_token = redeem_phone(
+            client,
+            pairing_code["displayCode"],
+            str(uuid.uuid4()),
+        )["auth"]["accessToken"]
+        auth = {"Authorization": f"Bearer {access_token}"}
+
+        # Clear without ever creating a conversation
+        clear_response = client.post("/v1/conversations/current/clear", headers=auth)
+        assert clear_response.status_code == 200
+        conversation = clear_response.json()["data"]["conversation"]
+        assert len(conversation["messages"]) == 0

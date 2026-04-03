@@ -5,6 +5,7 @@ import Foundation
 final class ChatStore {
     var conversation: Conversation?
     var isLoading = false
+    var pendingMessageSentAt: Date?
     private var isPollingEnabled = false
     private var pollingTask: Task<Void, Never>?
 
@@ -46,6 +47,7 @@ final class ChatStore {
         }
         conversation?.messages.append(optimistic)
         conversation?.lastActivity = optimistic.timestamp
+        pendingMessageSentAt = optimistic.timestamp
 
         let response = await hermesClient.send(message: trimmedContent, clientMessageID: clientMessageID)
         conversation = hermesClient.currentConversation
@@ -56,10 +58,23 @@ final class ChatStore {
             conversation?.lastActivity = response.timestamp
         }
 
+        if !hasPendingMessages {
+            pendingMessageSentAt = nil
+        }
+
         if let conversation {
             persistence.saveConversationCache(conversation)
         }
         restartPendingPollingIfNeeded()
+    }
+
+    func clearConversation() async throws {
+        let fresh = try await hermesClient.clearConversation()
+        conversation = fresh
+        pendingMessageSentAt = nil
+        persistence.saveConversationCache(fresh)
+        pollingTask?.cancel()
+        pollingTask = nil
     }
 
     func setPollingEnabled(_ isEnabled: Bool) {
@@ -78,6 +93,7 @@ final class ChatStore {
         isPollingEnabled = false
         conversation = nil
         isLoading = false
+        pendingMessageSentAt = nil
         persistence.clearConversationCache()
     }
 
@@ -113,6 +129,7 @@ final class ChatStore {
                     self.persistence.saveConversationCache(conversation)
                 }
                 if self.hasPendingMessages == false {
+                    self.pendingMessageSentAt = nil
                     break
                 }
             }

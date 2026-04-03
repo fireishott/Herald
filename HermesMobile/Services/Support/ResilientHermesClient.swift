@@ -51,4 +51,8 @@ final class ResilientHermesClient: HermesClientProtocol {
         }
         return conversation
     }
+
+    func clearConversation() async throws -> Conversation {
+        try await primary.clearConversation()
+    }
 }

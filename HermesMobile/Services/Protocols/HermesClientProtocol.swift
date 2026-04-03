@@ -8,4 +8,5 @@ protocol HermesClientProtocol {
     func disconnect() async
     func send(message: String, clientMessageID: UUID) async -> Message
     func loadConversation() async -> Conversation
+    func clearConversation() async throws -> Conversation
 }

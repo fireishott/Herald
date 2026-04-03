@@ -7,7 +7,11 @@ struct ChatScreen: View {
     @Environment(TabRouter.self) private var router
 
     @State private var messageText = ""
-    @State private var scrollPosition: ScrollPosition = .init(idType: Message.ID.self)
+    @State private var scrollPosition: ScrollPosition = .init(idType: UUID.self)
+    @State private var showClearConfirmation = false
+    @State private var showStatusCard = false
+
+    private let thinkingIndicatorID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
 
     var body: some View {
         ZStack {
@@ -22,7 +26,8 @@ struct ChatScreen: View {
                 ChatInputBar(
                     text: $messageText,
                     onSend: sendMessage,
-                    onPenTap: openCapture
+                    onPenTap: openCapture,
+                    onSlashCommand: handleSlashCommand
                 )
             }
         }
@@ -47,6 +52,21 @@ struct ChatScreen: View {
         .onChange(of: chatStore.conversation?.messages.count ?? 0) {
             scrollToBottom()
         }
+        .onChange(of: chatStore.pendingMessageSentAt) {
+            scrollToBottom()
+        }
+        .confirmationDialog(
+            "Clear Conversation",
+            isPresented: $showClearConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear", role: .destructive) {
+                Task { await performClear() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will archive the current conversation and start a new session. This cannot be undone.")
+        }
     }
 
     // MARK: - Message List
@@ -59,6 +79,22 @@ struct ChatScreen: View {
                         MessageBubble(message: message)
                             .id(message.id)
                     }
+                }
+
+                if let sentAt = chatStore.pendingMessageSentAt {
+                    ThinkingIndicatorView(startTime: sentAt)
+                        .id(thinkingIndicatorID)
+                        .transition(.opacity)
+                }
+
+                if showStatusCard {
+                    StatusCardView(
+                        isHostOnline: hostStore.isHostOnline,
+                        messageCount: chatStore.conversation?.messages.count ?? 0,
+                        conversationID: chatStore.conversation?.id,
+                        dismissAction: { showStatusCard = false }
+                    )
+                    .transition(.opacity)
                 }
             }
             .padding(.vertical, Design.Spacing.md)
@@ -104,13 +140,6 @@ struct ChatScreen: View {
         ToolbarItem(placement: .principal) {
             StatusIndicator(status: hostStore.isHostOnline ? .connected : .disconnected)
         }
-
-        ToolbarItem(placement: .topBarTrailing) {
-            GlassCircleButton(icon: "square.and.pencil") {
-                router.activeSheet = .newConversation
-            }
-            .accessibilityLabel("New conversation")
-        }
     }
 
     // MARK: - Actions
@@ -130,11 +159,37 @@ struct ChatScreen: View {
         router.navigate(to: .capture)
     }
 
-    private func scrollToBottom() {
-        if let lastID = chatStore.conversation?.messages.last?.id {
+    private func handleSlashCommand(_ command: SlashCommand) {
+        switch command {
+        case .clear:
+            showClearConfirmation = true
+        case .status:
             withAnimation(Design.Motion.standard) {
-                scrollPosition.scrollTo(id: lastID, anchor: .bottom)
+                showStatusCard.toggle()
             }
+        }
+    }
+
+    private func performClear() async {
+        do {
+            try await chatStore.clearConversation()
+            showStatusCard = false
+        } catch {
+            // Conversation unchanged on failure — user can retry
+        }
+    }
+
+    private func scrollToBottom() {
+        let targetID: UUID
+        if chatStore.pendingMessageSentAt != nil {
+            targetID = thinkingIndicatorID
+        } else if let lastID = chatStore.conversation?.messages.last?.id {
+            targetID = lastID
+        } else {
+            return
+        }
+        withAnimation(Design.Motion.standard) {
+            scrollPosition.scrollTo(id: targetID, anchor: .bottom)
         }
     }
 }
