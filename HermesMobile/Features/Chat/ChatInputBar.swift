@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatInputBar: View {
     @Binding var text: String
     let isStreaming: Bool
+    var isFocused: FocusState<Bool>.Binding
     let onSend: () -> Void
     let onStop: () -> Void
     let onAttach: () -> Void
@@ -10,8 +11,6 @@ struct ChatInputBar: View {
 
     @Environment(TalkStore.self) private var talkStore
     @Environment(TabRouter.self) private var router
-
-    @FocusState private var isFocused: Bool
 
     private var canSend: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSlashMode
@@ -58,7 +57,7 @@ struct ChatInputBar: View {
                     .font(Design.Typography.body)
                     .foregroundStyle(Design.Colors.foreground)
                     .lineLimit(1...5)
-                    .focused($isFocused)
+                    .focused(isFocused)
                     .padding(.horizontal, Design.Spacing.md)
                     .padding(.top, Design.Spacing.sm)
                     .padding(.bottom, Design.Spacing.xs)

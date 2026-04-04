@@ -37,7 +37,7 @@ enum VoiceState: String, Codable, Hashable, Sendable, CaseIterable {
         case .thinking: .purple
         case .speaking: .green
         case .interrupted: .orange
-        case .disconnected: .red
+        case .disconnected: Color.white.opacity(0.15)
         }
     }
 }

@@ -8,9 +8,10 @@ struct ChatScreen: View {
     @Environment(TabRouter.self) private var router
 
     @State private var messageText = ""
-    @State private var scrollPosition: ScrollPosition = .init(idType: UUID.self)
     @State private var showClearConfirmation = false
     @State private var showStatusCard = false
+    @State private var scrollProxy: ScrollViewProxy?
+    @FocusState private var isComposerFocused: Bool
 
     private let thinkingIndicatorID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
 
@@ -27,6 +28,7 @@ struct ChatScreen: View {
                 ChatInputBar(
                     text: $messageText,
                     isStreaming: chatStore.isStreaming,
+                    isFocused: $isComposerFocused,
                     onSend: sendMessage,
                     onStop: { chatStore.cancelStreaming() },
                     onAttach: { router.presentSheet(.attachments) },
@@ -91,41 +93,46 @@ struct ChatScreen: View {
     // MARK: - Message List
 
     private var messageList: some View {
-        ScrollView {
-            LazyVStack(spacing: Design.Spacing.md) {
-                if let messages = chatStore.conversation?.messages {
-                    ForEach(messages) { message in
-                        MessageBubble(message: message) { failedMessage in
-                            Task { await chatStore.retryMessage(failedMessage) }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: Design.Spacing.md) {
+                    if let messages = chatStore.conversation?.messages {
+                        ForEach(messages) { message in
+                            MessageBubble(message: message) { failedMessage in
+                                Task { await chatStore.retryMessage(failedMessage) }
+                            }
+                            .id(message.id)
                         }
-                        .id(message.id)
+                    }
+
+                    if let sentAt = chatStore.pendingMessageSentAt,
+                       chatStore.streamingMessageID == nil {
+                        ThinkingIndicatorView(startTime: sentAt)
+                            .id(thinkingIndicatorID)
+                            .transition(.opacity)
+                    }
+
+                    if showStatusCard {
+                        StatusCardView(
+                            isHostOnline: hostStore.isHostOnline,
+                            messageCount: chatStore.conversation?.messages.count ?? 0,
+                            conversationID: chatStore.conversation?.id,
+                            tokenUsage: chatStore.lastTokenUsage,
+                            dismissAction: { showStatusCard = false }
+                        )
+                        .transition(.opacity)
                     }
                 }
-
-                if let sentAt = chatStore.pendingMessageSentAt,
-                   chatStore.streamingMessageID == nil {
-                    ThinkingIndicatorView(startTime: sentAt)
-                        .id(thinkingIndicatorID)
-                        .transition(.opacity)
-                }
-
-                if showStatusCard {
-                    StatusCardView(
-                        isHostOnline: hostStore.isHostOnline,
-                        messageCount: chatStore.conversation?.messages.count ?? 0,
-                        conversationID: chatStore.conversation?.id,
-                        tokenUsage: chatStore.lastTokenUsage,
-                        dismissAction: { showStatusCard = false }
-                    )
-                    .transition(.opacity)
-                }
+                .padding(.vertical, Design.Spacing.md)
             }
-            .padding(.vertical, Design.Spacing.md)
+            .defaultScrollAnchor(.bottom)
+            .scrollDismissesKeyboard(.interactively)
+            .redacted(reason: chatStore.isLoading ? .placeholder : [])
+            .onTapGesture {
+                isComposerFocused = false
+            }
+            .onAppear { scrollProxy = proxy }
         }
-        .scrollPosition($scrollPosition)
-        .defaultScrollAnchor(.bottom)
-        .scrollDismissesKeyboard(.interactively)
-        .redacted(reason: chatStore.isLoading ? .placeholder : [])
     }
 
     private var hostOfflineBanner: some View {
@@ -320,16 +327,19 @@ struct ChatScreen: View {
     }
 
     private func scrollToBottom() {
-        let targetID: UUID
         if chatStore.pendingMessageSentAt != nil {
-            targetID = thinkingIndicatorID
-        } else if let lastID = chatStore.conversation?.messages.last?.id {
-            targetID = lastID
-        } else {
-            return
-        }
-        withAnimation(Design.Motion.standard) {
-            scrollPosition.scrollTo(id: targetID, anchor: .bottom)
+            // Thinking indicator is small — pin it at the bottom of the viewport
+            withAnimation(Design.Motion.standard) {
+                scrollProxy?.scrollTo(thinkingIndicatorID, anchor: .bottom)
+            }
+        } else if let lastMessage = chatStore.conversation?.messages.last {
+            // For assistant responses, scroll so the TOP of the message is visible
+            // so the user can start reading from the beginning.
+            // For user's own messages (short), .bottom is fine.
+            let anchor: UnitPoint = lastMessage.sender == .user ? .bottom : .top
+            withAnimation(Design.Motion.standard) {
+                scrollProxy?.scrollTo(lastMessage.id, anchor: anchor)
+            }
         }
     }
 }

@@ -64,7 +64,7 @@ final class LiveInboxService: InboxServiceProtocol {
         accessToken: String?
     ) async throws -> InboxActionResult {
         try await apiClient.post(
-            path: "inbox/\(itemID.uuidString)/action",
+            path: "inbox/\(itemID.uuidString.lowercased())/action",
             body: ActionBody(actionID: actionID),
             accessToken: accessToken
         )
