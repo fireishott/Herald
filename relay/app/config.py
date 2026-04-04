@@ -42,7 +42,7 @@ class Settings:
     hermes_toolsets: str | None = None
     hermes_source: str = "tool"
     hermes_history_limit: int = 20
-    connector_sync_wait_seconds: int = 25
+    connector_sync_wait_seconds: int = 0
     connector_job_lease_seconds: int = 180
     connector_heartbeat_timeout_seconds: int = 30
     connector_idle_poll_interval_seconds: float = 1.0

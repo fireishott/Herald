@@ -105,12 +105,19 @@ final class ChatStore {
                         resolved.codeDiff = diff
                         self.conversation?.messages[idx] = resolved
                     }
+                    // Mark user message as delivered if it's still in sending state
+                    if let idx = self.conversation?.messages.firstIndex(where: { $0.id == clientMessageID }) {
+                        if self.conversation?.messages[idx].status == .sending {
+                            self.conversation?.messages[idx].status = .delivered
+                        }
+                    }
                     self.conversation = self.mergeStreamingArtifacts(
                         from: self.conversation,
                         into: self.hermesClient.currentConversation
                     )
                     self.lastTokenUsage = usage
                     self.streamingMessageID = nil
+                    self.pendingMessageSentAt = nil
 
                 case .failed:
                     if let idx = self.conversation?.messages.firstIndex(where: { $0.id == placeholderID }) {

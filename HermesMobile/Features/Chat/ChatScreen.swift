@@ -327,19 +327,16 @@ struct ChatScreen: View {
     }
 
     private func scrollToBottom() {
+        let targetID: UUID
         if chatStore.pendingMessageSentAt != nil {
-            // Thinking indicator is small — pin it at the bottom of the viewport
-            withAnimation(Design.Motion.standard) {
-                scrollProxy?.scrollTo(thinkingIndicatorID, anchor: .bottom)
-            }
-        } else if let lastMessage = chatStore.conversation?.messages.last {
-            // For assistant responses, scroll so the TOP of the message is visible
-            // so the user can start reading from the beginning.
-            // For user's own messages (short), .bottom is fine.
-            let anchor: UnitPoint = lastMessage.sender == .user ? .bottom : .top
-            withAnimation(Design.Motion.standard) {
-                scrollProxy?.scrollTo(lastMessage.id, anchor: anchor)
-            }
+            targetID = thinkingIndicatorID
+        } else if let lastID = chatStore.conversation?.messages.last?.id {
+            targetID = lastID
+        } else {
+            return
+        }
+        withAnimation(Design.Motion.standard) {
+            scrollProxy?.scrollTo(targetID, anchor: .bottom)
         }
     }
 }
