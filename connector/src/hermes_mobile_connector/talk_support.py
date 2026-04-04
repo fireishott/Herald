@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import os
 from pathlib import Path
+import re
+import subprocess
 
 from .sensor_store import SensorStore
 from .state import VoiceContextSnapshot
@@ -10,6 +12,7 @@ from .state import VoiceContextSnapshot
 DEFAULT_REALTIME_MODELS = ["gpt-realtime-1.5", "gpt-realtime"]
 DEFAULT_REALTIME_VOICE = "verse"
 VOICE_CONTEXT_MAX_CHARS = 4000
+ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-9;]*[A-Za-z]")
 
 
 def utcnow_iso() -> str:
@@ -57,9 +60,48 @@ def summarize_sensor_freshness(sensor_store: SensorStore) -> str:
     return f"{location_summary} {health_summary}"
 
 
+def summarize_memory_provider(*, hermes_command: str | None, hermes_home: str | None) -> str:
+    if not hermes_command:
+        return "Memory provider status unavailable."
+
+    env = os.environ.copy()
+    if hermes_home:
+        env["HERMES_HOME"] = hermes_home
+
+    try:
+        completed = subprocess.run(
+            [hermes_command, "memory", "status"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+            env=env,
+        )
+    except Exception as error:  # noqa: BLE001
+        return f"Memory provider status unavailable: {error}"
+
+    output = completed.stdout or completed.stderr or ""
+    cleaned_lines = [
+        ANSI_ESCAPE_RE.sub("", line).strip()
+        for line in output.splitlines()
+        if line.strip()
+    ]
+    if not cleaned_lines:
+        return "Memory provider status unavailable."
+
+    relevant = [
+        line for line in cleaned_lines
+        if line.lower().startswith(("provider:", "builtin:", "status:", "enabled:"))
+    ]
+    if not relevant:
+        relevant = cleaned_lines[:4]
+    return " ".join(relevant)
+
+
 def build_voice_context_snapshot(
     *,
     sensor_store: SensorStore,
+    hermes_command: str | None,
     hermes_home: str | None,
     readiness_summary: str,
 ) -> VoiceContextSnapshot:
@@ -68,10 +110,15 @@ def build_voice_context_snapshot(
     memory_summary = read_memory_file(memories_dir / "MEMORY.md")
     user_summary = read_memory_file(memories_dir / "USER.md")
     sensor_summary = summarize_sensor_freshness(sensor_store)
+    memory_provider_summary = summarize_memory_provider(
+        hermes_command=hermes_command,
+        hermes_home=str(resolved_home),
+    )
     system_prompt = render_voice_system_prompt(
         memory_summary=memory_summary,
         user_summary=user_summary,
         sensor_summary=sensor_summary,
+        memory_provider_summary=memory_provider_summary,
         readiness_summary=readiness_summary,
     )
     return VoiceContextSnapshot(
@@ -79,6 +126,7 @@ def build_voice_context_snapshot(
         memory_summary=memory_summary,
         user_summary=user_summary,
         sensor_summary=sensor_summary,
+        memory_provider_summary=memory_provider_summary,
         readiness_summary=readiness_summary,
         updated_at=utcnow_iso(),
     )
@@ -89,6 +137,7 @@ def render_voice_system_prompt(
     memory_summary: str,
     user_summary: str,
     sensor_summary: str,
+    memory_provider_summary: str,
     readiness_summary: str,
 ) -> str:
     return (
@@ -104,6 +153,8 @@ def render_voice_system_prompt(
         f"{user_summary}\n\n"
         "Current sensor freshness:\n"
         f"{sensor_summary}\n\n"
+        "Hermes memory provider status:\n"
+        f"{memory_provider_summary}\n\n"
         "Hermes tool readiness:\n"
         f"{readiness_summary}"
     )

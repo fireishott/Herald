@@ -112,7 +112,13 @@ final class AppContainer {
         if usesMockPairingService {
             hostService = MockHermesHostService()
         } else {
-            hostService = LiveHermesHostService(apiClient: apiClient)
+            hostService = LiveHermesHostService(
+                apiClient: apiClient,
+                accessTokenRefresher: {
+                    await sessionStore.refreshAccessTokenIfNeeded()
+                    return await sessionStore.currentAccessToken()
+                }
+            )
         }
 
         let hostStore = HermesHostStore(
@@ -124,6 +130,10 @@ final class AppContainer {
             primary: LiveHermesClient(
                 apiClient: apiClient,
                 accessTokenProvider: { await sessionStore.currentAccessToken() },
+                accessTokenRefresher: {
+                    await sessionStore.refreshAccessTokenIfNeeded()
+                    return await sessionStore.currentAccessToken()
+                },
                 allowDemoFallback: allowMockFallbacks && usesMockPairingService
             ),
             fallback: MockHermesClient(),
@@ -136,6 +146,10 @@ final class AppContainer {
         let sensorUploadService: SensorUploadService? = usesMockPairingService ? nil : SensorUploadService(
             apiClient: apiClient,
             accessTokenProvider: { await sessionStore.currentAccessToken() },
+            accessTokenRefresher: {
+                await sessionStore.refreshAccessTokenIfNeeded()
+                return await sessionStore.currentAccessToken()
+            },
             persistence: persistence,
             isPairedProvider: { activePairingStore?.isPaired == true },
             locationService: liveLocationService,

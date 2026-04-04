@@ -6,7 +6,7 @@ struct ConnectHermesHostScreen: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground)
+            Design.Colors.background
                 .ignoresSafeArea()
 
             ScrollView {
@@ -34,14 +34,15 @@ struct ConnectHermesHostScreen: View {
         VStack(alignment: .leading, spacing: Design.Spacing.sm) {
             Text("Connect Your Hermes Host")
                 .font(Design.Typography.heroTitle)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Design.Colors.foreground)
 
             Text("Host setup now starts from the machine running Hermes. Run `hermes-mobile setup`, then `hermes-mobile pair-phone`, and keep the connector available with either the background service or `hermes-mobile run`.")
                 .font(Design.Typography.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
         }
         .padding(Design.Spacing.lg)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
 
     private var statusSection: some View {
@@ -58,12 +59,13 @@ struct ConnectHermesHostScreen: View {
             } else {
                 Text("No Hermes host is connected yet.")
                     .font(Design.Typography.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
             }
 
         }
         .padding(Design.Spacing.lg)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
 
     private var setupSection: some View {
@@ -73,22 +75,23 @@ struct ConnectHermesHostScreen: View {
 
             Text("1. On the Hermes host, run `hermes-mobile setup` once.")
                 .font(Design.Typography.callout)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Design.Colors.foreground)
 
             Text("2. Generate a phone code with `hermes-mobile pair-phone`, then scan or enter that code in the app.")
                 .font(Design.Typography.callout)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Design.Colors.foreground)
 
             Text("3. For persistent uptime, run `hermes-mobile service install` and `hermes-mobile service start`.")
                 .font(Design.Typography.callout)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Design.Colors.foreground)
 
             Text("4. Use `hermes-mobile run` when you want foreground debugging instead.")
                 .font(Design.Typography.callout)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Design.Colors.foreground)
         }
         .padding(Design.Spacing.lg)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
 
     private var dangerZoneSection: some View {
@@ -121,14 +124,15 @@ struct ConnectHermesHostScreen: View {
             }
         }
         .padding(Design.Spacing.lg)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
 
     private func hostRow(title: String, value: String) -> some View {
         HStack {
             Text(title)
                 .font(Design.Typography.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
             Spacer()
             Text(value)
                 .font(Design.Typography.callout.monospaced())
@@ -143,9 +147,10 @@ struct ConnectHermesHostScreen: View {
 
             Text(message)
                 .font(Design.Typography.callout)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Design.Colors.foreground)
         }
         .padding(Design.Spacing.md)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
     }
 }

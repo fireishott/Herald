@@ -8,8 +8,8 @@ struct HermesAvatar: View {
             .font(.system(size: size * 0.45, weight: .semibold, design: .rounded))
             .foregroundStyle(Design.Brand.accent)
             .frame(width: size, height: size)
+            .background(Design.Colors.surface)
             .clipShape(Circle())
-            .glassEffect(.regular, in: Circle())
             .accessibilityLabel("Hermes")
     }
 }

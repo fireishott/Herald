@@ -109,6 +109,7 @@ final class SensorUploadService {
 
     private let apiClient: RelayAPIClient
     private let accessTokenProvider: @MainActor () async -> String?
+    private let accessTokenRefresher: @MainActor () async -> String?
     private let persistence: AppPersistenceStoreProtocol
     private let isPairedProvider: @MainActor () -> Bool
     private let locationService: LiveLocationService
@@ -127,6 +128,7 @@ final class SensorUploadService {
     init(
         apiClient: RelayAPIClient,
         accessTokenProvider: @escaping @MainActor () async -> String?,
+        accessTokenRefresher: @escaping @MainActor () async -> String? = { nil },
         persistence: AppPersistenceStoreProtocol,
         isPairedProvider: @escaping @MainActor () -> Bool,
         locationService: LiveLocationService,
@@ -134,6 +136,7 @@ final class SensorUploadService {
     ) {
         self.apiClient = apiClient
         self.accessTokenProvider = accessTokenProvider
+        self.accessTokenRefresher = accessTokenRefresher
         self.persistence = persistence
         self.isPairedProvider = isPairedProvider
         self.locationService = locationService
@@ -221,13 +224,14 @@ final class SensorUploadService {
         guard let accessToken = await accessTokenProvider(), !accessToken.isEmpty else {
             return
         }
+        _ = accessToken
 
         isDraining = true
         defer { isDraining = false }
 
         while isActive && isPairedProvider() {
             if let pendingLocation = outboxState.pendingLocation {
-                let delivered = await uploadLocation(pendingLocation, accessToken: accessToken)
+                let delivered = await uploadLocation(pendingLocation)
                 guard delivered else { break }
                 outboxState.pendingLocation = nil
                 persistOutboxState()
@@ -235,7 +239,7 @@ final class SensorUploadService {
             }
 
             if !outboxState.pendingHealthSamples.isEmpty {
-                let delivered = await uploadHealth(outboxState.pendingHealthSamples, accessToken: accessToken)
+                let delivered = await uploadHealth(outboxState.pendingHealthSamples)
                 guard delivered else { break }
                 outboxState.pendingHealthSamples.removeAll()
                 persistOutboxState()
@@ -254,7 +258,7 @@ final class SensorUploadService {
         }
     }
 
-    private func uploadLocation(_ pending: SensorOutboxState.PendingLocation, accessToken: String) async -> Bool {
+    private func uploadLocation(_ pending: SensorOutboxState.PendingLocation) async -> Bool {
         let body = SensorLocationBody(
             latitude: pending.latitude,
             longitude: pending.longitude,
@@ -264,19 +268,10 @@ final class SensorUploadService {
             recordedAt: iso8601Formatter.string(from: pending.recordedAt)
         )
 
-        do {
-            let result: DeliveryResult = try await apiClient.post(
-                path: "device/sensor/location",
-                body: body,
-                accessToken: accessToken
-            )
-            return result.wasDelivered
-        } catch {
-            return false
-        }
+        return await performAuthorizedUpload(path: "device/sensor/location", body: body)
     }
 
-    private func uploadHealth(_ samples: [SensorOutboxState.PendingHealthSample], accessToken: String) async -> Bool {
+    private func uploadHealth(_ samples: [SensorOutboxState.PendingHealthSample]) async -> Bool {
         let body = SensorHealthBody(
             samples: samples.map { sample in
                 SensorHealthBody.Sample(
@@ -289,15 +284,31 @@ final class SensorUploadService {
             }
         )
 
+        return await performAuthorizedUpload(path: "device/sensor/health", body: body)
+    }
+
+    private func performAuthorizedUpload<Body: Encodable>(path: String, body: Body) async -> Bool {
         do {
-            let result: DeliveryResult = try await apiClient.post(
-                path: "device/sensor/health",
-                body: body,
-                accessToken: accessToken
-            )
-            return result.wasDelivered
+            return try await executeUpload(path: path, body: body, accessToken: await accessTokenProvider())
+        } catch RelayAPIClient.ClientError.unauthorized {
+            guard let refreshedToken = await accessTokenRefresher(), !refreshedToken.isEmpty else {
+                return false
+            }
+            return (try? await executeUpload(path: path, body: body, accessToken: refreshedToken)) ?? false
         } catch {
             return false
         }
+    }
+
+    private func executeUpload<Body: Encodable>(path: String, body: Body, accessToken: String?) async throws -> Bool {
+        guard let accessToken, !accessToken.isEmpty else {
+            return false
+        }
+        let result: DeliveryResult = try await apiClient.post(
+            path: path,
+            body: body,
+            accessToken: accessToken
+        )
+        return result.wasDelivered
     }
 }

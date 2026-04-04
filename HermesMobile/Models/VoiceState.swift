@@ -126,6 +126,7 @@ struct TalkSessionSnapshot: Hashable, Sendable {
     var statusMessage: String?
     var canStartSession: Bool
     var latencyMetrics: TalkLatencyMetrics
+    var voiceSessionID: UUID?
 }
 
 enum TalkSessionEvent: Hashable, Sendable {

@@ -4,6 +4,7 @@ struct ChatScreen: View {
     @Environment(ChatStore.self) private var chatStore
     @Environment(HermesHostStore.self) private var hostStore
     @Environment(AppSessionStore.self) private var sessionStore
+    @Environment(SettingsStore.self) private var settingsStore
     @Environment(TabRouter.self) private var router
 
     @State private var messageText = ""
@@ -15,7 +16,7 @@ struct ChatScreen: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground)
+            Design.Colors.background
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -25,15 +26,17 @@ struct ChatScreen: View {
                 messageList
                 ChatInputBar(
                     text: $messageText,
+                    isStreaming: chatStore.isStreaming,
                     onSend: sendMessage,
-                    onPenTap: openCapture,
+                    onStop: { chatStore.cancelStreaming() },
+                    onAttach: { router.presentSheet(.attachments) },
                     onSlashCommand: handleSlashCommand
                 )
             }
         }
-        .navigationTitle("Hermes Agent")
-        .toolbarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbarContent }
+        .toolbarBackground(.hidden, for: .navigationBar)
         .task {
             chatStore.setPollingEnabled(true)
             await hostStore.refresh()
@@ -55,6 +58,11 @@ struct ChatScreen: View {
         .onChange(of: chatStore.pendingMessageSentAt) {
             scrollToBottom()
         }
+        .onChange(of: chatStore.streamingMessageID) { old, new in
+            if old != nil && new == nil && settingsStore.settings.hapticFeedbackEnabled {
+                HapticEngine.responseReceived()
+            }
+        }
         .confirmationDialog(
             "Clear Conversation",
             isPresented: $showClearConfirmation,
@@ -69,6 +77,17 @@ struct ChatScreen: View {
         }
     }
 
+    // MARK: - Toolbar
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            GlassCircleButton(icon: "gearshape") {
+                router.presentSheet(.settings)
+            }
+        }
+    }
+
     // MARK: - Message List
 
     private var messageList: some View {
@@ -76,12 +95,15 @@ struct ChatScreen: View {
             LazyVStack(spacing: Design.Spacing.md) {
                 if let messages = chatStore.conversation?.messages {
                     ForEach(messages) { message in
-                        MessageBubble(message: message)
-                            .id(message.id)
+                        MessageBubble(message: message) { failedMessage in
+                            Task { await chatStore.retryMessage(failedMessage) }
+                        }
+                        .id(message.id)
                     }
                 }
 
-                if let sentAt = chatStore.pendingMessageSentAt {
+                if let sentAt = chatStore.pendingMessageSentAt,
+                   chatStore.streamingMessageID == nil {
                     ThinkingIndicatorView(startTime: sentAt)
                         .id(thinkingIndicatorID)
                         .transition(.opacity)
@@ -92,6 +114,7 @@ struct ChatScreen: View {
                         isHostOnline: hostStore.isHostOnline,
                         messageCount: chatStore.conversation?.messages.count ?? 0,
                         conversationID: chatStore.conversation?.id,
+                        tokenUsage: chatStore.lastTokenUsage,
                         dismissAction: { showStatusCard = false }
                     )
                     .transition(.opacity)
@@ -113,33 +136,26 @@ struct ChatScreen: View {
             VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
                 Text("Hermes host offline")
                     .font(Design.Typography.callout)
+                    .foregroundStyle(Design.Colors.foreground)
                 Text("Messages will queue until your Hermes host reconnects.")
                     .font(Design.Typography.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
             }
 
             Spacer()
 
             Button("Settings") {
-                router.selectedTab = .settings
+                router.presentSheet(.settings)
             }
-            .buttonStyle(.glass)
             .font(Design.Typography.caption)
+            .foregroundStyle(Design.Brand.accent)
         }
         .padding(.horizontal, Design.Spacing.md)
         .padding(.vertical, Design.Spacing.sm)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
         .padding(.horizontal, Design.Spacing.md)
         .padding(.top, Design.Spacing.md)
-    }
-
-    // MARK: - Toolbar
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .principal) {
-            StatusIndicator(status: hostStore.isHostOnline ? .connected : .disconnected)
-        }
     }
 
     // MARK: - Actions
@@ -149,23 +165,72 @@ struct ChatScreen: View {
         guard !content.isEmpty else { return }
         messageText = ""
 
+        if settingsStore.settings.hapticFeedbackEnabled {
+            HapticEngine.messageSent()
+        }
+
         Task {
             await chatStore.sendMessage(content)
             scrollToBottom()
         }
     }
 
-    private func openCapture() {
-        router.navigate(to: .capture)
-    }
-
-    private func handleSlashCommand(_ command: SlashCommand) {
+    private func handleSlashCommand(_ command: SlashCommand, _ argument: String?) {
         switch command {
-        case .clear:
+        case .new, .reset:
+            // /new and /reset: start a fresh session (new session ID, cleared history)
             showClearConfirmation = true
-        case .status:
-            withAnimation(Design.Motion.standard) {
-                showStatusCard.toggle()
+
+        case .clear:
+            // /clear: same as /new but also scrolls to top for a "clean screen" feel
+            showClearConfirmation = true
+
+        case .history:
+            // /history: show the full conversation with each message previewed
+            showConversationHistory()
+
+        case .save:
+            // /save: export conversation to a JSON file (matches TUI: saves to disk file)
+            chatStore.exportConversationToFile()
+            appendSystemMessage("Conversation saved to Documents folder.")
+
+        case .retry:
+            // /retry: remove last exchange and re-send the last user message
+            Task { await performRetry() }
+
+        case .undo:
+            // /undo: remove everything from the last user message onward
+            performUndo()
+
+        case .title:
+            // /title [name]: set or show session title
+            if let name = argument?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+                chatStore.setConversationTitle(name)
+                appendSystemMessage("Session title set: \(name)")
+            } else {
+                let current = chatStore.conversation?.title ?? "Hermes"
+                let id = chatStore.conversation.map { String($0.id.uuidString.prefix(8)) } ?? "—"
+                appendSystemMessage("Session ID: \(id)…\nTitle: \(current)\nUsage: /title <your session title>")
+            }
+
+        case .compress:
+            // /compress: summarize conversation to reduce token usage
+            appendSystemMessage("Compress is not yet supported. Requires relay endpoint for context summarization.")
+
+        case .rollback:
+            // /rollback [N]: list or restore filesystem checkpoints on the Hermes host
+            appendSystemMessage("Rollback is not yet supported. Requires connector RPC for filesystem checkpoints.")
+
+        case .stop:
+            // /stop: kill all running background processes (NOT streaming — that's the stop button)
+            appendSystemMessage("No running background processes.")
+
+        case .background:
+            // /background <prompt>: run a prompt in a separate background session
+            if let prompt = argument?.trimmingCharacters(in: .whitespacesAndNewlines), !prompt.isEmpty {
+                appendSystemMessage("Background tasks are not yet supported. Requires relay job management.\nPrompt: \"\(prompt)\"")
+            } else {
+                appendSystemMessage("Usage: /background <prompt>\nThe task runs in a separate session and results display here when done.")
             }
         }
     }
@@ -177,6 +242,81 @@ struct ChatScreen: View {
         } catch {
             // Conversation unchanged on failure — user can retry
         }
+    }
+
+    private func performRetry() async {
+        guard let messages = chatStore.conversation?.messages, !messages.isEmpty else {
+            appendSystemMessage("No messages to retry.")
+            return
+        }
+
+        // Find the last user message
+        guard let lastUserIdx = messages.lastIndex(where: { $0.sender == .user }) else {
+            appendSystemMessage("No user message found to retry.")
+            return
+        }
+
+        let lastUserContent = messages[lastUserIdx].content
+
+        // Remove everything from the last user message onward (user msg + assistant response + tool msgs)
+        chatStore.conversation?.messages.removeSubrange(lastUserIdx...)
+
+        appendSystemMessage("Retrying: \"\(String(lastUserContent.prefix(60)))\(lastUserContent.count > 60 ? "..." : "")\"")
+
+        // Re-send the message through the full pipeline
+        await chatStore.sendMessage(lastUserContent)
+        scrollToBottom()
+    }
+
+    private func performUndo() {
+        guard let messages = chatStore.conversation?.messages, !messages.isEmpty else {
+            appendSystemMessage("No messages to undo.")
+            return
+        }
+
+        // Walk backwards to find the last user message
+        guard let lastUserIdx = messages.lastIndex(where: { $0.sender == .user }) else {
+            appendSystemMessage("No user message found to undo.")
+            return
+        }
+
+        let removedContent = messages[lastUserIdx].content
+        let removedCount = messages.count - lastUserIdx
+
+        // Truncate history to before the last user message
+        chatStore.conversation?.messages.removeSubrange(lastUserIdx...)
+
+        let remaining = chatStore.conversation?.messages.count ?? 0
+        appendSystemMessage("Undid \(removedCount) message\(removedCount == 1 ? "" : "s"). Removed: \"\(String(removedContent.prefix(60)))\(removedContent.count > 60 ? "..." : "")\"\n\(remaining) message\(remaining == 1 ? "" : "s") remaining.")
+    }
+
+    private func showConversationHistory() {
+        guard let messages = chatStore.conversation?.messages, !messages.isEmpty else {
+            appendSystemMessage("No conversation history yet.")
+            return
+        }
+
+        let previewLimit = 200
+        var lines: [String] = ["── Conversation History ──"]
+        var visibleIndex = 0
+
+        for msg in messages {
+            guard msg.sender == .user || msg.sender == .hermes else { continue }
+            visibleIndex += 1
+            let role = msg.sender == .user ? "You" : "Hermes"
+            let preview = msg.content.prefix(previewLimit)
+            let suffix = msg.content.count > previewLimit ? "..." : ""
+            lines.append("[\(role) #\(visibleIndex)] \(preview)\(suffix)")
+        }
+
+        lines.append("\(visibleIndex) visible message\(visibleIndex == 1 ? "" : "s"), \(messages.count) total")
+        appendSystemMessage(lines.joined(separator: "\n"))
+    }
+
+    private func appendSystemMessage(_ text: String) {
+        let msg = Message(sender: .system, content: text, status: .delivered)
+        chatStore.conversation?.messages.append(msg)
+        scrollToBottom()
     }
 
     private func scrollToBottom() {

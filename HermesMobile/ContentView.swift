@@ -2,48 +2,33 @@ import SwiftUI
 
 struct MainTabView: View {
     @Environment(TabRouter.self) private var router
+    @Environment(TalkStore.self) private var talkStore
+    @Environment(ChatStore.self) private var chatStore
 
     var body: some View {
         @Bindable var router = router
-        TabView(selection: $router.selectedTab) {
-            Tab("Chat", systemImage: AppTab.chat.icon, value: .chat) {
-                NavigationStack(path: router.binding(for: .chat)) {
-                    ChatScreen()
-                        .navigationDestination(for: Route.self) { route in
-                            routeDestination(route)
-                        }
+        NavigationStack(path: router.pathBinding()) {
+            ChatScreen()
+                .navigationDestination(for: Route.self) { route in
+                    routeDestination(route)
                 }
-            }
-
-            Tab("Talk", systemImage: AppTab.talk.icon, value: .talk) {
-                NavigationStack(path: router.binding(for: .talk)) {
-                    TalkModeScreen()
-                        .navigationDestination(for: Route.self) { route in
-                            routeDestination(route)
-                        }
-                }
-            }
-
-            Tab("Inbox", systemImage: AppTab.inbox.icon, value: .inbox) {
-                NavigationStack(path: router.binding(for: .inbox)) {
-                    InboxScreen()
-                        .navigationDestination(for: Route.self) { route in
-                            routeDestination(route)
-                        }
-                }
-            }
-
-            Tab("Settings", systemImage: AppTab.settings.icon, value: .settings) {
-                NavigationStack(path: router.binding(for: .settings)) {
-                    SettingsScreen()
-                        .navigationDestination(for: Route.self) { route in
-                            routeDestination(route)
-                        }
-                }
-            }
         }
         .sheet(item: $router.activeSheet) { destination in
             sheetDestination(destination)
+        }
+        .fullScreenCover(isPresented: $router.isVoiceOverlayPresented) {
+            VoiceOverlayScreen()
+        }
+        .onChange(of: talkStore.lastCompletedSession != nil) { _, hasSession in
+            if hasSession, let session = talkStore.lastCompletedSession {
+                Task {
+                    await chatStore.injectVoiceTranscript(
+                        voiceSessionId: session.voiceSessionId,
+                        duration: session.duration
+                    )
+                    talkStore.clearLastCompletedSession()
+                }
+            }
         }
     }
 
@@ -62,8 +47,18 @@ struct MainTabView: View {
     @ViewBuilder
     private func sheetDestination(_ destination: SheetDestination) -> some View {
         switch destination {
-        case .inboxItemDetail(let item):
-            InboxItemDetailSheet(item: item)
+        case .settings:
+            NavigationStack {
+                SettingsScreen()
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        case .attachments:
+            AttachmentPickerSheet()
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        case .newChat:
+            EmptyView()
         }
     }
 }

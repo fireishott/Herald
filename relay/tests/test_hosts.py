@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from threading import Thread
 
@@ -260,6 +261,134 @@ def test_connected_host_gets_job_and_preserves_session_resume(tmp_path):
             assert second_response["payload"].status_code == 200
             messages = second_response["payload"].json()["data"]["conversation"]["messages"]
             assert messages[-1]["text"] == "Second connector reply"
+
+
+def test_completed_job_events_include_usage_and_result_message(tmp_path):
+    with build_client(tmp_path) as client:
+        connector_data = setup_connector(client)
+        pairing_code = create_phone_pairing_code(client, connector_data["connectorCredential"])
+        access_token = redeem_phone(
+            client,
+            pairing_code["displayCode"],
+            "81818181-9191-a1a1-b1b1-c1c1c1c1c1c1",
+        )["auth"]["accessToken"]
+
+        with client.websocket_connect(
+            "/v1/hosts/ws",
+            headers={"Authorization": f"Bearer {connector_data['connectorCredential']}"},
+        ) as websocket:
+            websocket.send_json(
+                {
+                    "type": "hello",
+                    "connector": {
+                        "platform": "macos",
+                        "hostname": "dylans-mac-mini",
+                        "connectorVersion": "0.1.0",
+                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesVersion": "hermes 1.2.3",
+                    },
+                }
+            )
+            assert websocket.receive_json()["type"] == "ready"
+
+            response_holder: dict = {}
+
+            def send_message() -> None:
+                response_holder["payload"] = client.post(
+                    "/v1/messages",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    json={"text": "Stream completion details"},
+                )
+
+            thread = Thread(target=send_message)
+            thread.start()
+            job = websocket.receive_json()["job"]
+            websocket.send_json(
+                {
+                    "type": "job.result",
+                    "jobId": job["id"],
+                    "text": "Completed connector reply",
+                    "sessionId": "session-usage-1",
+                    "usage": {
+                        "promptTokens": 12,
+                        "completionTokens": 8,
+                        "totalTokens": 20,
+                    },
+                }
+            )
+            thread.join(timeout=5)
+            assert response_holder["payload"].status_code == 200
+
+            events_response = client.get(
+                f"/v1/jobs/{job['id']}/events",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+
+            assert events_response.status_code == 200
+            payload = json.loads(events_response.text.split("data: ", maxsplit=1)[1].strip())
+            assert payload["status"] == "completed"
+            assert payload["usage"]["totalTokens"] == 20
+            assert payload["message"]["role"] == "hermes"
+            assert payload["message"]["jobId"] == job["id"]
+
+
+def test_failed_job_response_and_conversation_include_job_id(tmp_path):
+    with build_client(tmp_path) as client:
+        connector_data = setup_connector(client)
+        pairing_code = create_phone_pairing_code(client, connector_data["connectorCredential"])
+        access_token = redeem_phone(
+            client,
+            pairing_code["displayCode"],
+            "91919191-a2a2-b2b2-c2c2-d2d2d2d2d2d2",
+        )["auth"]["accessToken"]
+
+        with client.websocket_connect(
+            "/v1/hosts/ws",
+            headers={"Authorization": f"Bearer {connector_data['connectorCredential']}"},
+        ) as websocket:
+            websocket.send_json(
+                {
+                    "type": "hello",
+                    "connector": {
+                        "platform": "macos",
+                        "hostname": "dylans-mac-mini",
+                        "connectorVersion": "0.1.0",
+                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesVersion": "hermes 1.2.3",
+                    },
+                }
+            )
+            assert websocket.receive_json()["type"] == "ready"
+
+            response_holder: dict = {}
+
+            def send_message() -> None:
+                response_holder["payload"] = client.post(
+                    "/v1/messages",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    json={"text": "Fail this job"},
+                )
+
+            thread = Thread(target=send_message)
+            thread.start()
+            job = websocket.receive_json()["job"]
+            websocket.send_json(
+                {
+                    "type": "job.failed",
+                    "jobId": job["id"],
+                    "retryable": False,
+                    "error": "Tool failed hard",
+                }
+            )
+            thread.join(timeout=5)
+
+            response = response_holder["payload"]
+            assert response.status_code == 200
+            data = response.json()["data"]
+            assert data["replyState"] == "failed"
+            assert data["message"]["role"] == "system"
+            assert data["message"]["jobId"] == job["id"]
+            assert data["conversation"]["messages"][-1]["jobId"] == job["id"]
 
 
 def test_talk_readiness_reflects_connector_configuration(tmp_path):

@@ -2,20 +2,34 @@ import SwiftUI
 
 // MARK: - Design Tokens
 // All visual constants for HermesMobile. No magic numbers in view code.
-// Customize the brand section; use system backgrounds so Liquid Glass renders cleanly.
 
 enum Design {
 
-    // MARK: - Brand (customize per app)
+    // MARK: - Brand
 
     enum Brand {
-        /// Hermes warm gold — accents, toggles, avatars, send button.
-        static let accent = Color(red: 0.82, green: 0.68, blue: 0.42)
+        /// Hermes warm terracotta accent.
+        static let accent = Color(hex: 0xCC7D5E)
         static let accentGradient = LinearGradient(
             colors: [accent, accent.opacity(0.8)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+
+    // MARK: - Colors
+
+    enum Colors {
+        /// Deep charcoal background.
+        static let background = Color(hex: 0x2D2D2B)
+        /// Warm off-white foreground text.
+        static let foreground = Color(hex: 0xF9F9F7)
+        /// Muted foreground at 80% contrast.
+        static let secondaryForeground = foreground.opacity(0.6)
+        /// Subtle surface for cards and elevated elements.
+        static let surface = Color.white.opacity(0.08)
+        /// Border/divider at low opacity.
+        static let divider = Color.white.opacity(0.1)
     }
 
     // MARK: - Spacing (4pt base grid)
@@ -92,5 +106,18 @@ enum Design {
         static let inputBarHeight: CGFloat = 52
         static let voiceOrbSize: CGFloat = 200
         static let glassCircleButton: CGFloat = 40
+    }
+}
+
+// MARK: - Color Hex Extension
+
+extension Color {
+    init(hex: UInt, opacity: Double = 1.0) {
+        self.init(
+            red: Double((hex >> 16) & 0xFF) / 255.0,
+            green: Double((hex >> 8) & 0xFF) / 255.0,
+            blue: Double(hex & 0xFF) / 255.0,
+            opacity: opacity
+        )
     }
 }

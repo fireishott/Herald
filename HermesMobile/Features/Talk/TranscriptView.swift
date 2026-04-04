@@ -12,10 +12,10 @@ struct TranscriptView: View {
                         VStack(spacing: Design.Spacing.xxxs) {
                             Text(item.speaker.displayLabel.uppercased())
                                 .font(Design.Typography.caption2)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.5))
                             Text(item.text)
                                 .font(Design.Typography.body)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Design.Colors.foreground)
                                 .multilineTextAlignment(.center)
                                 .opacity(item.isPartial ? 0.72 : 1)
                         }

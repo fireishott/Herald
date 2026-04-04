@@ -27,6 +27,8 @@ class ConnectorRuntimeConfig:
     hermes_source: str
     hermes_history_limit: int
     hermes_home: str | None = None
+    api_server_url: str | None = None
+    api_server_key: str | None = None
 
 
 @dataclass
@@ -50,6 +52,7 @@ class VoiceContextSnapshot:
     sensor_summary: str
     readiness_summary: str
     updated_at: str
+    memory_provider_summary: str = "Memory provider status unavailable."
 
 
 @dataclass

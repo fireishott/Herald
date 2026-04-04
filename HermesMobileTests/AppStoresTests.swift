@@ -2,6 +2,7 @@ import Foundation
 import Testing
 @testable import HermesMobile
 
+@Suite(.serialized)
 struct AppStoresTests {
 
     private final class StubURLProtocol: URLProtocol, @unchecked Sendable {
@@ -182,8 +183,26 @@ struct AppStoresTests {
             return nextResponse
         }
 
+        func sendStreaming(message: String, clientMessageID: UUID) -> AsyncStream<StreamingUpdate> {
+            AsyncStream { continuation in
+                Task { @MainActor in
+                    sendCallCount += 1
+                    lastClientMessageID = clientMessageID
+                    continuation.yield(.messageSent(jobID: UUID()))
+                    continuation.yield(.finished(nextResponse, nil, nil))
+                    continuation.finish()
+                }
+            }
+        }
+
         func loadConversation() async -> Conversation {
             currentConversation ?? Conversation(title: "Hermes")
+        }
+
+        func clearConversation() async throws -> Conversation {
+            let conversation = Conversation(title: "Hermes")
+            currentConversation = conversation
+            return conversation
         }
     }
 
@@ -209,7 +228,8 @@ struct AppStoresTests {
                 blockedReason: blockedReason,
                 statusMessage: statusMessage,
                 canStartSession: canStartSession,
-                latencyMetrics: latencyMetrics
+                latencyMetrics: latencyMetrics,
+                voiceSessionID: nil
             )
         }
 
@@ -346,7 +366,11 @@ struct AppStoresTests {
     @Test @MainActor
     func chatStorePassesClientMessageIDAndSkipsPendingDuplicate() async throws {
         let hermesClient = RecordingHermesClient()
-        let chatStore = ChatStore(hermesClient: hermesClient)
+        let suiteName = "chat-store-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let persistence = UserDefaultsAppPersistenceStore(defaults: defaults)
+        let chatStore = ChatStore(hermesClient: hermesClient, persistence: persistence)
 
         await chatStore.sendMessage("Hello Hermes")
 
@@ -364,6 +388,89 @@ struct AppStoresTests {
 
         #expect(hermesClient.sendCallCount == 1)
         #expect(chatStore.conversation?.messages.count == 1)
+    }
+
+    @Test @MainActor
+    func chatStorePreservesStreamingArtifactsAfterConversationRefresh() async throws {
+        final class StreamingArtifactClient: HermesClientProtocol {
+            var connectionStatus: ConnectionStatus = .connected
+            var currentConversation: Conversation?
+
+            func connect() async {}
+            func disconnect() async {}
+
+            func send(message: String, clientMessageID: UUID) async -> Message {
+                Message(sender: .hermes, content: "unused", status: .delivered)
+            }
+
+            func sendStreaming(message: String, clientMessageID: UUID) -> AsyncStream<StreamingUpdate> {
+                let jobID = UUID()
+                let finalMessageID = UUID()
+                currentConversation = Conversation(
+                    title: "Hermes",
+                    messages: [
+                        Message(id: clientMessageID, sender: .user, content: message, status: .sent),
+                        Message(id: finalMessageID, sender: .hermes, content: "Patched answer", jobID: jobID, status: .delivered),
+                    ]
+                )
+
+                let diff = CodeDiff(
+                    files: [
+                        FileDiff(
+                            path: "src/example.py",
+                            status: "modified",
+                            additions: 2,
+                            deletions: 1,
+                            patch: "@@ -1 +1 @@\n-old\n+new"
+                        ),
+                    ],
+                    summary: "1 file changed, 2 insertions(+), 1 deletion(-)"
+                )
+
+                return AsyncStream { continuation in
+                    Task { @MainActor in
+                        continuation.yield(.messageSent(jobID: jobID))
+                        continuation.yield(.toolActivity("🔍 Searching files"))
+                        continuation.yield(.finished(
+                            Message(
+                                id: finalMessageID,
+                                sender: .hermes,
+                                content: "Patched answer",
+                                jobID: jobID,
+                                status: .delivered
+                            ),
+                            nil,
+                            diff
+                        ))
+                        continuation.finish()
+                    }
+                }
+            }
+
+            func loadConversation() async -> Conversation {
+                currentConversation ?? Conversation(title: "Hermes")
+            }
+
+            func clearConversation() async throws -> Conversation {
+                let conversation = Conversation(title: "Hermes")
+                currentConversation = conversation
+                return conversation
+            }
+        }
+
+        let suiteName = "chat-store-stream-artifacts-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let persistence = UserDefaultsAppPersistenceStore(defaults: defaults)
+        let hermesClient = StreamingArtifactClient()
+        let chatStore = ChatStore(hermesClient: hermesClient, persistence: persistence)
+
+        await chatStore.sendMessage("Fix the bug")
+
+        let hermesMessage = chatStore.conversation?.messages.last(where: { $0.sender == .hermes })
+        #expect(hermesMessage?.toolActivities.count == 1)
+        #expect(hermesMessage?.codeDiff?.fileCount == 1)
+        #expect(hermesMessage?.codeDiff?.summary == "1 file changed, 2 insertions(+), 1 deletion(-)")
     }
 
     @Test @MainActor
@@ -458,6 +565,140 @@ struct AppStoresTests {
         #expect(voiceService.connectionState == .ready)
         #expect(voiceService.statusMessage == "Hermes talk is ready.")
         #expect(voiceService.blockedReason == nil)
+    }
+
+    @Test @MainActor
+    func liveHermesClientRefreshesExpiredAccessTokenDuringConversationLoad() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+
+        let accessToken = MutableBox("expired-token")
+        let refreshCallCount = MutableBox(0)
+        let requestCount = MutableBox(0)
+        let conversationID = UUID()
+
+        StubURLProtocol.requestHandler = { request in
+            requestCount.value += 1
+            let url = try #require(request.url)
+            #expect(url.absoluteString == "https://relay.example.com/v1/conversations/current")
+
+            let authHeader = request.value(forHTTPHeaderField: "Authorization")
+            if authHeader == "Bearer expired-token" {
+                let response = HTTPURLResponse(url: url, statusCode: 401, httpVersion: nil, headerFields: nil)!
+                let data = #"{"error":{"code":"unauthorized","message":"expired or invalid access token","retryable":false}}"#.data(using: .utf8)!
+                return (response, data)
+            }
+
+            #expect(authHeader == "Bearer refreshed-token")
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = #"""
+            {"data":{
+              "conversation":{
+                "id":"\#(conversationID.uuidString)",
+                "title":"Hermes",
+                "updatedAt":"2026-04-03T21:15:00Z",
+                "messages":[]
+              }
+            }}
+            """#.data(using: .utf8)!
+            return (response, data)
+        }
+
+        defer {
+            StubURLProtocol.requestHandler = nil
+        }
+
+        let apiClient = RelayAPIClient(
+            baseURLProvider: { "https://relay.example.com/v1" },
+            session: session
+        )
+        let hermesClient = LiveHermesClient(
+            apiClient: apiClient,
+            accessTokenProvider: { accessToken.value },
+            accessTokenRefresher: {
+                refreshCallCount.value += 1
+                accessToken.value = "refreshed-token"
+                return accessToken.value
+            },
+            allowDemoFallback: false
+        )
+
+        let conversation = await hermesClient.loadConversation()
+
+        #expect(refreshCallCount.value == 1)
+        #expect(requestCount.value == 2)
+        #expect(conversation.id == conversationID)
+        #expect(hermesClient.connectionStatus == .connected)
+    }
+
+    @Test @MainActor
+    func liveHermesHostServiceRefreshesExpiredAccessTokenDuringFetch() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+
+        let accessToken = MutableBox("expired-token")
+        let refreshCallCount = MutableBox(0)
+        let requestCount = MutableBox(0)
+        let hostID = UUID()
+
+        StubURLProtocol.requestHandler = { request in
+            requestCount.value += 1
+            let url = try #require(request.url)
+            #expect(url.absoluteString == "https://relay.example.com/v1/hosts/current")
+
+            let authHeader = request.value(forHTTPHeaderField: "Authorization")
+            if authHeader == "Bearer expired-token" {
+                let response = HTTPURLResponse(url: url, statusCode: 401, httpVersion: nil, headerFields: nil)!
+                let data = #"{"error":{"code":"unauthorized","message":"expired or invalid access token","retryable":false}}"#.data(using: .utf8)!
+                return (response, data)
+            }
+
+            #expect(authHeader == "Bearer refreshed-token")
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = #"""
+            {"data":{
+              "host":{
+                "id":"\#(hostID.uuidString)",
+                "displayName":"Home Mac mini",
+                "hostname":"dylans-mac-mini",
+                "platform":"macos",
+                "connectorVersion":"0.1.0",
+                "hermesCommand":"/Users/dylan/.local/bin/hermes",
+                "hermesVersion":"hermes 0.7.0",
+                "lastSeenAt":"2026-04-03T21:15:00Z",
+                "lastConnectedAt":"2026-04-03T21:10:00Z",
+                "isOnline":true
+              }
+            }}
+            """#.data(using: .utf8)!
+            return (response, data)
+        }
+
+        defer {
+            StubURLProtocol.requestHandler = nil
+        }
+
+        let apiClient = RelayAPIClient(
+            baseURLProvider: { "https://relay.example.com/v1" },
+            session: session
+        )
+        let hostService = LiveHermesHostService(
+            apiClient: apiClient,
+            accessTokenRefresher: {
+                refreshCallCount.value += 1
+                accessToken.value = "refreshed-token"
+                return accessToken.value
+            }
+        )
+
+        let host = try await hostService.fetchCurrentHost(accessToken: accessToken.value)
+
+        #expect(refreshCallCount.value == 1)
+        #expect(requestCount.value == 2)
+        #expect(host?.id == hostID)
+        #expect(host?.isOnline == true)
     }
 
     @Test @MainActor

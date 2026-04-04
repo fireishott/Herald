@@ -12,7 +12,11 @@ from hermes_mobile_connector.mcp_registration import (
     register_native_mcp_server,
 )
 from hermes_mobile_connector.setup_code import decode_host_setup_code
-from hermes_mobile_connector.runtime_adapter import HermesRuntimeAdapter, RuntimeConversationMessage
+from hermes_mobile_connector.runtime_adapter import (
+    HermesAPIRuntimeAdapter,
+    HermesRuntimeAdapter,
+    RuntimeConversationMessage,
+)
 from hermes_mobile_connector.state import (
     ConnectorSecrets,
     ConnectorState,
@@ -529,6 +533,75 @@ def test_hermes_runtime_adapter_preserves_history_and_session(monkeypatch):
     assert len(captured["history"]) == 1
     assert captured["history"][0].role == "user"
     assert captured["history"][0].text == "Hello"
+
+
+def test_hermes_api_runtime_adapter_preserves_session_with_history():
+    """Session ID should always be passed through to preserve prefix caching."""
+    captured: dict = {}
+
+    class FakeExecutor:
+        async def send_message(self, *, latest_user_message, history=None, session_id=None):  # noqa: ANN001
+            captured["latest_user_message"] = latest_user_message
+            captured["history"] = history
+            captured["session_id"] = session_id
+            return type(
+                "FakeResult",
+                (),
+                {
+                    "text": "API reply",
+                    "session_id": "session-456",
+                    "usage": {"total_tokens": 42},
+                },
+            )()
+
+    adapter = HermesAPIRuntimeAdapter(FakeExecutor())
+
+    result = adapter.send_text_message(
+        latest_user_message="How are you?",
+        history=[
+            RuntimeConversationMessage(role="user", text="Hello"),
+            RuntimeConversationMessage(role="hermes", text="Hi there"),
+        ],
+        session_id="session-123",
+    )
+
+    assert result.text == "API reply"
+    assert result.session_id == "session-456"
+    assert captured["latest_user_message"] == "How are you?"
+    assert captured["session_id"] == "session-123"
+    assert len(captured["history"]) == 2
+    assert captured["history"][1].role == "hermes"
+
+
+def test_hermes_api_runtime_adapter_delegate_uses_session_id():
+    captured: dict = {}
+
+    class FakeExecutor:
+        async def send_message(self, *, latest_user_message, history=None, session_id=None):  # noqa: ANN001
+            captured["latest_user_message"] = latest_user_message
+            captured["history"] = history
+            captured["session_id"] = session_id
+            return type(
+                "FakeResult",
+                (),
+                {
+                    "text": "Delegated",
+                    "session_id": "voice-session-2",
+                    "usage": None,
+                },
+            )()
+
+    adapter = HermesAPIRuntimeAdapter(FakeExecutor())
+
+    result = adapter.delegate_talk_turn(
+        prompt="Use tools",
+        session_id="voice-session-1",
+    )
+
+    assert result.text == "Delegated"
+    assert captured["latest_user_message"] == "Use tools"
+    assert captured["session_id"] == "voice-session-1"
+    assert captured["history"] == []
 
 
 def test_rpc_talk_delegate_supports_neutral_and_legacy_method_names(monkeypatch, tmp_path):

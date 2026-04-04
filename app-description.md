@@ -1,43 +1,54 @@
-# App Store Description: Hermes
+# Hermes Mobile Product Description
 
-## App Name
-Hermes
+## Summary
 
-## Tagline
-Your Personal AI Companion
+Hermes Mobile is a native iPhone companion for a user-owned Hermes host. It is not a generic agent browser and it is not a cloud-only chatbot. The phone stays focused on native UX, while the user’s Hermes machine remains the runtime that holds memory, tools, and provider configuration.
 
-## Short Description (< 170 chars)
-A premium AI assistant companion app with voice conversations, smart inbox, and seamless device integration. Warm, beautiful, and built for iOS 26.
+## Current Product Story
 
-## Full Description
-Hermes is your personal AI companion — a beautifully crafted mobile shell for a persistent assistant that helps manage your day, answer questions, and take action on your behalf.
+### Connector-first setup
 
-**Conversation-First Design**
-Chat naturally with Hermes through an elegant messaging interface. Your messages appear in frosted glass bubbles while Hermes responds with clean, readable text. The connection status keeps you informed without getting in the way.
+The user sets up Hermes Mobile from the machine running Hermes:
 
-**Talk Mode**
-Switch to voice with a single tap. A stunning animated orb visualizes the conversation state — listening, thinking, speaking — with smooth physics-based animations. Full transcript support keeps track of what was said.
+1. install and configure the connector
+2. pair the phone with a short code or QR
+3. keep the connector alive as a background service
 
-**Smart Inbox**
-Hermes surfaces actionable items that need your attention: approvals, reminders, suggestions, and alerts. Each item has clear actions — approve, dismiss, or dive deeper. Nothing falls through the cracks.
+The app then becomes the personal companion interface for that host.
 
-**Privacy-First Permissions**
-You control exactly what data Hermes can access. Each capability comes with a clear explanation of why it's needed and a one-tap action to enable or adjust. Your privacy is always respected.
+### Chat
 
-**Thoughtful Settings**
-Configure your experience with profile customization, connection management, environment selection, notification preferences, and privacy controls — all organized in a clean, scannable layout.
+Chat is the primary surface.
 
-**Built for iOS 26**
-Hermes embraces Apple's Liquid Glass design language throughout. Every surface, every control, every interaction feels native and premium. Warm cream tones create an inviting atmosphere that's distinctly not your typical cold tech app.
+- messages are persisted on the relay
+- Hermes work is executed on the user’s host connector
+- replies can stream with compact thinking and tool activity
+- coding turns can render inline diffs when the connector can detect workspace edits
 
-## Keywords (< 100 chars)
-ai,assistant,chat,voice,companion,smart,inbox,productivity,personal,hermes
+### Talk mode
 
-## Primary Category
-Productivity
+Talk mode uses OpenAI Realtime with WebRTC from the app, but the sensitive Realtime configuration lives on the connector host.
 
-## Secondary Category
-Utilities
+- the phone receives only short-lived session bootstrap data
+- the host owns the OpenAI key and model preference
+- Hermes memory and sensor context are prefetched into a lightweight voice context
+- deeper tool or memory work can delegate back to Hermes
 
-## Age Rating
-4+
+### Native companion features
+
+- pairing and secure session bootstrap
+- host status and lifecycle controls
+- permissions for location, health, notifications, and microphone
+- sensor context delivery from phone to host
+- inbox surfaces for relay-driven actions
+
+## Current Constraints
+
+- Talk mode is foreground-only.
+- True barge-in interruption is not fully finished yet.
+- Background HealthKit and Always-on location still require real-device validation.
+- Capture/media workflows are not complete.
+
+## Positioning
+
+Hermes Mobile should keep feeling like a native Hermes companion, even as the host-side architecture gradually becomes more runtime-agnostic behind the connector boundary.

@@ -12,7 +12,7 @@ struct InboxItemRow: View {
 
             Text(item.body)
                 .font(Design.Typography.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
                 .lineLimit(3)
 
             if item.isActionable && !item.isRead {
@@ -21,7 +21,8 @@ struct InboxItemRow: View {
         }
         .padding(Design.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: Design.CornerRadius.lg))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
         .opacity(item.isRead ? 0.7 : 1.0)
         .onTapGesture(perform: onOpenDetails)
     }
@@ -34,24 +35,24 @@ struct InboxItemRow: View {
                 .font(.system(size: Design.Size.iconMedium))
                 .foregroundStyle(item.type.displayColor)
                 .frame(width: Design.Size.avatarSmall, height: Design.Size.avatarSmall)
+                .background(Design.Colors.surface)
                 .clipShape(Circle())
-                .glassEffect(.regular, in: Circle())
 
             VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
                 Text(item.title)
                     .font(Design.Typography.headline)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Design.Colors.foreground)
 
                 Text(item.timestamp, style: .relative)
                     .font(Design.Typography.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.6))
             }
 
             Spacer()
 
             Text(item.priority.rawValue.capitalized)
                 .font(Design.Typography.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
 
             if !item.isRead {
                 Circle()
@@ -71,10 +72,12 @@ struct InboxItemRow: View {
             } label: {
                 Text(item.primaryAction?.title ?? defaultPrimaryActionTitle)
                     .font(Design.Typography.footnote.weight(.semibold))
+                    .foregroundStyle(Design.Colors.foreground)
                     .padding(.horizontal, Design.Spacing.md)
                     .padding(.vertical, Design.Spacing.xs)
             }
-            .buttonStyle(.glassProminent)
+            .background(Design.Brand.accent)
+            .clipShape(Capsule())
             .accessibilityLabel("\(item.primaryAction?.title ?? defaultPrimaryActionTitle) \(item.title)")
 
             Button {
@@ -82,11 +85,12 @@ struct InboxItemRow: View {
             } label: {
                 Text(item.secondaryAction?.title ?? "Dismiss")
                     .font(Design.Typography.footnote.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
                     .padding(.horizontal, Design.Spacing.md)
                     .padding(.vertical, Design.Spacing.xs)
             }
-            .buttonStyle(.glass)
+            .background(Design.Colors.surface)
+            .clipShape(Capsule())
             .accessibilityLabel("Dismiss \(item.title)")
         }
     }

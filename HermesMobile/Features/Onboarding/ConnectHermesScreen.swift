@@ -11,7 +11,7 @@ struct ConnectHermesScreen: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground)
+            Design.Colors.background
                 .ignoresSafeArea()
 
             ScrollView {
@@ -46,15 +46,16 @@ struct ConnectHermesScreen: View {
         VStack(alignment: .leading, spacing: Design.Spacing.sm) {
             Text("Connect Your Hermes")
                 .font(Design.Typography.heroTitle)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Design.Colors.foreground)
 
             Text("On the machine running Hermes, finish connector setup and run `hermes-mobile pair-phone`. Then scan the QR code or enter the 8-character code here.")
                 .font(Design.Typography.body)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
         }
         .padding(Design.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
 
     private var entryOptions: some View {
@@ -65,9 +66,12 @@ struct ConnectHermesScreen: View {
             } label: {
                 Label("Scan QR Code", systemImage: "qrcode.viewfinder")
                     .font(Design.Typography.headline)
+                    .foregroundStyle(Design.Colors.foreground)
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, Design.Spacing.sm)
             }
-            .buttonStyle(.glassProminent)
+            .background(Design.Brand.accent)
+            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
             .accessibilityLabel("Scan QR Code")
 
             Button {
@@ -79,9 +83,12 @@ struct ConnectHermesScreen: View {
             } label: {
                 Label("Enter Pairing Code", systemImage: "number")
                     .font(Design.Typography.headline)
+                    .foregroundStyle(Design.Colors.foreground)
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, Design.Spacing.sm)
             }
-            .buttonStyle(.glass)
+            .background(Design.Colors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
             .accessibilityLabel("Enter Setup Code")
         }
     }
@@ -90,13 +97,15 @@ struct ConnectHermesScreen: View {
         VStack(alignment: .leading, spacing: Design.Spacing.md) {
             Text("Phone Pairing Code")
                 .font(Design.Typography.sectionTitle)
+                .foregroundStyle(Design.Colors.foreground)
 
             TextField("ABCD-EFGH", text: $setupCode)
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
                 .font(Design.Typography.callout.monospaced())
+                .foregroundStyle(Design.Colors.foreground)
                 .padding(Design.Spacing.md)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+                .background(Design.Colors.surface, in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
                 .focused($isSetupCodeFocused)
                 .accessibilityLabel("Setup code")
 
@@ -105,19 +114,25 @@ struct ConnectHermesScreen: View {
             } label: {
                 if pairingStore.isWorking {
                     ProgressView()
+                        .tint(Design.Colors.foreground)
                         .frame(maxWidth: .infinity)
                 } else {
                     Text("Connect Hermes")
                         .font(Design.Typography.headline)
+                        .foregroundStyle(Design.Colors.foreground)
                         .frame(maxWidth: .infinity)
                 }
             }
-            .buttonStyle(.glassProminent)
+            .padding(.vertical, Design.Spacing.sm)
+            .background(Design.Brand.accent)
+            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
             .disabled(pairingStore.isWorking || !PhonePairingCode.isComplete(setupCode))
+            .opacity(pairingStore.isWorking || !PhonePairingCode.isComplete(setupCode) ? 0.5 : 1)
             .accessibilityLabel("Connect Hermes")
         }
         .padding(Design.Spacing.lg)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
 
     private var scannerSheet: some View {
@@ -135,17 +150,29 @@ struct ConnectHermesScreen: View {
                 )
                 .ignoresSafeArea()
             } else {
-                ContentUnavailableView {
-                    Label("Scanner Unavailable", systemImage: "qrcode.viewfinder")
-                } description: {
-                    Text("QR scanning is not available here. Use the pairing code option instead.")
-                } actions: {
-                    Button("Use Pairing Code") {
-                        isScannerPresented = false
-                        isManualEntryVisible = true
-                        isSetupCodeFocused = true
+                ZStack {
+                    Design.Colors.background
+                        .ignoresSafeArea()
+
+                    ContentUnavailableView {
+                        Label("Scanner Unavailable", systemImage: "qrcode.viewfinder")
+                            .foregroundStyle(Design.Colors.foreground)
+                    } description: {
+                        Text("QR scanning is not available here. Use the pairing code option instead.")
+                            .foregroundStyle(Design.Colors.secondaryForeground)
+                    } actions: {
+                        Button("Use Pairing Code") {
+                            isScannerPresented = false
+                            isManualEntryVisible = true
+                            isSetupCodeFocused = true
+                        }
+                        .font(Design.Typography.headline)
+                        .foregroundStyle(Design.Colors.foreground)
+                        .padding(.horizontal, Design.Spacing.lg)
+                        .padding(.vertical, Design.Spacing.sm)
+                        .background(Design.Brand.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
                     }
-                    .buttonStyle(.glassProminent)
                 }
                 .presentationDetents([.medium])
             }
@@ -172,10 +199,11 @@ struct ConnectHermesScreen: View {
 
             Text(message)
                 .font(Design.Typography.callout)
-                .foregroundStyle(.primary)
+                .foregroundStyle(Design.Colors.foreground)
         }
         .padding(Design.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
     }
 }

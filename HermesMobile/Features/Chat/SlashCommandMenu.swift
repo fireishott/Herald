@@ -5,35 +5,34 @@ struct SlashCommandMenu: View {
     let onSelect: (SlashCommand) -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            ForEach(commands) { command in
-                Button { onSelect(command) } label: {
-                    HStack(spacing: Design.Spacing.sm) {
-                        Image(systemName: command.icon)
-                            .frame(width: Design.Size.iconMedium)
-
-                        VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(commands) { command in
+                    Button { onSelect(command) } label: {
+                        HStack(spacing: 0) {
                             Text(command.displayTitle)
-                                .font(Design.Typography.headline)
+                                .font(.system(.subheadline, design: .monospaced, weight: .medium))
+                                .foregroundStyle(Design.Brand.accent)
+                                .frame(width: 90, alignment: .leading)
+
                             Text(command.displayDescription)
                                 .font(Design.Typography.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Design.Colors.secondaryForeground)
+                                .lineLimit(1)
+
+                            Spacer(minLength: 0)
                         }
-
-                        Spacer()
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, Design.Spacing.md)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.horizontal, Design.Spacing.md)
-                    .padding(.vertical, Design.Spacing.sm)
-                }
-                .foregroundStyle(command.isDestructive ? .red : .primary)
-
-                if command.id != commands.last?.id {
-                    Divider()
-                        .padding(.leading, Design.Spacing.xxl)
+                    .buttonStyle(.plain)
                 }
             }
         }
-        .glassEffect(.regular, in: .rect(cornerRadius: Design.CornerRadius.lg))
+        .frame(maxHeight: 220)
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.md))
         .padding(.horizontal, Design.Spacing.md)
     }
 }
