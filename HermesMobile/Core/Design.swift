@@ -9,7 +9,7 @@ enum Design {
 
     enum Brand {
         /// Hermes warm terracotta accent.
-        static let accent = Color(hex: 0xCC7D5E)
+        static let accent = Color(hex: 0xFFBF00)
         static let accentGradient = LinearGradient(
             colors: [accent, accent.opacity(0.8)],
             startPoint: .topLeading,
