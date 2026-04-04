@@ -7,13 +7,19 @@ struct SlashCommandMenu: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(commands) { command in
+                ForEach(Array(commands.enumerated()), id: \.element.id) { index, command in
+                    if index > 0 {
+                        Divider()
+                            .background(Design.Colors.divider)
+                            .padding(.horizontal, Design.Spacing.md)
+                    }
+
                     Button { onSelect(command) } label: {
-                        HStack(spacing: 0) {
+                        HStack(spacing: Design.Spacing.sm) {
                             Text(command.displayTitle)
-                                .font(.system(.subheadline, design: .monospaced, weight: .medium))
+                                .font(.system(.subheadline, design: .monospaced, weight: .semibold))
                                 .foregroundStyle(Design.Brand.accent)
-                                .frame(width: 90, alignment: .leading)
+                                .frame(width: 100, alignment: .leading)
 
                             Text(command.displayDescription)
                                 .font(Design.Typography.caption)
@@ -22,7 +28,7 @@ struct SlashCommandMenu: View {
 
                             Spacer(minLength: 0)
                         }
-                        .padding(.vertical, 6)
+                        .padding(.vertical, 10)
                         .padding(.horizontal, Design.Spacing.md)
                         .contentShape(Rectangle())
                     }
@@ -30,9 +36,14 @@ struct SlashCommandMenu: View {
                 }
             }
         }
-        .frame(maxHeight: 220)
-        .background(Design.Colors.surface)
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(maxHeight: 260)
+        .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.md))
+        .overlay(
+            RoundedRectangle(cornerRadius: Design.CornerRadius.md)
+                .stroke(Design.Colors.divider, lineWidth: 1)
+        )
         .padding(.horizontal, Design.Spacing.md)
     }
 }

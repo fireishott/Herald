@@ -34,7 +34,39 @@ struct VoiceOverlayScreen: View {
 
                 // Voice orb
                 VoiceOrb(voiceState: talkStore.voiceState)
-                    .padding(.bottom, Design.Spacing.xl)
+                    .onTapGesture {
+                        if talkStore.voiceState == .speaking {
+                            talkStore.interruptAssistant()
+                        }
+                    }
+                    .padding(.bottom, Design.Spacing.sm)
+
+                // Status info below orb
+                if !talkStore.isSessionActive {
+                    VStack(spacing: Design.Spacing.xs) {
+                        if let blocked = talkStore.blockedReason {
+                            Text(blocked)
+                                .font(Design.Typography.callout)
+                                .foregroundStyle(Design.Colors.secondaryForeground)
+                                .multilineTextAlignment(.center)
+                        } else if let status = talkStore.statusMessage {
+                            Text(status)
+                                .font(Design.Typography.callout)
+                                .foregroundStyle(Design.Colors.secondaryForeground)
+                                .multilineTextAlignment(.center)
+                        } else if talkStore.voiceState == .disconnected {
+                            Text("Unable to connect to voice")
+                                .font(Design.Typography.callout)
+                                .foregroundStyle(Design.Colors.secondaryForeground)
+                            Text("Check that your Hermes host is online\nand has an OpenAI API key configured.")
+                                .font(Design.Typography.caption)
+                                .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.7))
+                                .multilineTextAlignment(.center)
+                        }
+                    }
+                    .padding(.horizontal, Design.Spacing.xl)
+                    .transition(.opacity)
+                }
 
                 Spacer()
 

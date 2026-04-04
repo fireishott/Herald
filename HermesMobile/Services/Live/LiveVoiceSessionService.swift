@@ -425,7 +425,7 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         let _: EmptyRelayResponse = try await performAuthorizedRequest { [self] in
             let token = await self.accessTokenProvider()
             return try await self.apiClient.post(
-                path: "talk/session/\(voiceSessionID.uuidString)/end",
+                path: "talk/session/\(voiceSessionID.uuidString.lowercased())/end",
                 body: EmptyBody(),
                 accessToken: token
             )
@@ -446,7 +446,7 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             _ = try? await self.performAuthorizedRequest { [self] in
                 let token = await self.accessTokenProvider()
                 return try await self.apiClient.post(
-                    path: "talk/session/\(voiceSessionID.uuidString)/turns",
+                    path: "talk/session/\(voiceSessionID.uuidString.lowercased())/turns",
                     body: VoiceTurnCreateRequest(
                         clientTurnId: clientTurnID,
                         role: speaker.rawValue,

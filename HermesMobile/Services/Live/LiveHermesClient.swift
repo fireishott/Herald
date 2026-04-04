@@ -239,7 +239,7 @@ final class LiveHermesClient: HermesClientProtocol {
     func injectVoiceTranscript(voiceSessionId: UUID) async throws -> Conversation {
         let response: ConversationResponse = try await performAuthorizedRequest { [self] token in
             try await self.apiClient.post(
-                path: "talk/session/\(voiceSessionId.uuidString)/inject",
+                path: "talk/session/\(voiceSessionId.uuidString.lowercased())/inject",
                 accessToken: token
             )
         }
@@ -321,7 +321,7 @@ final class LiveHermesClient: HermesClientProtocol {
             }
             do {
                 let stream = apiClient.streamEvents(
-                    path: "jobs/\(jobId.uuidString)/events",
+                    path: "jobs/\(jobId.uuidString.lowercased())/events",
                     accessToken: accessToken
                 )
                 for try await sseEvent in stream {
