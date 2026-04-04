@@ -4,11 +4,16 @@ import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
 import uuid
+
+logger = logging.getLogger("hermes.relay")
+
+import json
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -59,6 +64,7 @@ from .services import (
     get_message_job_for_user_message,
     get_or_create_current_conversation,
     get_voice_session,
+    inject_voice_transcript,
     get_user_message_by_client_message_id,
     hermes_host_is_online,
     list_conversation_messages,
@@ -137,7 +143,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         database.create_all()
+
+        async def _cleanup_stale_job_queues():
+            """Periodically remove event queues for completed/failed jobs."""
+            while True:
+                await asyncio.sleep(60)
+                try:
+                    stale_ids = []
+                    with database.session() as db:
+                        for job_id in list(app.state.job_event_queues.keys()):
+                            job = get_message_job(db, job_id=job_id)
+                            if job is None or job.status in ("completed", "failed"):
+                                stale_ids.append(job_id)
+                    for job_id in stale_ids:
+                        app.state.job_event_queues.pop(job_id, None)
+                    if stale_ids:
+                        logger.info("Cleaned up %d stale job event queues", len(stale_ids))
+                except Exception:
+                    logger.warning("Error in job queue cleanup", exc_info=True)
+
+        cleanup_task = asyncio.create_task(_cleanup_stale_job_queues())
         yield
+        cleanup_task.cancel()
 
     app = FastAPI(title=settings.service_name, version=settings.version, lifespan=lifespan)
     app.state.settings = settings
@@ -150,6 +177,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.connector_sessions: dict[str, ConnectorSession] = {}
     app.state.sensor_delivery_waiters: dict[str, asyncio.Future[bool]] = {}
     app.state.connector_rpc_waiters: dict[str, asyncio.Future[dict]] = {}
+    app.state.job_event_queues: dict[str, list[asyncio.Queue]] = {}
+
+    def subscribe_job_events(job_id: str) -> asyncio.Queue:
+        queue: asyncio.Queue = asyncio.Queue(maxsize=1024)
+        app.state.job_event_queues.setdefault(job_id, []).append(queue)
+        return queue
+
+    def unsubscribe_job_events(job_id: str, queue: asyncio.Queue) -> None:
+        queues = app.state.job_event_queues.get(job_id, [])
+        if queue in queues:
+            queues.remove(queue)
+        if not queues:
+            app.state.job_event_queues.pop(job_id, None)
+
+    def publish_job_event(job_id: str, event: dict) -> None:
+        for queue in app.state.job_event_queues.get(job_id, []):
+            try:
+                queue.put_nowait(event)
+            except asyncio.QueueFull:
+                logger.warning(
+                    "SSE event queue full for job %s, dropping %s event",
+                    job_id,
+                    event.get("event", "unknown"),
+                )
 
     def require_connector_host(
         authorization: str | None = Header(default=None),
@@ -295,17 +346,33 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         payload = {
             "replyState": reply_state_for_job(job.status),
+            "jobId": job.id,
             "conversation": serialize_conversation(conversation, messages, jobs=jobs),
             "userMessage": serialize_message(user_message, job=job) if user_message else None,
         }
 
+        if job.usage_data:
+            payload["usage"] = job.usage_data
+
+        if job.diff_data:
+            payload["diff"] = job.diff_data
+
         if job.result_message_id:
             result_message = db.get(Message, job.result_message_id)
             if result_message is not None:
-                payload["message"] = serialize_message(result_message)
+                payload["message"] = serialize_message(result_message, job=job)
 
         status_code = status.HTTP_202_ACCEPTED if job.status in {"queued", "running"} else status.HTTP_200_OK
         return payload, status_code
+
+    _ROLE_MAP = {
+        "voice_user": "user",
+        "voice_hermes": "hermes",
+    }
+
+    def _normalize_role(role: str) -> str:
+        """Map voice transcript roles to standard roles for the connector."""
+        return _ROLE_MAP.get(role, role)
 
     def build_job_execute_payload(db: Session, *, job_id: str) -> dict:
         job = get_message_job(db, job_id=job_id)
@@ -328,7 +395,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "id": job.id,
                 "conversationId": job.conversation_id,
                 "latestUserMessage": user_message.text,
-                "history": [{"role": message.role, "text": message.text} for message in history],
+                "history": [
+                    {
+                        "role": _normalize_role(message.role),
+                        "text": message.text,
+                    }
+                    for message in history
+                ],
                 "sessionId": job.session_id_snapshot,
                 "timeoutSeconds": settings.connector_job_lease_seconds,
             },
@@ -887,6 +960,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db.commit()
         return success({"turn": serialize_voice_turn(turn)})
 
+    @app.post("/v1/talk/session/{voice_session_id}/inject")
+    def inject_talk_transcript(
+        voice_session_id: str,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        """Inject finalized voice turns into the current chat conversation."""
+        voice_session = get_voice_session(db, voice_session_id=voice_session_id)
+        if voice_session is None or voice_session.user_id != auth.user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Talk session not found.")
+
+        conversation = inject_voice_transcript(
+            db,
+            voice_session_id=voice_session.id,
+            user_id=auth.user.id,
+        )
+
+        record_audit(
+            db,
+            actor_type="user",
+            actor_id=auth.user.id,
+            action="talk.transcript.inject",
+            entity_type="voice_session",
+            entity_id=voice_session.id,
+        )
+        db.commit()
+
+        messages = list_conversation_messages(db, conversation_id=conversation.id)
+        return success({
+            "conversation": serialize_conversation(db, conversation=conversation, messages=messages),
+        })
+
     @app.post("/v1/hosts/redeem")
     def redeem_host(
         payload: HostRedeemRequest,
@@ -1151,6 +1256,69 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db.commit()
         return success_response(payload_data, status_code=status_code)
 
+    # ------------------------------------------------------------------
+    # Job Events SSE
+    # ------------------------------------------------------------------
+
+    @app.get("/v1/jobs/{job_id}/events")
+    async def job_events_stream(
+        job_id: str,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ):
+        from .models import MessageJob
+
+        job = get_message_job(db, job_id=job_id)
+        if job is None or job.user_id != auth.user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
+
+        if job.status in ("completed", "failed"):
+            async def completed_stream():
+                event_data: dict = {"jobId": job_id, "status": job.status}
+                if job.usage_data:
+                    event_data["usage"] = job.usage_data
+                if job.diff_data:
+                    event_data["diff"] = job.diff_data
+                if job.error_text:
+                    event_data["error"] = job.error_text
+                if job.result_message_id:
+                    result_message = db.get(Message, job.result_message_id)
+                    if result_message is not None:
+                        event_data["message"] = serialize_message(result_message, job=job)
+                yield f"event: done\ndata: {json.dumps(jsonable_encoder(event_data))}\n\n"
+            return StreamingResponse(
+                completed_stream(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            )
+
+        queue = subscribe_job_events(job_id)
+
+        async def event_stream():
+            try:
+                while True:
+                    try:
+                        event = await asyncio.wait_for(queue.get(), timeout=float(settings.sse_keepalive_seconds))
+                        event_type = event.get("event", "progress")
+                        event_data = json.dumps(jsonable_encoder(event.get("data", {})))
+                        yield f"event: {event_type}\ndata: {event_data}\n\n"
+                        if event_type == "done":
+                            break
+                    except asyncio.TimeoutError:
+                        yield ": keepalive\n\n"
+            finally:
+                unsubscribe_job_events(job_id, queue)
+
+        return StreamingResponse(
+            event_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    # ------------------------------------------------------------------
+    # Inbox
+    # ------------------------------------------------------------------
+
     @app.get("/v1/inbox")
     def inbox(auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_db)) -> dict:
         items = [serialize_inbox_item(item) for item in list_inbox_items(db, user_id=auth.user.id)]
@@ -1350,6 +1518,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                 )
                                 continue
 
+                            if message_type == "job.progress" and incoming.get("jobId") == claimed_job.id:
+                                publish_job_event(claimed_job.id, {
+                                    "event": incoming.get("kind", "progress"),
+                                    "data": {
+                                        "jobId": claimed_job.id,
+                                        "kind": incoming.get("kind"),
+                                        "delta": incoming.get("delta"),
+                                        "label": incoming.get("label"),
+                                    },
+                                })
+                                continue
+
                             if message_type == "job.result" and incoming.get("jobId") == claimed_job.id:
                                 with database.session() as db:
                                     completed = complete_message_job(
@@ -1358,10 +1538,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                         connection_nonce=connection_nonce,
                                         text=incoming.get("text", "").strip(),
                                         session_id=incoming.get("sessionId"),
+                                        usage=incoming.get("usage"),
+                                        diff=incoming.get("diff"),
                                     )
                                     if completed is None:
                                         await websocket.close(code=1011)
                                         return
+                                    result_message = (
+                                        serialize_message(db.get(Message, completed.result_message_id), job=completed)
+                                        if completed.result_message_id and db.get(Message, completed.result_message_id) is not None
+                                        else None
+                                    )
+                                done_event_data: dict = {
+                                    "jobId": claimed_job.id,
+                                    "status": "completed",
+                                    "usage": completed.usage_data,
+                                    "message": result_message,
+                                }
+                                if completed.diff_data:
+                                    done_event_data["diff"] = completed.diff_data
+                                publish_job_event(claimed_job.id, {
+                                    "event": "done",
+                                    "data": done_event_data,
+                                })
                                 break
 
                             if message_type == "job.failed" and incoming.get("jobId") == claimed_job.id:
@@ -1376,6 +1575,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                     if failed is None:
                                         await websocket.close(code=1011)
                                         return
+                                    result_message = (
+                                        serialize_message(db.get(Message, failed.result_message_id), job=failed)
+                                        if failed.result_message_id and db.get(Message, failed.result_message_id) is not None
+                                        else None
+                                    )
+                                publish_job_event(claimed_job.id, {
+                                    "event": "done",
+                                    "data": {
+                                        "jobId": claimed_job.id,
+                                        "status": "failed",
+                                        "error": incoming.get("error"),
+                                        "message": result_message,
+                                    },
+                                })
                                 break
 
                             await websocket.close(code=4400)

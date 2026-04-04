@@ -13,6 +13,8 @@ import httpx
 from websockets.asyncio.client import connect as websocket_connect
 
 from . import __version__
+from .git_diff import capture_diff, capture_snapshot
+from .hermes_api_executor import HermesAPIExecutor
 from .hermes_runner import ConnectorHermesSettings, HermesCLIExecutor
 from .mcp_registration import (
     inspect_native_mcp_registration,
@@ -22,7 +24,7 @@ from .mcp_registration import (
     validate_native_mcp_server,
 )
 from .sensor_store import HealthSample, LocationReading, SensorStore
-from .runtime_adapter import HermesRuntimeAdapter, HostRuntimeAdapter, RuntimeConversationMessage
+from .runtime_adapter import HermesAPIRuntimeAdapter, HermesRuntimeAdapter, HostRuntimeAdapter, RuntimeConversationMessage
 from .service_management import build_service_manager
 from .setup_code import decode_host_setup_code
 from .state import (
@@ -74,6 +76,8 @@ class HermesMobileConnector:
         self.reconnect_delay_seconds = reconnect_delay_seconds
         self._sensor_store: SensorStore | None = None
         self._voice_delegate_sessions: dict[str, str] = {}
+        self._health_cache: tuple[float, HostRuntimeAdapter | None] = (0.0, None)
+        self._HEALTH_CACHE_TTL: float = 30.0
 
     @property
     def sensor_store(self) -> SensorStore:
@@ -278,6 +282,7 @@ class HermesMobileConnector:
             readiness_summary = f"{readiness_summary} ({state.mcp_last_test_error})"
         state.voice_context_snapshot = build_voice_context_snapshot(
             sensor_store=self.sensor_store,
+            hermes_command=settings.hermes_command,
             hermes_home=state.runtime_config.hermes_home if state.runtime_config else os.getenv("HERMES_HOME"),
             readiness_summary=readiness_summary,
         )
@@ -463,7 +468,83 @@ class HermesMobileConnector:
 
     async def _handle_job(self, websocket, job: dict) -> None:
         state = self.state_store.load()
-        runtime = self.runtime_adapter_for_state(state)
+        runtime = await self.runtime_adapter_for_state_async(state)
+        workdir = state.runtime_config.hermes_workdir if state.runtime_config else None
+
+        if getattr(runtime, "supports_streaming", False):
+            await self._handle_job_streaming(websocket, job, runtime, workdir=workdir)
+        else:
+            await self._handle_job_cli(websocket, job, runtime)
+
+    async def _handle_job_streaming(
+        self, websocket, job: dict, runtime, *, workdir: str | None = None,
+    ) -> None:
+        """Process a job using the Hermes API server with streaming events."""
+        try:
+            accumulated_text = ""
+            session_id: str | None = None
+            usage: dict | None = None
+
+            # Snapshot git state before Hermes runs so we can diff afterwards
+            pre_snapshot = await capture_snapshot(workdir) if workdir else None
+
+            history = [
+                RuntimeConversationMessage(role=item["role"], text=item["text"])
+                for item in job.get("history", [])
+            ]
+
+            async for event in runtime.send_text_message_streaming(
+                latest_user_message=job["latestUserMessage"],
+                history=history,
+                session_id=job.get("sessionId"),
+            ):
+                if event.type == "text_delta":
+                    accumulated_text += event.data
+                    await websocket.send(json.dumps({
+                        "type": "job.progress",
+                        "jobId": job["id"],
+                        "kind": "text_delta",
+                        "delta": event.data,
+                    }))
+                elif event.type == "tool_activity":
+                    await websocket.send(json.dumps({
+                        "type": "job.progress",
+                        "jobId": job["id"],
+                        "kind": "tool_activity",
+                        "label": event.label,
+                    }))
+                elif event.type == "finish":
+                    session_id = event.session_id
+                    usage = event.usage
+
+            final_text = accumulated_text.strip()
+            if not final_text:
+                raise RuntimeError("Hermes API server returned an empty response.")
+
+            # Capture what files Hermes changed during this job
+            diff_data = await capture_diff(workdir, pre_snapshot) if pre_snapshot else None
+
+            result_payload: dict = {
+                "type": "job.result",
+                "jobId": job["id"],
+                "text": final_text,
+                "sessionId": session_id,
+                "usage": usage,
+            }
+            if diff_data is not None:
+                result_payload["diff"] = diff_data
+
+            await websocket.send(json.dumps(result_payload))
+        except Exception as error:  # noqa: BLE001
+            await websocket.send(json.dumps({
+                "type": "job.failed",
+                "jobId": job["id"],
+                "retryable": False,
+                "error": str(error),
+            }))
+
+    async def _handle_job_cli(self, websocket, job: dict, runtime) -> None:
+        """Process a job using the CLI subprocess (original path)."""
 
         async def execute_job() -> dict:
             try:
@@ -805,6 +886,8 @@ class HermesMobileConnector:
             hermes_source=settings.hermes_source,
             hermes_history_limit=settings.hermes_history_limit,
             hermes_home=os.getenv("HERMES_HOME") or None,
+            api_server_url=os.getenv("HERMES_API_SERVER_URL") or None,
+            api_server_key=os.getenv("HERMES_API_SERVER_KEY") or None,
         )
 
     def settings_for_state(self, state: ConnectorState) -> ConnectorHermesSettings:
@@ -817,6 +900,44 @@ class HermesMobileConnector:
 
     def runtime_adapter_for_state(self, state: ConnectorState) -> HostRuntimeAdapter:
         return HermesRuntimeAdapter(self.executor_for_state(state))
+
+    async def runtime_adapter_for_state_async(self, state: ConnectorState) -> HostRuntimeAdapter:
+        """Prefer the API server adapter when available, fall back to CLI.
+
+        Caches the health check result for ``_HEALTH_CACHE_TTL`` seconds to
+        avoid hitting the API server on every single job.
+        """
+        import time
+
+        now = time.monotonic()
+        cached_at, cached_adapter = self._health_cache
+        if cached_adapter is not None and (now - cached_at) < self._HEALTH_CACHE_TTL:
+            return cached_adapter
+
+        config = state.runtime_config
+        api_url = (config.api_server_url if config else None) or os.getenv("HERMES_API_SERVER_URL")
+        api_key = (config.api_server_key if config else None) or os.getenv("HERMES_API_SERVER_KEY")
+
+        if api_url or api_key:
+            executor = HermesAPIExecutor(
+                api_server_url=api_url or "http://localhost:8642",
+                api_server_key=api_key,
+            )
+            if await executor.health_check():
+                adapter = HermesAPIRuntimeAdapter(executor)
+                self._health_cache = (now, adapter)
+                return adapter
+
+        # Try default localhost even without explicit config
+        executor = HermesAPIExecutor(api_server_key=api_key)
+        if await executor.health_check():
+            adapter = HermesAPIRuntimeAdapter(executor)
+            self._health_cache = (now, adapter)
+            return adapter
+
+        cli_adapter = HermesRuntimeAdapter(self.executor_for_state(state))
+        self._health_cache = (now, cli_adapter)
+        return cli_adapter
 
     def apply_runtime_environment(self, state: ConnectorState) -> None:
         if state.runtime_config is not None and state.runtime_config.hermes_home:

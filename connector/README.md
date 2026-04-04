@@ -2,6 +2,15 @@
 
 `hermes-mobile` is the host-side process that runs next to a local Hermes install and bridges it to a public Hermes Mobile relay.
 
+The connector is the durable host boundary for:
+
+- Hermes execution
+- host enrollment and phone pairing
+- local MCP registration
+- local sensor storage
+- OpenAI Realtime talk configuration
+- background service management
+
 ## Install
 
 ```bash
@@ -11,9 +20,9 @@ source .venv/bin/activate
 pip install -e .[dev]
 ```
 
-## Configure Hermes execution
+## Runtime configuration
 
-The connector only uses Hermes through the documented CLI surface. Configure it with environment variables:
+The connector persists its runtime configuration after setup, but these environment variables are still the easiest way to define the initial Hermes execution context:
 
 ```bash
 export HERMES_COMMAND=/absolute/path/to/hermes
@@ -45,30 +54,48 @@ Create or link the relay account from the Hermes host first:
 hermes-mobile setup
 ```
 
-If you want to register the host first and leave Hermes config untouched for now:
+During setup the connector can optionally:
+
+- configure `mcp_servers.hermes_mobile` in `~/.hermes/config.yaml`
+- validate that MCP entry with `hermes mcp test hermes_mobile`
+- configure OpenAI Realtime talk mode with a connector-owned API key
+- install or start the background connector service
+
+If you want to skip MCP registration during setup:
 
 ```bash
 hermes-mobile setup --skip-mcp
 ```
 
-`setup` now does three things in one pass:
-- validates that the local Hermes CLI is runnable
-- creates or refreshes the relay-side host account
-- optionally registers `mcp_servers.hermes_mobile` in `~/.hermes/config.yaml` and runs `hermes mcp test hermes_mobile`
+If Hermes chat is already open when setup finishes, the connector may report `Reload required`. Run `/reload-mcp` inside Hermes or start a fresh chat so the new `hermes_mobile` MCP server is loaded into the active session.
 
-Native MCP is the supported product path. `mcporter` is only useful for debugging or manual inspection.
-
-In the interactive setup wizard, the connector now asks before it edits your Hermes config file:
-
-`Automatically configure iOS tools MCP (Location Services, Health, and sensor context) in your Hermes Agent config file?`
-
-If Hermes chat is already running when setup finishes, the connector will report `Reload required`. Run `/reload-mcp` inside Hermes or start a fresh chat so the new `hermes_mobile` MCP server is loaded into the active session.
-
-If you skip MCP config during setup, you can enable it later with:
+If you skip MCP config during setup, you can enable it later:
 
 ```bash
 hermes-mobile configure-mcp
+hermes-mobile validate-mcp
 ```
+
+## Realtime talk configuration
+
+Realtime talk configuration is connector-owned, not app-owned.
+
+The connector wizard can configure this during `setup`, or you can do it later:
+
+```bash
+hermes-mobile configure-realtime
+```
+
+This stores the OpenAI API key in a connector-owned secrets file, not in relay state and not on the phone.
+
+Useful related commands:
+
+```bash
+hermes-mobile configure-realtime --clear
+hermes-mobile status
+```
+
+`status` reports whether talk is configured, the selected model preference, and the last validation result without printing secrets.
 
 ## Pair a phone
 
@@ -106,9 +133,35 @@ hermes-mobile service install --force
 ```
 
 Platform behavior:
+
 - macOS uses a per-user `launchd` LaunchAgent and starts after that user logs in.
 - Windows gateway support is WSL2-only. The connector installs a Windows Scheduled Task that launches the WSL-hosted connector after Windows logon.
 - Native Windows Hermes execution is not supported.
+
+## Foreground debugging
+
+```bash
+hermes-mobile run
+```
+
+`run` is the foreground development/debugging path. For day-to-day uptime, prefer the managed service.
+
+## What the connector does today
+
+- opens one outbound authenticated WebSocket to the relay
+- heartbeats while idle or during long jobs
+- executes one Hermes job at a time
+- preserves Hermes session continuity where possible
+- exposes phone-derived context through a local MCP server
+- supports chat streaming progress and final result delivery
+- can attach git-visible inline diff data for coding turns
+- builds a cached talk-mode voice context from Hermes memory files, memory-provider status, and sensor freshness
+
+## Current limitations
+
+- Talk mode bootstrap is implemented, but true barge-in interruption is not fully complete in the app yet.
+- Inline diffs depend on git-visible file changes in the configured Hermes workdir.
+- Background health delivery and Always-authorized background location still require a physical iPhone for full validation.
 
 ## Legacy enroll
 
@@ -118,25 +171,9 @@ The legacy host-enrollment path still exists for development and migration:
 hermes-mobile enroll --code 'HC1:...'
 ```
 
-You can inspect the stored enrollment:
+You can inspect the stored enrollment and host config with:
 
 ```bash
 hermes-mobile status
 hermes-mobile service status
-hermes-mobile configure-mcp
-hermes-mobile validate-mcp
 ```
-
-## Run
-
-```bash
-hermes-mobile run
-```
-
-`run` is the foreground development/debugging path. For day-to-day uptime, prefer `hermes-mobile service install` plus `hermes-mobile service start`.
-
-The connector opens one outbound authenticated WebSocket to the relay, heartbeats while idle or during long jobs, executes one Hermes CLI job at a time, and reports results back to the relay.
-
-Location and health data stay off the relay. The phone keeps a local outbox until the relay receives a live ACK from the connector path, and the connector stores delivered sensor context only in its local SQLite database for MCP queries.
-
-HealthKit observer delivery and background location behavior require a physical iPhone for full validation. The simulator is still useful for pairing and foreground sync, but it does not prove device-only background wake behavior.

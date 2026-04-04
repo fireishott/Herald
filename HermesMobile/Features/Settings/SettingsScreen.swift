@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsScreen: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(AppSessionStore.self) private var sessionStore
     @Environment(HermesHostStore.self) private var hostStore
     @Environment(PairingStore.self) private var pairingStore
@@ -10,7 +11,7 @@ struct SettingsScreen: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground)
+            Design.Colors.background
                 .ignoresSafeArea()
 
             ScrollView {
@@ -19,16 +20,25 @@ struct SettingsScreen: View {
                     if settingsStore.availableEnvironments.count > 1 {
                         environmentSection
                     }
-                    notificationsSection
+                    preferencesSection
                     privacySection
                     aboutSection
                 }
                 .padding(.horizontal, Design.Spacing.md)
                 .padding(.vertical, Design.Spacing.sm)
             }
-            .scrollEdgeEffectStyle(.soft, for: .top)
         }
         .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: Design.Size.iconSmall, weight: .semibold))
+                        .foregroundStyle(Design.Colors.foreground)
+                }
+            }
+        }
         .task {
             await hostStore.refresh()
             await permissionsStore.reloadCapabilities()
@@ -38,55 +48,40 @@ struct SettingsScreen: View {
     // MARK: - Connection
 
     private var connectionSection: some View {
-        @Bindable var settingsStore = settingsStore
-
-        return SettingsSectionView(title: "Connection") {
-            VStack(spacing: Design.Spacing.sm) {
+        SettingsSectionView(title: "Connection") {
+            VStack(spacing: 0) {
                 settingsRow(
                     icon: sessionStore.state.connectionStatus.displayIcon,
                     iconColor: sessionStore.state.connectionStatus.displayColor,
                     title: "Status",
-                    subtitle: sessionStore.state.connectionStatus.displayLabel
+                    value: sessionStore.state.connectionStatus.displayLabel
                 )
 
+                sectionDivider
+
                 if pairingStore.pairedRelayConfiguration != nil {
-                    settingsRow(
+                    settingsNavRow(
                         icon: hostStore.isHostOnline ? "desktopcomputer" : "desktopcomputer.trianglebadge.exclamationmark",
                         iconColor: hostStore.isHostOnline ? .green : .orange,
                         title: "Hermes Host",
-                        subtitle: hostStore.currentHost?.resolvedDisplayName ?? "Not Connected"
-                    )
-
-                    if let host = hostStore.currentHost {
-                        settingsRow(
-                            icon: "clock.arrow.circlepath",
-                            iconColor: .secondary,
-                            title: "Last Seen",
-                            subtitle: host.lastSeenAt?.formatted(date: .abbreviated, time: .shortened) ?? "Unknown"
-                        )
-                    }
-
-                    Button {
-                        router.navigate(to: .connectHost, in: .settings)
-                    } label: {
-                        HStack {
-                            Label("Host Status", systemImage: "desktopcomputer.and.arrow.down")
-                                .font(Design.Typography.callout)
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(Design.Typography.caption)
-                                .foregroundStyle(.tertiary)
+                        value: hostStore.currentHost?.resolvedDisplayName ?? "Not Connected"
+                    ) {
+                        dismiss()
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(300))
+                            router.navigate(to: .connectHost)
                         }
-                        .frame(minHeight: Design.Size.minTapTarget)
                     }
+
+                    sectionDivider
                 }
 
-                Toggle(isOn: $settingsStore.settings.autoConnectOnLaunch) {
-                    Label("Auto-Connect on Launch", systemImage: "bolt.fill")
-                        .font(Design.Typography.callout)
-                }
-                .tint(Design.Brand.accent)
+                settingsToggle(
+                    icon: "bolt.fill",
+                    iconColor: Design.Brand.accent,
+                    title: "Auto-Connect",
+                    isOn: autoConnectBinding
+                )
             }
         }
     }
@@ -95,8 +90,8 @@ struct SettingsScreen: View {
 
     private var environmentSection: some View {
         SettingsSectionView(title: "Environment") {
-            VStack(spacing: Design.Spacing.sm) {
-                ForEach(settingsStore.availableEnvironments, id: \.self) { env in
+            VStack(spacing: 0) {
+                ForEach(Array(settingsStore.availableEnvironments.enumerated()), id: \.element) { index, env in
                     Button {
                         withAnimation(Design.Motion.quickResponse) {
                             settingsStore.settings.environment = env
@@ -105,42 +100,47 @@ struct SettingsScreen: View {
                         HStack {
                             Text(env.displayLabel)
                                 .font(Design.Typography.callout)
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(Design.Colors.foreground)
 
                             Spacer()
 
                             if settingsStore.settings.environment == env {
                                 Image(systemName: "checkmark")
+                                    .font(.system(size: 14, weight: .semibold))
                                     .foregroundStyle(Design.Brand.accent)
-                                    .transition(.scale.combined(with: .opacity))
                             }
                         }
                         .frame(minHeight: Design.Size.minTapTarget)
                     }
-                }
 
+                    if index < settingsStore.availableEnvironments.count - 1 {
+                        sectionDivider
+                    }
+                }
             }
         }
     }
 
-    // MARK: - Notifications
+    // MARK: - Preferences
 
-    private var notificationsSection: some View {
-        @Bindable var settingsStore = settingsStore
+    private var preferencesSection: some View {
+        SettingsSectionView(title: "Preferences") {
+            VStack(spacing: 0) {
+                settingsToggle(
+                    icon: "bell.fill",
+                    iconColor: .orange,
+                    title: "Notifications",
+                    isOn: notificationsBinding
+                )
 
-        return SettingsSectionView(title: "Notifications") {
-            VStack(spacing: Design.Spacing.sm) {
-                Toggle(isOn: $settingsStore.settings.notificationsEnabled) {
-                    Label("Push Notifications", systemImage: "bell.fill")
-                        .font(Design.Typography.callout)
-                }
-                .tint(Design.Brand.accent)
+                sectionDivider
 
-                Toggle(isOn: $settingsStore.settings.hapticFeedbackEnabled) {
-                    Label("Haptic Feedback", systemImage: "hand.tap.fill")
-                        .font(Design.Typography.callout)
-                }
-                .tint(Design.Brand.accent)
+                settingsToggle(
+                    icon: "hand.tap.fill",
+                    iconColor: .purple,
+                    title: "Haptic Feedback",
+                    isOn: hapticBinding
+                )
             }
         }
     }
@@ -149,167 +149,160 @@ struct SettingsScreen: View {
 
     private var privacySection: some View {
         SettingsSectionView(title: "Privacy") {
-            VStack(spacing: Design.Spacing.sm) {
-                locationServicesPanel
-                healthDataRow
-
-                Button {
-                    router.navigate(to: .permissions)
-                } label: {
-                    HStack {
-                        Label("Permissions", systemImage: "lock.shield.fill")
-                            .font(Design.Typography.callout)
-                            .foregroundStyle(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(Design.Typography.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .frame(minHeight: Design.Size.minTapTarget)
-                }
-            }
-        }
-    }
-
-    private var locationServicesPanel: some View {
-        VStack(spacing: Design.Spacing.sm) {
-            settingsRow(
-                icon: "location.fill",
-                iconColor: .blue,
-                title: "Location Services",
-                subtitle: permissionsStore.locationAuthorizationLevel.displayLabel
-            )
-
-            if permissionsStore.locationAuthorizationLevel == .whenInUse || permissionsStore.locationAuthorizationLevel == .always {
-                settingsRow(
-                    icon: permissionsStore.locationAccuracyLevel == .reduced ? "scope" : "location.north.line.fill",
-                    iconColor: permissionsStore.locationAccuracyLevel == .reduced ? .orange : .green,
-                    title: "Location Accuracy",
-                    subtitle: permissionsStore.locationAccuracyLevel.displayLabel
-                )
-
-                settingsRow(
-                    icon: settingsStore.settings.locationSyncPreference == .backgroundAllowed ? "arrow.triangle.2.circlepath.circle.fill" : "location.slash.fill",
-                    iconColor: settingsStore.settings.locationSyncPreference == .backgroundAllowed ? .green : .secondary,
-                    title: "Background Location",
-                    subtitle: backgroundLocationSubtitle
-                )
-            }
-
-            locationActionButtons
-        }
-    }
-
-    @ViewBuilder
-    private var locationActionButtons: some View {
-        switch permissionsStore.locationAuthorizationLevel {
-        case .notDetermined:
-            Button("Enable While Using") {
-                Task { await permissionsStore.requestPermission(for: .location) }
-            }
-            .buttonStyle(.glassProminent)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        case .denied, .restricted:
-            Button("Open Location Settings") {
-                permissionsStore.openLocationSystemSettings()
-            }
-            .buttonStyle(.glassProminent)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        case .whenInUse:
-            Button("Allow Background Location") {
+            settingsNavRow(
+                icon: "lock.shield.fill",
+                iconColor: .green,
+                title: "Permissions"
+            ) {
+                dismiss()
                 Task {
-                    await permissionsStore.requestBackgroundLocationAccess()
-                    if permissionsStore.locationAuthorizationLevel == .always {
-                        settingsStore.settings.locationSyncPreference = .backgroundAllowed
-                        permissionsStore.updateLocationSyncPreference(.backgroundAllowed)
-                    } else {
-                        permissionsStore.openLocationSystemSettings()
-                    }
+                    try? await Task.sleep(for: .milliseconds(300))
+                    router.navigate(to: .permissions)
                 }
             }
-            .buttonStyle(.glassProminent)
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            if settingsStore.settings.locationSyncPreference == .backgroundAllowed {
-                Button("Use Foreground Only") {
-                    settingsStore.settings.locationSyncPreference = .foregroundOnly
-                    permissionsStore.updateLocationSyncPreference(.foregroundOnly)
-                }
-                .buttonStyle(.glass)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        case .always:
-            if settingsStore.settings.locationSyncPreference == .backgroundAllowed {
-                Button("Use Foreground Only") {
-                    settingsStore.settings.locationSyncPreference = .foregroundOnly
-                    permissionsStore.updateLocationSyncPreference(.foregroundOnly)
-                }
-                .buttonStyle(.glass)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                Button("Enable Background Location") {
-                    settingsStore.settings.locationSyncPreference = .backgroundAllowed
-                    permissionsStore.updateLocationSyncPreference(.backgroundAllowed)
-                }
-                .buttonStyle(.glassProminent)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
         }
-    }
-
-    private var backgroundLocationSubtitle: String {
-        if settingsStore.settings.locationSyncPreference == .foregroundOnly {
-            return "Off"
-        }
-
-        if permissionsStore.locationAuthorizationLevel == .always {
-            return "Always Allowed"
-        }
-
-        return "Needs Always Access"
-    }
-
-    private var healthDataRow: some View {
-        let healthCapability = permissionsStore.capabilities.first { $0.permissionType == .health }
-        return settingsRow(
-            icon: "heart.fill",
-            iconColor: .red,
-            title: "Health Data",
-            subtitle: healthCapability?.statusDetail ?? healthCapability?.status.displayLabel
-        )
     }
 
     // MARK: - About
 
     private var aboutSection: some View {
         SettingsSectionView(title: "About") {
-            VStack(spacing: Design.Spacing.sm) {
-                settingsRow(icon: "info.circle", iconColor: .secondary, title: "Version", subtitle: "1.0.0 (1)")
-                settingsRow(icon: "doc.text", iconColor: .secondary, title: "Terms of Service", subtitle: nil)
-                settingsRow(icon: "hand.raised", iconColor: .secondary, title: "Privacy Policy", subtitle: nil)
+            VStack(spacing: 0) {
+                settingsRow(
+                    icon: "info.circle",
+                    iconColor: .secondary,
+                    title: "Version",
+                    value: "1.0.0 (1)"
+                )
+
+                sectionDivider
+
+                settingsNavRow(
+                    icon: "doc.text",
+                    iconColor: .secondary,
+                    title: "Terms of Service"
+                ) {
+                    // TODO: Open URL
+                }
+
+                sectionDivider
+
+                settingsNavRow(
+                    icon: "hand.raised",
+                    iconColor: .secondary,
+                    title: "Privacy Policy"
+                ) {
+                    // TODO: Open URL
+                }
             }
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Bindings
 
-    private func settingsRow(icon: String, iconColor: Color, title: String, subtitle: String?) -> some View {
+    private var autoConnectBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.autoConnectOnLaunch },
+            set: { settingsStore.settings.autoConnectOnLaunch = $0 }
+        )
+    }
+
+    private var notificationsBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.notificationsEnabled },
+            set: { settingsStore.settings.notificationsEnabled = $0 }
+        )
+    }
+
+    private var hapticBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.hapticFeedbackEnabled },
+            set: { settingsStore.settings.hapticFeedbackEnabled = $0 }
+        )
+    }
+
+    // MARK: - Row Components
+
+    private var sectionDivider: some View {
+        Divider()
+            .overlay(Design.Colors.divider)
+    }
+
+    private func settingsRow(icon: String, iconColor: Color, title: String, value: String?) -> some View {
         HStack(spacing: Design.Spacing.sm) {
             Image(systemName: icon)
+                .font(.system(size: 14))
                 .foregroundStyle(iconColor)
-                .frame(width: Design.Size.iconMedium)
+                .frame(width: 20, alignment: .center)
 
             Text(title)
                 .font(Design.Typography.callout)
+                .foregroundStyle(Design.Colors.foreground)
 
             Spacer()
 
-            if let subtitle {
-                Text(subtitle)
+            if let value {
+                Text(value)
                     .font(Design.Typography.callout)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
             }
         }
+        .frame(minHeight: Design.Size.minTapTarget)
+    }
+
+    private func settingsNavRow(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        value: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: Design.Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 20, alignment: .center)
+
+                Text(title)
+                    .font(Design.Typography.callout)
+                    .foregroundStyle(Design.Colors.foreground)
+
+                Spacer()
+
+                if let value {
+                    Text(value)
+                        .font(Design.Typography.callout)
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Design.Colors.secondaryForeground)
+            }
+            .frame(minHeight: Design.Size.minTapTarget)
+        }
+    }
+
+    private func settingsToggle(
+        icon: String,
+        iconColor: Color,
+        title: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        Toggle(isOn: isOn) {
+            HStack(spacing: Design.Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(iconColor)
+                    .frame(width: 20, alignment: .center)
+
+                Text(title)
+                    .font(Design.Typography.callout)
+                    .foregroundStyle(Design.Colors.foreground)
+            }
+        }
+        .tint(Design.Brand.accent)
         .frame(minHeight: Design.Size.minTapTarget)
     }
 }

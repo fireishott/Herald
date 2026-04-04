@@ -84,7 +84,8 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             blockedReason: blockedReason,
             statusMessage: statusMessage,
             canStartSession: canStartSession,
-            latencyMetrics: latencyMetrics
+            latencyMetrics: latencyMetrics,
+            voiceSessionID: voiceSessionID
         )
     }
 

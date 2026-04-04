@@ -49,6 +49,7 @@ class Settings:
     connector_sensor_ack_timeout_seconds: float = 3.0
     connector_rpc_timeout_seconds: float = 30.0
     talk_delegate_timeout_seconds: float = 90.0
+    sse_keepalive_seconds: int = 30
 
     @classmethod
     def from_env(cls) -> "Settings":

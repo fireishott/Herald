@@ -1,34 +1,5 @@
 import SwiftUI
 
-// MARK: - Tab Definition
-
-enum AppTab: String, CaseIterable, Identifiable {
-    case chat
-    case talk
-    case inbox
-    case settings
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .chat: "Chat"
-        case .talk: "Talk"
-        case .inbox: "Inbox"
-        case .settings: "Settings"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .chat: "bubble.left.and.bubble.right"
-        case .talk: "waveform.circle"
-        case .inbox: "tray.full"
-        case .settings: "gearshape"
-        }
-    }
-}
-
 // MARK: - Navigation Routes
 
 enum Route: Hashable {
@@ -40,46 +11,84 @@ enum Route: Hashable {
 // MARK: - Sheet Destinations
 
 enum SheetDestination: Identifiable {
-    case inboxItemDetail(InboxItem)
+    case settings
+    case attachments
+    case newChat
 
     var id: String {
         switch self {
-        case .inboxItemDetail(let item): "inboxItemDetail-\(item.id)"
+        case .settings: "settings"
+        case .attachments: "attachments"
+        case .newChat: "newChat"
         }
     }
 }
 
-// MARK: - Tab Router
+// MARK: - App Tab (kept for backward compatibility during transition)
+
+enum AppTab: String, CaseIterable, Identifiable {
+    case chat
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .chat: "Chat"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .chat: "bubble.left.and.bubble.right"
+        }
+    }
+}
+
+// MARK: - Router
 
 @MainActor
 @Observable
 final class TabRouter {
     var selectedTab: AppTab = .chat
     var activeSheet: SheetDestination?
-    private var paths: [AppTab: [Route]] = [:]
+    var isVoiceOverlayPresented = false
+    private var navigationPath: [Route] = []
 
-    func path(for tab: AppTab) -> [Route] {
-        paths[tab, default: []]
+    func path() -> [Route] {
+        navigationPath
     }
 
     func binding(for tab: AppTab) -> Binding<[Route]> {
         Binding(
-            get: { self.paths[tab, default: []] },
-            set: { self.paths[tab] = $0 }
+            get: { self.navigationPath },
+            set: { self.navigationPath = $0 }
+        )
+    }
+
+    func pathBinding() -> Binding<[Route]> {
+        Binding(
+            get: { self.navigationPath },
+            set: { self.navigationPath = $0 }
         )
     }
 
     func navigate(to route: Route, in tab: AppTab? = nil) {
-        let target = tab ?? selectedTab
-        paths[target, default: []].append(route)
+        navigationPath.append(route)
     }
 
     func popToRoot(for tab: AppTab? = nil) {
-        let target = tab ?? selectedTab
-        paths[target] = []
+        navigationPath = []
     }
 
     func resetAll() {
-        paths.removeAll()
+        navigationPath.removeAll()
+    }
+
+    func presentSheet(_ sheet: SheetDestination) {
+        activeSheet = sheet
+    }
+
+    func dismissSheet() {
+        activeSheet = nil
     }
 }

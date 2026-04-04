@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time as _time
 import uuid
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, urlunparse
@@ -340,7 +341,7 @@ def redeem_phone_pairing_code(
     db.commit()
     db.refresh(pairing_code)
 
-    if pairing_code.attempt_count > settings.phone_pairing_max_attempts_per_code:
+    if pairing_code.attempt_count >= settings.phone_pairing_max_attempts_per_code:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="This phone pairing code has too many attempts.")
 
     if pairing_code.redeemed_at is not None:
@@ -671,6 +672,56 @@ def serialize_voice_turn(turn: VoiceTurn) -> dict:
     }
 
 
+def inject_voice_transcript(
+    db: Session,
+    *,
+    voice_session_id: str,
+    user_id: str,
+) -> Conversation:
+    """Inject finalized voice turns into the current chat conversation.
+
+    Reads all VoiceTurn rows for the given session and creates corresponding
+    Message rows in the user's active conversation. Appends a system banner
+    marking the end of the voice session.
+    """
+    turns = (
+        db.scalars(
+            select(VoiceTurn)
+            .where(VoiceTurn.voice_session_id == voice_session_id)
+            .order_by(VoiceTurn.created_at)
+        )
+        .all()
+    )
+
+    conversation = get_or_create_current_conversation(db, user_id=user_id)
+
+    for turn in turns:
+        role = "voice_user" if turn.role == "user" else "voice_hermes"
+        append_message(
+            db,
+            conversation=conversation,
+            user_id=user_id,
+            role=role,
+            text=turn.text,
+            source="voice_transcript",
+            delivery_status="delivered",
+            created_at_override=turn.created_at,
+        )
+
+    # System banner
+    append_message(
+        db,
+        conversation=conversation,
+        user_id=user_id,
+        role="system",
+        text="[Voice session ended]",
+        source="voice_transcript",
+        delivery_status="delivered",
+    )
+
+    return conversation
+
+
 def hermes_host_is_online(db: Session, *, host: HermesHost | None, settings: Settings) -> bool:
     if host is None or host.revoked_at is not None or host.active_connection_nonce is None or host.last_seen_at is None:
         return False
@@ -902,6 +953,8 @@ def append_message(
     text: str,
     client_message_id: str | None = None,
     delivery_status: str | None = None,
+    source: str | None = None,
+    created_at_override: datetime | None = None,
 ) -> Message:
     message = Message(
         conversation_id=conversation.id,
@@ -910,7 +963,10 @@ def append_message(
         text=text,
         client_message_id=client_message_id,
         delivery_status=delivery_status,
+        source=source,
     )
+    if created_at_override is not None:
+        message.created_at = created_at_override
     conversation.last_message_at = utcnow()
     conversation.updated_at = utcnow()
     db.add(message)
@@ -974,6 +1030,10 @@ def requeue_expired_message_jobs(db: Session) -> None:
     db.commit()
 
 
+_last_requeue_at: float = 0.0
+_REQUEUE_INTERVAL: float = 30.0
+
+
 def claim_next_message_job(
     db: Session,
     *,
@@ -981,7 +1041,11 @@ def claim_next_message_job(
     connection_nonce: str,
     settings: Settings,
 ) -> MessageJob | None:
-    requeue_expired_message_jobs(db)
+    global _last_requeue_at
+    now_mono = _time.monotonic()
+    if now_mono - _last_requeue_at >= _REQUEUE_INTERVAL:
+        requeue_expired_message_jobs(db)
+        _last_requeue_at = now_mono
 
     job = db.scalar(
         select(MessageJob)
@@ -1052,6 +1116,8 @@ def complete_message_job(
     connection_nonce: str | None,
     text: str,
     session_id: str | None,
+    usage: dict | None = None,
+    diff: dict | None = None,
 ) -> MessageJob | None:
     job = db.get(MessageJob, job_id)
     if job is None:
@@ -1080,6 +1146,8 @@ def complete_message_job(
     job.result_text = text
     job.result_session_id = session_id or job.result_session_id
     job.result_message_id = result_message.id
+    job.usage_data = usage
+    job.diff_data = diff
     job.retryable = False
     db.commit()
     db.refresh(job)
@@ -1224,14 +1292,25 @@ def serialize_message(message: Message, *, job: MessageJob | None = None) -> dic
         "timestamp": message.created_at,
         "deliveryStatus": default_message_delivery_status(message),
     }
-    if job is not None and payload["deliveryStatus"] in {"pending", "failed"}:
+    if job is not None and (
+        payload["deliveryStatus"] in {"pending", "failed"} or message.id == job.result_message_id
+    ):
         payload["jobId"] = job.id
     return payload
 
 
 def serialize_conversation(conversation: Conversation, messages: list[Message], jobs: list[MessageJob] | None = None) -> dict:
-    jobs_by_message_id = {job.user_message_id: job for job in jobs or []}
-    return {
+    jobs_by_message_id: dict[str, MessageJob] = {}
+    for job in jobs or []:
+        jobs_by_message_id[job.user_message_id] = job
+        if job.result_message_id:
+            jobs_by_message_id[job.result_message_id] = job
+    latest_usage = None
+    for job in reversed(jobs or []):
+        if job.status == "completed" and job.usage_data:
+            latest_usage = job.usage_data
+            break
+    result = {
         "id": conversation.id,
         "title": conversation.title,
         "updatedAt": conversation.updated_at,
@@ -1240,6 +1319,9 @@ def serialize_conversation(conversation: Conversation, messages: list[Message], 
             for message in messages
         ],
     }
+    if latest_usage:
+        result["latestUsage"] = latest_usage
+    return result
 
 
 def serialize_inbox_item(item: InboxItem) -> dict:

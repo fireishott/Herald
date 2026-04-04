@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ThinkingIndicatorView: View {
     let startTime: Date
+    var toolActivity: String? = nil
 
     @State private var showElapsedTime = false
     @State private var isPulsing = false
@@ -12,7 +13,11 @@ struct ThinkingIndicatorView: View {
                 .opacity(isPulsing ? 0.5 : 1.0)
 
             VStack(alignment: .leading, spacing: Design.Spacing.xxs) {
-                thinkingDots
+                if let activity = toolActivity {
+                    toolActivityLabel(activity)
+                } else {
+                    thinkingDots
+                }
                 elapsedTimeLabel
             }
 
@@ -28,11 +33,23 @@ struct ThinkingIndicatorView: View {
         }
     }
 
+    private func toolActivityLabel(_ label: String) -> some View {
+        Text(label)
+            .font(Design.Typography.caption)
+            .foregroundStyle(Design.Colors.secondaryForeground)
+            .padding(.horizontal, Design.Spacing.sm)
+            .padding(.vertical, Design.Spacing.xxs)
+            .background(Design.Colors.surface)
+            .clipShape(Capsule())
+            .transition(.opacity)
+            .animation(Design.Motion.quickResponse, value: label)
+    }
+
     private var thinkingDots: some View {
         HStack(spacing: Design.Spacing.xxs) {
             ForEach(0 ..< 3, id: \.self) { index in
                 Circle()
-                    .fill(.secondary)
+                    .fill(Design.Colors.secondaryForeground)
                     .frame(width: 6, height: 6)
                     .opacity(isPulsing ? 0.3 : 0.8)
                     .animation(
@@ -53,7 +70,7 @@ struct ThinkingIndicatorView: View {
                 let elapsed = context.date.timeIntervalSince(startTime)
                 Text(formatElapsed(elapsed))
                     .font(Design.Typography.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
             }
         }
     }

@@ -6,7 +6,7 @@ struct TalkModeScreen: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground)
+            Design.Colors.background
                 .ignoresSafeArea()
 
             VStack(spacing: Design.Spacing.xl) {
@@ -22,7 +22,7 @@ struct TalkModeScreen: View {
                 if let statusMessage = talkStore.statusMessage {
                     Text(statusMessage)
                         .font(Design.Typography.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Design.Colors.secondaryForeground)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, Design.Spacing.lg)
                 }
@@ -61,7 +61,7 @@ struct TalkModeScreen: View {
             if talkStore.isSessionActive {
                 Text(formattedDuration)
                     .font(Design.Typography.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
                     .transition(.opacity.combined(with: .scale(scale: 0.9)))
             }
         }
@@ -77,48 +77,48 @@ struct TalkModeScreen: View {
     // MARK: - Controls
 
     private var controlBar: some View {
-        GlassEffectContainer(spacing: Design.Spacing.lg) {
-            HStack(spacing: Design.Spacing.lg) {
-                if talkStore.isSessionActive {
-                    // Mute button
-                    Button {
-                        Task { await talkStore.toggleMute() }
-                    } label: {
-                        Image(systemName: talkStore.isMuted ? "mic.slash.fill" : "mic.fill")
-                            .font(.system(size: Design.Size.iconLarge))
-                            .foregroundStyle(talkStore.isMuted ? .red : .primary)
-                            .frame(width: Design.Size.minTapTarget, height: Design.Size.minTapTarget)
-                    }
-                    .clipShape(Circle())
-                    .glassEffect(.regular.interactive(), in: Circle())
-                    .accessibilityLabel(talkStore.isMuted ? "Unmute" : "Mute")
-
-                    // End session button
-                    Button {
-                        endSession()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: Design.Size.iconLarge, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: Design.Size.iconHero, height: Design.Size.iconHero)
-                            .background(.red, in: Circle())
-                    }
-                    .accessibilityLabel("End session")
-                } else {
-                    // Start session button
-                    Button {
-                        startSession()
-                    } label: {
-                        Label("Start Talking", systemImage: "mic.fill")
-                            .font(Design.Typography.headline)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, Design.Spacing.lg)
-                            .padding(.vertical, Design.Spacing.sm)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .accessibilityLabel("Start voice session")
-                    .disabled(!talkStore.canStartSession)
+        HStack(spacing: Design.Spacing.lg) {
+            if talkStore.isSessionActive {
+                // Mute button
+                Button {
+                    Task { await talkStore.toggleMute() }
+                } label: {
+                    Image(systemName: talkStore.isMuted ? "mic.slash.fill" : "mic.fill")
+                        .font(.system(size: Design.Size.iconLarge))
+                        .foregroundStyle(talkStore.isMuted ? .red : Design.Colors.foreground)
+                        .frame(width: Design.Size.minTapTarget, height: Design.Size.minTapTarget)
+                        .background(Design.Colors.surface)
+                        .clipShape(Circle())
                 }
+                .accessibilityLabel(talkStore.isMuted ? "Unmute" : "Mute")
+
+                // End session button
+                Button {
+                    endSession()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: Design.Size.iconLarge, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: Design.Size.iconHero, height: Design.Size.iconHero)
+                        .background(.red, in: Circle())
+                }
+                .accessibilityLabel("End session")
+            } else {
+                // Start session button
+                Button {
+                    startSession()
+                } label: {
+                    Label("Start Talking", systemImage: "mic.fill")
+                        .font(Design.Typography.headline)
+                        .foregroundStyle(Design.Colors.foreground)
+                        .padding(.horizontal, Design.Spacing.lg)
+                        .padding(.vertical, Design.Spacing.sm)
+                }
+                .background(Design.Brand.accent)
+                .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+                .accessibilityLabel("Start voice session")
+                .disabled(!talkStore.canStartSession)
+                .opacity(talkStore.canStartSession ? 1 : 0.5)
             }
         }
         .animation(Design.Motion.expressive, value: talkStore.isSessionActive)
@@ -129,10 +129,11 @@ struct TalkModeScreen: View {
     private var mockIndicator: some View {
         Text(sessionStore.state.isMockMode ? "MOCK" : "LIVE")
             .font(Design.Typography.caption2)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Design.Colors.secondaryForeground)
             .padding(.horizontal, Design.Spacing.xs)
             .padding(.vertical, Design.Spacing.xxxs)
-            .glassEffect(.regular, in: Capsule())
+            .background(Design.Colors.surface)
+            .clipShape(Capsule())
     }
 
     // MARK: - Actions

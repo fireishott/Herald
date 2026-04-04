@@ -42,6 +42,49 @@ final class MockHermesClient: HermesClientProtocol {
         return hermesMessage
     }
 
+    func sendStreaming(message content: String, clientMessageID: UUID) -> AsyncStream<StreamingUpdate> {
+        AsyncStream { continuation in
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    continuation.finish()
+                    return
+                }
+
+                let userMessage = Message(sender: .user, content: content, status: .sent)
+                self.currentConversation?.messages.append(userMessage)
+
+                continuation.yield(.messageSent(jobID: UUID()))
+
+                // Simulate tool activity
+                try? await Task.sleep(for: .seconds(0.5))
+                continuation.yield(.toolActivity("Searching..."))
+
+                // Simulate streaming text
+                try? await Task.sleep(for: .seconds(0.3))
+                let response = self.generateResponse(for: content)
+                let words = response.split(separator: " ")
+                for word in words {
+                    try? await Task.sleep(for: .milliseconds(50))
+                    continuation.yield(.textDelta(String(word) + " "))
+                }
+
+                let hermesMessage = Message(
+                    sender: .hermes,
+                    content: response,
+                    status: .delivered
+                )
+                self.currentConversation?.messages.append(hermesMessage)
+
+                continuation.yield(.finished(
+                    hermesMessage,
+                    TokenUsage(promptTokens: 150, completionTokens: 80, totalTokens: 230),
+                    nil
+                ))
+                continuation.finish()
+            }
+        }
+    }
+
     func loadConversation() async -> Conversation {
         let conversation = DemoData.sampleConversation
         currentConversation = conversation
@@ -52,6 +95,10 @@ final class MockHermesClient: HermesClientProtocol {
         let fresh = Conversation(title: "Hermes")
         currentConversation = fresh
         return fresh
+    }
+
+    func injectVoiceTranscript(voiceSessionId: UUID) async throws -> Conversation {
+        return currentConversation ?? Conversation(title: "Hermes")
     }
 
     private func generateResponse(for input: String) -> String {

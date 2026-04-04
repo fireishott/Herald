@@ -161,6 +161,7 @@ class Message(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     client_message_id: Mapped[str | None] = mapped_column(String(36))
     delivery_status: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str | None] = mapped_column(Text)  # None = chat, "voice_transcript"
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
@@ -183,6 +184,8 @@ class MessageJob(Base):
     result_session_id: Mapped[str | None] = mapped_column(Text)
     error_text: Mapped[str | None] = mapped_column(Text)
     retryable: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    usage_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    diff_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 

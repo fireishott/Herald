@@ -8,7 +8,7 @@ struct SettingsSectionView<Content: View>: View {
         VStack(alignment: .leading, spacing: Design.Spacing.sm) {
             Text(title)
                 .font(Design.Typography.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
                 .textCase(.uppercase)
                 .padding(.leading, Design.Spacing.xxs)
 
@@ -17,7 +17,8 @@ struct SettingsSectionView<Content: View>: View {
             }
             .padding(Design.Spacing.md)
             .frame(maxWidth: .infinity)
-            .glassEffect(.regular, in: .rect(cornerRadius: Design.CornerRadius.lg))
+            .background(Design.Colors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
         }
     }
 }

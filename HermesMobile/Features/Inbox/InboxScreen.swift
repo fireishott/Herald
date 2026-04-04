@@ -6,7 +6,7 @@ struct InboxScreen: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground)
+            Design.Colors.background
                 .ignoresSafeArea()
 
             if inboxStore.items.isEmpty {
@@ -34,7 +34,7 @@ struct InboxScreen: View {
                             Task { await inboxStore.dismiss(item) }
                         },
                         onOpenDetails: {
-                            router.activeSheet = .inboxItemDetail(item)
+                            // Inbox detail navigation deprecated — no-op
                         }
                     )
                 }
@@ -53,6 +53,7 @@ struct InboxScreen: View {
             "All Caught Up",
             systemImage: "tray",
             description: Text("No new items from Hermes. Check back later.")
+                .foregroundStyle(Design.Colors.secondaryForeground)
         )
     }
 
@@ -64,7 +65,7 @@ struct InboxScreen: View {
             if inboxStore.unreadCount > 0 {
                 Text("\(inboxStore.unreadCount) new")
                     .font(Design.Typography.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
             }
         }
     }

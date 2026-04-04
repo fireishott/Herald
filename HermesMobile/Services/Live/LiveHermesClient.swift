@@ -13,6 +13,9 @@ final class LiveHermesClient: HermesClientProtocol {
         let conversation: RelayConversation
         let userMessage: RelayMessage?
         let message: RelayMessage?
+        let jobId: UUID?
+        let usage: TokenUsage?
+        let diff: CodeDiff?
     }
 
     private struct RelayConversation: Decodable {
@@ -31,6 +34,22 @@ final class LiveHermesClient: HermesClientProtocol {
         let jobId: UUID?
     }
 
+    private struct StreamProgressPayload: Decodable {
+        let jobId: UUID?
+        let kind: String?
+        let delta: String?
+        let label: String?
+    }
+
+    private struct StreamDonePayload: Decodable {
+        let jobId: UUID?
+        let status: String
+        let usage: TokenUsage?
+        let diff: CodeDiff?
+        let error: String?
+        let message: RelayMessage?
+    }
+
     private struct MessageCreateBody: Encodable {
         let conversationId: UUID?
         let text: String
@@ -42,26 +61,30 @@ final class LiveHermesClient: HermesClientProtocol {
 
     private let apiClient: RelayAPIClient
     private let accessTokenProvider: @MainActor () async -> String?
+    private let accessTokenRefresher: @MainActor () async -> String?
     private let allowDemoFallback: Bool
 
     init(
         apiClient: RelayAPIClient,
         accessTokenProvider: @escaping @MainActor () async -> String?,
+        accessTokenRefresher: @escaping @MainActor () async -> String? = { nil },
         allowDemoFallback: Bool = true
     ) {
         self.apiClient = apiClient
         self.accessTokenProvider = accessTokenProvider
+        self.accessTokenRefresher = accessTokenRefresher
         self.allowDemoFallback = allowDemoFallback
     }
 
     func connect() async {
         connectionStatus = .connecting
         do {
-            let token = await accessTokenProvider()
-            let response: ConversationResponse = try await apiClient.get(
-                path: "conversations/current",
-                accessToken: token
-            )
+            let response: ConversationResponse = try await performAuthorizedRequest { [self] token in
+                try await self.apiClient.get(
+                    path: "conversations/current",
+                    accessToken: token
+                )
+            }
             currentConversation = mapConversation(response.conversation)
             connectionStatus = .connected
         } catch {
@@ -75,16 +98,17 @@ final class LiveHermesClient: HermesClientProtocol {
 
     func send(message: String, clientMessageID: UUID) async -> Message {
         do {
-            let token = await accessTokenProvider()
-            let response: MessageResponse = try await apiClient.post(
-                path: "messages",
-                body: MessageCreateBody(
-                    conversationId: currentConversation?.id,
-                    text: message,
-                    clientMessageId: clientMessageID
-                ),
-                accessToken: token
-            )
+            let response: MessageResponse = try await performAuthorizedRequest { [self] token in
+                try await self.apiClient.post(
+                    path: "messages",
+                    body: MessageCreateBody(
+                        conversationId: self.currentConversation?.id,
+                        text: message,
+                        clientMessageId: clientMessageID
+                    ),
+                    accessToken: token
+                )
+            }
             currentConversation = mapConversation(response.conversation)
             connectionStatus = .connected
             if let message = response.message {
@@ -100,13 +124,94 @@ final class LiveHermesClient: HermesClientProtocol {
         }
     }
 
+    func sendStreaming(message content: String, clientMessageID: UUID) -> AsyncStream<StreamingUpdate> {
+        AsyncStream { continuation in
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    continuation.yield(.failed("Client deallocated"))
+                    continuation.finish()
+                    return
+                }
+
+                do {
+                    let response: MessageResponse = try await self.performAuthorizedRequest { [self] token in
+                        try await self.apiClient.post(
+                            path: "messages",
+                            body: MessageCreateBody(
+                                conversationId: self.currentConversation?.id,
+                                text: content,
+                                clientMessageId: clientMessageID
+                            ),
+                            accessToken: token
+                        )
+                    }
+
+                    self.currentConversation = self.mapConversation(response.conversation)
+                    self.connectionStatus = .connected
+
+                    // If the reply is already complete (synchronous response), yield finished immediately
+                    if response.replyState != "pending" {
+                        if let msg = response.message {
+                            continuation.yield(.finished(self.mapMessage(msg), response.usage, response.diff))
+                        } else {
+                            continuation.yield(.finished(
+                                Message(sender: .system, content: "Hermes did not return a message.", status: .failed),
+                                nil, nil
+                            ))
+                        }
+                        continuation.finish()
+                        return
+                    }
+
+                    // Reply is pending — stream job events via SSE
+                    guard let jobId = response.jobId else {
+                        // No jobId available, fall back to non-streaming result
+                        if let msg = response.message ?? response.userMessage {
+                            continuation.yield(.finished(self.mapMessage(msg), response.usage, response.diff))
+                        } else {
+                            continuation.yield(.finished(
+                                Message(sender: .user, content: content, status: .sent),
+                                nil, nil
+                            ))
+                        }
+                        continuation.finish()
+                        return
+                    }
+
+                    continuation.yield(.messageSent(jobID: jobId))
+
+                    do {
+                        let donePayload = try await self.streamJobEvents(jobId: jobId, continuation: continuation)
+                        let finalMessage = self.resolveFinalMessage(
+                            jobId: jobId,
+                            donePayload: donePayload,
+                            conversation: self.currentConversation
+                        )
+                        continuation.yield(.finished(finalMessage, donePayload?.usage, donePayload?.diff))
+                        continuation.finish()
+                    } catch {
+                        Self.logger.warning("SSE stream error: \(error.localizedDescription)")
+                        continuation.yield(.failed("Stream interrupted"))
+                        continuation.finish()
+                    }
+
+                } catch {
+                    self.connectionStatus = .error
+                    continuation.yield(.failed("Hermes relay is unavailable right now."))
+                    continuation.finish()
+                }
+            }
+        }
+    }
+
     func loadConversation() async -> Conversation {
         do {
-            let token = await accessTokenProvider()
-            let response: ConversationResponse = try await apiClient.get(
-                path: "conversations/current",
-                accessToken: token
-            )
+            let response: ConversationResponse = try await performAuthorizedRequest { [self] token in
+                try await self.apiClient.get(
+                    path: "conversations/current",
+                    accessToken: token
+                )
+            }
             let conversation = mapConversation(response.conversation)
             currentConversation = conversation
             connectionStatus = .connected
@@ -119,14 +224,27 @@ final class LiveHermesClient: HermesClientProtocol {
     }
 
     func clearConversation() async throws -> Conversation {
-        let token = await accessTokenProvider()
-        let response: ConversationResponse = try await apiClient.post(
-            path: "conversations/current/clear",
-            accessToken: token
-        )
+        let response: ConversationResponse = try await performAuthorizedRequest { [self] token in
+            try await self.apiClient.post(
+                path: "conversations/current/clear",
+                accessToken: token
+            )
+        }
         let conversation = mapConversation(response.conversation)
         currentConversation = conversation
         connectionStatus = .connected
+        return conversation
+    }
+
+    func injectVoiceTranscript(voiceSessionId: UUID) async throws -> Conversation {
+        let response: ConversationResponse = try await performAuthorizedRequest { [self] token in
+            try await self.apiClient.post(
+                path: "talk/session/\(voiceSessionId.uuidString)/inject",
+                accessToken: token
+            )
+        }
+        let conversation = mapConversation(response.conversation)
+        currentConversation = conversation
         return conversation
     }
 
@@ -170,6 +288,132 @@ final class LiveHermesClient: HermesClientProtocol {
             return .failed
         default:
             return sender == .user ? .sent : .delivered
+        }
+    }
+
+    private func performAuthorizedRequest<T>(
+        _ operation: @escaping @MainActor (_ accessToken: String?) async throws -> T
+    ) async throws -> T {
+        do {
+            return try await operation(await accessTokenProvider())
+        } catch RelayAPIClient.ClientError.unauthorized {
+            guard let refreshedToken = await accessTokenRefresher(), !refreshedToken.isEmpty else {
+                throw RelayAPIClient.ClientError.unauthorized("Expired or invalid access token.")
+            }
+            return try await operation(refreshedToken)
+        }
+    }
+
+    private func streamJobEvents(
+        jobId: UUID,
+        continuation: AsyncStream<StreamingUpdate>.Continuation
+    ) async throws -> StreamDonePayload? {
+        var didRetryUnauthorized = false
+        var overrideToken: String?
+
+        while true {
+            let accessToken: String?
+            if let override = overrideToken {
+                accessToken = override
+                overrideToken = nil
+            } else {
+                accessToken = await accessTokenProvider()
+            }
+            do {
+                let stream = apiClient.streamEvents(
+                    path: "jobs/\(jobId.uuidString)/events",
+                    accessToken: accessToken
+                )
+                for try await sseEvent in stream {
+                    if Task.isCancelled { return nil }
+
+                    switch sseEvent.event {
+                    case "text_delta":
+                        if let payload = decode(StreamProgressPayload.self, from: sseEvent.data),
+                           let delta = payload.delta,
+                           !delta.isEmpty {
+                            continuation.yield(.textDelta(delta))
+                        }
+                    case "tool_activity":
+                        if let payload = decode(StreamProgressPayload.self, from: sseEvent.data),
+                           let label = payload.label,
+                           !label.isEmpty {
+                            continuation.yield(.toolActivity(label))
+                        }
+                    case "done":
+                        return decode(StreamDonePayload.self, from: sseEvent.data)
+                    default:
+                        break
+                    }
+                }
+
+                return nil
+            } catch RelayAPIClient.ClientError.unauthorized {
+                guard !didRetryUnauthorized else {
+                    throw RelayAPIClient.ClientError.unauthorized("Expired or invalid access token.")
+                }
+                guard let refreshedToken = await accessTokenRefresher(), !refreshedToken.isEmpty else {
+                    throw RelayAPIClient.ClientError.unauthorized("Expired or invalid access token.")
+                }
+                didRetryUnauthorized = true
+                overrideToken = refreshedToken
+                continue
+            }
+        }
+    }
+
+    private func reloadConversationForStreaming() async -> Conversation? {
+        do {
+            let response: ConversationResponse = try await performAuthorizedRequest { [self] token in
+                try await self.apiClient.get(
+                    path: "conversations/current",
+                    accessToken: token
+                )
+            }
+            let conversation = mapConversation(response.conversation)
+            currentConversation = conversation
+            connectionStatus = .connected
+            return conversation
+        } catch {
+            Self.logger.warning("Failed to refresh conversation after streaming: \(error.localizedDescription)")
+            return currentConversation
+        }
+    }
+
+    private func resolveFinalMessage(
+        jobId: UUID,
+        donePayload: StreamDonePayload?,
+        conversation: Conversation?
+    ) -> Message {
+        if let relayMessage = donePayload?.message {
+            return mapMessage(relayMessage)
+        }
+
+        if let conversation,
+           let message = conversation.messages.last(where: { $0.jobID == jobId && $0.sender != .user }) {
+            return message
+        }
+
+        if donePayload?.status == "failed" {
+            let text = donePayload?.error.map { "Hermes could not process this message: \($0)" }
+                ?? "Hermes could not process this message."
+            return Message(sender: .system, content: text, jobID: jobId, status: .failed)
+        }
+
+        return Message(sender: .hermes, content: "", jobID: jobId, status: .delivered)
+    }
+
+    private func decode<T: Decodable>(_ type: T.Type, from raw: String) -> T? {
+        guard let data = raw.data(using: .utf8) else {
+            Self.logger.warning("SSE decode: failed to convert raw string to UTF-8 data")
+            return nil
+        }
+        do {
+            return try RelayCoders.makeDecoder().decode(type, from: data)
+        } catch {
+            let snippet = String(raw.prefix(200))
+            Self.logger.warning("SSE decode failed for \(String(describing: T.self)): \(error.localizedDescription) — raw: \(snippet)")
+            return nil
         }
     }
 }

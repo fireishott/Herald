@@ -12,7 +12,8 @@ struct PermissionCard: View {
         }
         .padding(Design.Spacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: Design.CornerRadius.lg))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
     }
 
     // MARK: - Header
@@ -27,6 +28,7 @@ struct PermissionCard: View {
 
             Text(capability.permissionType.displayLabel)
                 .font(Design.Typography.headline)
+                .foregroundStyle(Design.Colors.foreground)
 
             Spacer()
         }
@@ -37,7 +39,7 @@ struct PermissionCard: View {
     private var explanationText: some View {
         Text(capability.permissionType.explanation)
             .font(Design.Typography.callout)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Design.Colors.secondaryForeground)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -52,11 +54,17 @@ struct PermissionCard: View {
             Spacer()
 
             if let actionLabel = capability.status.actionLabel {
-                Button(actionLabel) {
+                Button {
                     onRequest()
+                } label: {
+                    Text(actionLabel)
+                        .font(Design.Typography.footnote.weight(.semibold))
+                        .foregroundStyle(Design.Colors.foreground)
+                        .padding(.horizontal, Design.Spacing.md)
+                        .padding(.vertical, Design.Spacing.xs)
                 }
-                .buttonStyle(.glassProminent)
-                .font(Design.Typography.footnote.weight(.semibold))
+                .background(Design.Brand.accent)
+                .clipShape(Capsule())
             }
         }
     }

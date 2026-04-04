@@ -15,12 +15,13 @@ struct InboxItemDetailSheet: View {
                 }
                 .padding(Design.Spacing.lg)
             }
-            .background(Color(.systemBackground))
+            .background(Design.Colors.background)
             .navigationTitle(item.type.displayLabel)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
+                        .foregroundStyle(Design.Brand.accent)
                 }
             }
         }
@@ -34,24 +35,25 @@ struct InboxItemDetailSheet: View {
 
             Text(item.title)
                 .font(Design.Typography.screenTitle2)
+                .foregroundStyle(Design.Colors.foreground)
         }
     }
 
     private var bodySection: some View {
         Text(item.body)
             .font(Design.Typography.body)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Design.Colors.secondaryForeground)
     }
 
     private var metadataSection: some View {
         HStack(spacing: Design.Spacing.md) {
             Label(item.status.rawValue.capitalized, systemImage: "checklist")
                 .font(Design.Typography.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
 
             Label(item.priority.rawValue.capitalized, systemImage: "flag")
                 .font(Design.Typography.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
         }
     }
 }

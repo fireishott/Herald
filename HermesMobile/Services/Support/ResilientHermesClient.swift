@@ -44,6 +44,10 @@ final class ResilientHermesClient: HermesClientProtocol {
         return response
     }
 
+    func sendStreaming(message: String, clientMessageID: UUID) -> AsyncStream<StreamingUpdate> {
+        primary.sendStreaming(message: message, clientMessageID: clientMessageID)
+    }
+
     func loadConversation() async -> Conversation {
         let conversation = await primary.loadConversation()
         if allowsFallback() && primary.connectionStatus == .error {
@@ -54,5 +58,9 @@ final class ResilientHermesClient: HermesClientProtocol {
 
     func clearConversation() async throws -> Conversation {
         try await primary.clearConversation()
+    }
+
+    func injectVoiceTranscript(voiceSessionId: UUID) async throws -> Conversation {
+        try await primary.injectVoiceTranscript(voiceSessionId: voiceSessionId)
     }
 }

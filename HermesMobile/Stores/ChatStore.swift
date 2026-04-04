@@ -6,11 +6,16 @@ final class ChatStore {
     var conversation: Conversation?
     var isLoading = false
     var pendingMessageSentAt: Date?
+    var lastTokenUsage: TokenUsage?
     private var isPollingEnabled = false
     private var pollingTask: Task<Void, Never>?
+    private var streamingTask: Task<Void, Never>?
+    private(set) var streamingMessageID: UUID?
+
+    var isStreaming: Bool { streamingMessageID != nil }
 
     private let hermesClient: any HermesClientProtocol
-    private let persistence: any AppPersistenceStoreProtocol
+    let persistence: any AppPersistenceStoreProtocol
 
     init(hermesClient: any HermesClientProtocol, persistence: any AppPersistenceStoreProtocol) {
         self.hermesClient = hermesClient
@@ -49,13 +54,79 @@ final class ChatStore {
         conversation?.lastActivity = optimistic.timestamp
         pendingMessageSentAt = optimistic.timestamp
 
-        let response = await hermesClient.send(message: trimmedContent, clientMessageID: clientMessageID)
-        conversation = hermesClient.currentConversation
+        // Append a placeholder Hermes message for streaming content
+        let placeholderID = UUID()
+        let placeholder = Message(
+            id: placeholderID,
+            sender: .hermes,
+            content: "",
+            status: .sending,
+            isStreaming: true
+        )
+        conversation?.messages.append(placeholder)
+        streamingMessageID = placeholderID
 
-        if conversation == nil && response.status == .failed {
-            conversation = Conversation(title: "Hermes")
-            conversation?.messages.append(response)
-            conversation?.lastActivity = response.timestamp
+        let stream = hermesClient.sendStreaming(message: trimmedContent, clientMessageID: clientMessageID)
+
+        streamingTask = Task { [weak self] in
+            guard let self else { return }
+            for await update in stream {
+                if Task.isCancelled { break }
+                switch update {
+                case .messageSent:
+                    if let idx = self.conversation?.messages.firstIndex(where: { $0.id == clientMessageID }) {
+                        self.conversation?.messages[idx].status = .sent
+                    }
+
+                case .textDelta(let delta):
+                    if let idx = self.conversation?.messages.firstIndex(where: { $0.id == placeholderID }) {
+                        self.conversation?.messages[idx].content += delta
+                        self.conversation?.messages[idx].toolActivity = nil
+                        for i in self.conversation!.messages[idx].toolActivities.indices {
+                            self.conversation?.messages[idx].toolActivities[i].isActive = false
+                        }
+                    }
+
+                case .toolActivity(let label):
+                    if let idx = self.conversation?.messages.firstIndex(where: { $0.id == placeholderID }) {
+                        for i in self.conversation!.messages[idx].toolActivities.indices {
+                            self.conversation?.messages[idx].toolActivities[i].isActive = false
+                        }
+                        let activity = ToolActivity(label: label)
+                        self.conversation?.messages[idx].toolActivities.append(activity)
+                        self.conversation?.messages[idx].toolActivity = label
+                    }
+
+                case .finished(let finalMessage, let usage, let diff):
+                    if let idx = self.conversation?.messages.firstIndex(where: { $0.id == placeholderID }) {
+                        let activities = self.conversation!.messages[idx].toolActivities
+                        var resolved = finalMessage
+                        resolved.toolActivities = activities
+                        resolved.codeDiff = diff
+                        self.conversation?.messages[idx] = resolved
+                    }
+                    self.conversation = self.mergeStreamingArtifacts(
+                        from: self.conversation,
+                        into: self.hermesClient.currentConversation
+                    )
+                    self.lastTokenUsage = usage
+                    self.streamingMessageID = nil
+
+                case .failed:
+                    if let idx = self.conversation?.messages.firstIndex(where: { $0.id == placeholderID }) {
+                        self.conversation?.messages.remove(at: idx)
+                    }
+                    self.streamingMessageID = nil
+                }
+            }
+        }
+        await streamingTask?.value
+        streamingTask = nil
+
+        // If streaming didn't finish cleanly, fall back to existing polling behavior
+        if streamingMessageID != nil {
+            streamingMessageID = nil
+            restartPendingPollingIfNeeded()
         }
 
         if !hasPendingMessages {
@@ -65,7 +136,6 @@ final class ChatStore {
         if let conversation {
             persistence.saveConversationCache(conversation)
         }
-        restartPendingPollingIfNeeded()
     }
 
     func clearConversation() async throws {
@@ -75,6 +145,102 @@ final class ChatStore {
         persistence.saveConversationCache(fresh)
         pollingTask?.cancel()
         pollingTask = nil
+    }
+
+    func cancelStreaming() {
+        streamingTask?.cancel()
+        streamingTask = nil
+
+        // Finalize current streaming message with content received so far
+        if let sid = streamingMessageID,
+           let idx = conversation?.messages.firstIndex(where: { $0.id == sid }) {
+            conversation?.messages[idx].isStreaming = false
+            conversation?.messages[idx].status = .delivered
+            for i in conversation!.messages[idx].toolActivities.indices {
+                conversation?.messages[idx].toolActivities[i].isActive = false
+            }
+        }
+        streamingMessageID = nil
+        pendingMessageSentAt = nil
+
+        if let conversation {
+            persistence.saveConversationCache(conversation)
+        }
+    }
+
+    func injectVoiceTranscript(voiceSessionId: UUID, duration: TimeInterval) async {
+        do {
+            let updated = try await hermesClient.injectVoiceTranscript(voiceSessionId: voiceSessionId)
+            conversation = updated
+
+            // Set voiceSessionDuration on the system banner message
+            if let idx = conversation?.messages.lastIndex(where: {
+                $0.sender == .system && $0.content.contains("[Voice session ended]")
+            }) {
+                conversation?.messages[idx].voiceSessionDuration = duration
+            }
+
+            if let conversation {
+                persistence.saveConversationCache(conversation)
+            }
+        } catch {
+            // Injection failed — voice transcript not added to chat. Non-fatal.
+        }
+    }
+
+    func exportConversationToFile() {
+        guard let conversation else { return }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        let timestamp = formatter.string(from: Date())
+        let filename = "hermes_conversation_\(timestamp).json"
+
+        let exportData: [String: Any] = [
+            "title": conversation.title,
+            "sessionId": conversation.id.uuidString,
+            "exportedAt": ISO8601DateFormatter().string(from: Date()),
+            "messageCount": conversation.messages.count,
+            "messages": conversation.messages.map { msg in
+                [
+                    "role": msg.sender.rawValue,
+                    "content": msg.content,
+                    "timestamp": ISO8601DateFormatter().string(from: msg.timestamp),
+                ] as [String: String]
+            },
+        ]
+
+        guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let fileURL = dir.appendingPathComponent(filename)
+
+        do {
+            let data = try JSONSerialization.data(withJSONObject: exportData, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: fileURL)
+            // Append a system message confirming the save (caller handles this)
+        } catch {
+            // Export failed silently — caller can check
+        }
+    }
+
+    func setConversationTitle(_ title: String) {
+        conversation?.title = title
+        if let conversation {
+            persistence.saveConversationCache(conversation)
+        }
+    }
+
+    func retryMessage(_ message: Message) async {
+        // Remove the failed message
+        conversation?.messages.removeAll { $0.id == message.id }
+
+        if message.sender == .user {
+            await sendMessage(message.content)
+        } else {
+            // For failed Hermes messages, re-send the last user message
+            if let lastUserMsg = conversation?.messages.last(where: { $0.sender == .user }) {
+                await sendMessage(lastUserMsg.content)
+            }
+        }
     }
 
     func setPollingEnabled(_ isEnabled: Bool) {
@@ -109,6 +275,8 @@ final class ChatStore {
         }) == true
     }
 
+    private static let maxPollAttempts = 30 // 30 × 2s = 60 seconds max
+
     private func restartPendingPollingIfNeeded() {
         guard isPollingEnabled, hasPendingMessages else {
             pollingTask?.cancel()
@@ -120,8 +288,10 @@ final class ChatStore {
 
         pollingTask = Task { [weak self] in
             guard let self else { return }
+            var attempts = 0
 
-            while !Task.isCancelled {
+            while !Task.isCancelled, attempts < Self.maxPollAttempts {
+                attempts += 1
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { break }
                 self.conversation = await self.hermesClient.loadConversation()
@@ -134,9 +304,67 @@ final class ChatStore {
                 }
             }
 
+            // If we exhausted attempts, mark stuck messages as failed
+            if attempts >= Self.maxPollAttempts, self.hasPendingMessages {
+                if var conv = self.conversation {
+                    for i in conv.messages.indices where conv.messages[i].sender == .user && conv.messages[i].status == .sending {
+                        conv.messages[i].status = .failed
+                    }
+                    self.conversation = conv
+                    self.persistence.saveConversationCache(conv)
+                }
+                self.pendingMessageSentAt = nil
+            }
+
             if self.pollingTask?.isCancelled == false {
                 self.pollingTask = nil
             }
         }
+    }
+
+    /// Re-attaches transient streaming artifacts (tool timeline, code diff) onto the
+    /// canonical conversation that the relay returned, since the relay knows nothing
+    /// about those client-only fields.
+    private func mergeStreamingArtifacts(
+        from localConversation: Conversation?,
+        into refreshedConversation: Conversation?
+    ) -> Conversation? {
+        guard var refreshedConversation else { return localConversation }
+        guard let localConversation else { return refreshedConversation }
+
+        for index in refreshedConversation.messages.indices {
+            let remote = refreshedConversation.messages[index]
+
+            // Prefer exact UUID match (works when the relay echoes back the same ID).
+            let local: Message?
+            if let byID = localConversation.messages.first(where: { $0.id == remote.id }) {
+                local = byID
+            } else if let remoteJobID = remote.jobID {
+                // Fallback: the streaming placeholder had a client-generated UUID that
+                // differs from the server-assigned message ID.  Match on jobID + sender
+                // instead, but only for Hermes messages that actually carry artifacts.
+                local = localConversation.messages.first(where: {
+                    $0.jobID == remoteJobID
+                        && $0.sender == remote.sender
+                        && $0.sender == .hermes
+                        && (!$0.toolActivities.isEmpty || $0.codeDiff != nil)
+                })
+            } else {
+                local = nil
+            }
+
+            guard let local else { continue }
+
+            if !local.toolActivities.isEmpty {
+                refreshedConversation.messages[index].toolActivities = local.toolActivities
+                refreshedConversation.messages[index].toolActivity = local.toolActivity
+            }
+
+            if let diff = local.codeDiff, refreshedConversation.messages[index].codeDiff == nil {
+                refreshedConversation.messages[index].codeDiff = diff
+            }
+        }
+
+        return refreshedConversation
     }
 }

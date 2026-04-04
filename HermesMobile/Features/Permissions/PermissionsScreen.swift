@@ -5,7 +5,7 @@ struct PermissionsScreen: View {
 
     var body: some View {
         ZStack {
-            Color(.systemBackground)
+            Design.Colors.background
                 .ignoresSafeArea()
 
             ScrollView {
@@ -21,7 +21,6 @@ struct PermissionsScreen: View {
                 .padding(.horizontal, Design.Spacing.md)
                 .padding(.vertical, Design.Spacing.sm)
             }
-            .scrollEdgeEffectStyle(.soft, for: .top)
         }
         .navigationTitle("Permissions")
         .task { await permissionsStore.reloadCapabilities() }
@@ -30,7 +29,7 @@ struct PermissionsScreen: View {
     private var headerText: some View {
         Text("Hermes works best with your permission. You control what data Hermes can access.")
             .font(Design.Typography.callout)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Design.Colors.secondaryForeground)
             .padding(.horizontal, Design.Spacing.xxs)
     }
 

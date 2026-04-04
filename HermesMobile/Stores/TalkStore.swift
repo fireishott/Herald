@@ -1,5 +1,12 @@
 import Foundation
 
+/// Metadata captured when a voice session completes, used to trigger transcript injection.
+struct CompletedVoiceSession: Sendable {
+    let voiceSessionId: UUID
+    let duration: TimeInterval
+    let turnCount: Int
+}
+
 @MainActor
 @Observable
 final class TalkStore {
@@ -13,6 +20,10 @@ final class TalkStore {
     var statusMessage: String?
     var canStartSession = true
     var latencyMetrics = TalkLatencyMetrics()
+    var voiceSessionID: UUID?
+
+    /// Set after a voice session ends; consumed by MainTabView to trigger transcript injection.
+    var lastCompletedSession: CompletedVoiceSession?
 
     private let voiceService: any VoiceSessionServiceProtocol
     private var eventTask: Task<Void, Never>?
@@ -34,8 +45,22 @@ final class TalkStore {
     }
 
     func endSession() async {
+        // Capture session metadata before the service resets
+        let sessionId = voiceSessionID
+        let duration = sessionDuration
+        let turnCount = transcriptItems.filter { !$0.isPartial }.count
+
         await voiceService.endSession()
         applySnapshot(voiceService.snapshot)
+
+        // Publish completed session for injection
+        if let sessionId, turnCount > 0 {
+            lastCompletedSession = CompletedVoiceSession(
+                voiceSessionId: sessionId,
+                duration: duration,
+                turnCount: turnCount
+            )
+        }
     }
 
     func toggleMute() async {
@@ -46,6 +71,10 @@ final class TalkStore {
     func endSessionIfNeeded() async {
         guard isSessionActive else { return }
         await endSession()
+    }
+
+    func clearLastCompletedSession() {
+        lastCompletedSession = nil
     }
 
     func reset() {
@@ -59,6 +88,8 @@ final class TalkStore {
         statusMessage = nil
         canStartSession = true
         latencyMetrics = TalkLatencyMetrics()
+        voiceSessionID = nil
+        lastCompletedSession = nil
     }
 
     private func subscribeToEvents() {
@@ -85,6 +116,7 @@ final class TalkStore {
         statusMessage = snapshot.statusMessage
         canStartSession = snapshot.canStartSession
         latencyMetrics = snapshot.latencyMetrics
+        voiceSessionID = snapshot.voiceSessionID
         isSessionActive = connectionState == .connecting || connectionState == .connected
     }
 }

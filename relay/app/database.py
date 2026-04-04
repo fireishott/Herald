@@ -58,6 +58,40 @@ class Database:
                     "ON voice_sessions (relay_tool_token_hash)"
                 )
             )
+            job_columns = {column["name"] for column in inspector.get_columns("message_jobs")}
+            if "usage_data" not in job_columns:
+                connection.execute(text("ALTER TABLE message_jobs ADD COLUMN usage_data JSON"))
+            if "diff_data" not in job_columns:
+                connection.execute(text("ALTER TABLE message_jobs ADD COLUMN diff_data JSON"))
+
+            if "source" not in message_columns:
+                connection.execute(text("ALTER TABLE messages ADD COLUMN source TEXT"))
+
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_message_jobs_user_status_created "
+                    "ON message_jobs (user_id, status, created_at)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_message_jobs_status_lease "
+                    "ON message_jobs (status, lease_expires_at)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_messages_conversation_created "
+                    "ON messages (conversation_id, created_at)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_conversations_user_archived "
+                    "ON conversations (user_id, is_archived)"
+                )
+            )
+
             voice_turn_columns = {column["name"] for column in inspector.get_columns("voice_turns")}
             if "client_turn_id" not in voice_turn_columns:
                 connection.execute(text("ALTER TABLE voice_turns ADD COLUMN client_turn_id TEXT"))

@@ -1,6 +1,8 @@
 # Hermes Mobile Relay
 
-FastAPI relay for Hermes Mobile. This service owns device registration, pairing, app session bootstrap, host enrollment, message persistence, connector queueing, push registration, inbox APIs, and Hermes-facing internal inbox hooks.
+FastAPI relay for Hermes Mobile. The relay is the public control plane for pairing, auth, persistence, host coordination, talk bootstrap, and inbox flows.
+
+It is not the Hermes runtime itself in connector mode. Hermes work runs on the user-owned host connector.
 
 ## Run locally
 
@@ -23,45 +25,64 @@ uvicorn app.main:app --reload
 
 ## Deploy to Fly.io
 
-Fly's docs recommend installing `flyctl`, logging in with `fly auth login`, and running `fly launch` or `fly deploy` from the app source directory. Because this repo is a monorepo and Fly deploys from the current working directory, deploy from [`/Users/dylan-mac-mini/Documents/HermesMobile/relay`](/Users/dylan-mac-mini/Documents/HermesMobile/relay), where [`fly.toml`](/Users/dylan-mac-mini/Documents/HermesMobile/relay/fly.toml) and [`Dockerfile`](/Users/dylan-mac-mini/Documents/HermesMobile/relay/Dockerfile) live.
+Fly deploys from the current working directory, so deploy from [`/Users/dylan-mac-mini/Documents/HermesMobile/relay`](/Users/dylan-mac-mini/Documents/HermesMobile/relay), where [`fly.toml`](/Users/dylan-mac-mini/Documents/HermesMobile/relay/fly.toml) and [`Dockerfile`](/Users/dylan-mac-mini/Documents/HermesMobile/relay/Dockerfile) live.
 
-The Fly deployment details for this relay are documented in [`relay/docs/fly-io.md`](/Users/dylan-mac-mini/Documents/HermesMobile/relay/docs/fly-io.md).
+Deployment notes for this relay are documented in [`/Users/dylan-mac-mini/Documents/HermesMobile/relay/docs/fly-io.md`](/Users/dylan-mac-mini/Documents/HermesMobile/relay/docs/fly-io.md).
 
 ## API surface
 
+### Core and auth
+
 - `GET /v1/health`
 - `GET /v1/version`
-- `POST /v1/connector/setup`
-- `POST /v1/connector/phone-pairing-codes`
-- `POST /v1/phone-pairing/redeem`
-- `POST /v1/device/register`
-- `POST /v1/pairing/redeem`
-- `POST /v1/hosts/enrollment-codes`
-- `GET /v1/hosts/current`
-- `POST /v1/hosts/current/revoke`
-- `POST /v1/hosts/redeem`
-- `GET /v1/hosts/ws` (WebSocket)
 - `GET /v1/session`
 - `POST /v1/auth/refresh`
 - `POST /v1/auth/revoke`
-- `POST /v1/push/register`
+- `POST /v1/device/register`
+
+### Connector-first pairing and host management
+
+- `POST /v1/connector/setup`
+- `POST /v1/connector/phone-pairing-codes`
+- `POST /v1/phone-pairing/redeem`
+- `POST /v1/pairing/redeem` (legacy/dev compatibility)
+- `POST /v1/hosts/enrollment-codes` (legacy/dev compatibility)
+- `POST /v1/hosts/redeem` (legacy/dev compatibility)
+- `GET /v1/hosts/current`
+- `POST /v1/hosts/current/revoke`
+- `GET /v1/hosts/ws` (WebSocket)
+
+### Chat and streaming
+
 - `GET /v1/conversations/current`
 - `POST /v1/messages`
+- `GET /v1/jobs/{job_id}/events`
+
+### Talk mode
+
+- `GET /v1/talk/readiness`
+- `POST /v1/talk/session`
+- `POST /v1/talk/session/{voice_session_id}/end`
+- `POST /v1/talk/session/{voice_session_id}/turns`
+
+### Inbox and push
+
 - `GET /v1/inbox`
 - `POST /v1/inbox/{id}/action`
+- `POST /v1/push/register`
 - `POST /internal/inbox/create`
 - `GET /internal/inbox/{id}/actions`
 
 ## Hermes execution modes
 
-The relay now supports three Hermes execution modes:
+The relay supports three Hermes execution modes:
 
 - `HERMES_ADAPTER=mock`
-  - local/demo behavior with deterministic mock replies
+  - deterministic local/demo behavior
 - `HERMES_ADAPTER=cli`
   - the relay shells out to Hermes locally, useful for same-machine development and smoke tests
 - `HERMES_ADAPTER=connector`
-  - production-oriented mode where the public relay queues jobs and a user-owned host connector invokes Hermes locally on that machine
+  - production-oriented mode where the relay persists jobs and a connected host connector claims and executes them
 
 For local CLI mode, set:
 
@@ -74,8 +95,6 @@ HERMES_MODEL=
 HERMES_TOOLSETS=
 HERMES_SOURCE=tool
 ```
-
-The relay now uses Hermes quiet mode for programmatic calls, parses the returned `session_id`, and stores that ID on the relay conversation. The first turn still uses relay-side history replay into `hermes chat -Q -q ...`; follow-up turns resume the same Hermes session when possible, and fall back to transcript replay if the local Hermes session is missing.
 
 For connector mode, set:
 
@@ -93,9 +112,42 @@ CONNECTOR_HEARTBEAT_TIMEOUT_SECONDS=30
 CONNECTOR_IDLE_POLL_INTERVAL_SECONDS=1.0
 ```
 
-In connector mode the relay never shells out to Hermes directly. Instead, it persists chat jobs and waits for a connected `hermes-mobile-connector` host process to claim and execute them.
+## Connector mode behavior
 
-Sensor delivery in connector mode is relay-stateless. The phone uploads location and health samples only when paired and authenticated, the relay forwards them to the live connector WebSocket, and the request is treated as delivered only after the connector ACKs local storage. If the host is offline or busy, the relay returns `202` with `deliveryState=retry` and the phone keeps the payload in its local outbox.
+In connector mode the relay:
+
+- never shells out to Hermes directly
+- persists user messages before queuing work
+- stores message jobs durably in the database
+- lets a connected host claim jobs over WebSocket
+- supports synchronous inline replies when the host finishes within the sync window
+- falls back to pending/queued replies when the host is offline or slow
+- streams job progress over SSE
+- persists final assistant output and optional inline diff metadata
+
+## Sensor delivery
+
+Sensor delivery in connector mode is relay-stateless.
+
+- the phone uploads location and health samples only when paired and authenticated
+- the relay forwards them over the live connector control channel
+- a request is treated as delivered only after the connector ACKs local storage
+- if the host is offline or unavailable, the relay returns `202` with `deliveryState=retry`
+- the phone keeps the payload in its local outbox until a later successful delivery
+
+## Talk mode
+
+The relay is the control plane for voice sessions.
+
+It currently provides:
+
+- talk readiness checks
+- short-lived Realtime bootstrap from the host connector
+- one active voice session per user in v1
+- relay-hosted `hermes_delegate` MCP bridging for talk sessions
+- persisted final voice turns
+
+The relay does not proxy live audio. Media flows directly between the app and OpenAI Realtime once the session is bootstrapped.
 
 ## Connector-first setup
 
@@ -117,12 +169,18 @@ hermes-mobile service install
 hermes-mobile service start
 ```
 
-`pair-phone` prints the short-lived manual code plus an ASCII QR. Hermes Mobile release onboarding now expects that connector-generated phone pairing code instead of the old HM1/HC1 two-step flow.
+`pair-phone` prints the short-lived manual code plus an ASCII QR. The iOS app expects that connector-generated phone pairing code instead of the older HM1/HC1 flow.
 
-`setup` also auto-registers `mcp_servers.hermes_mobile` in the local Hermes config and validates it with `hermes mcp test hermes_mobile`. If Hermes chat is already open, the connector reports `Reload required`, and the user should run `/reload-mcp` or start a fresh chat before expecting location and health tools to appear in the current session.
+`setup` can also:
 
-`hermes-mobile run` is still available for foreground debugging, but the managed service is the recommended path for a persistent host.
+- auto-register `mcp_servers.hermes_mobile` in the local Hermes config
+- validate that MCP entry with `hermes mcp test hermes_mobile`
+- configure connector-owned OpenAI Realtime talk settings
 
-The connector keeps one outbound authenticated WebSocket connection to the relay, executes one Hermes job at a time, resumes Hermes sessions when possible, and sends replies back to the relay for delivery to the iOS app.
+If Hermes chat is already open, the connector may report `Reload required`. Run `/reload-mcp` or start a fresh chat before expecting new MCP tools to appear in that active Hermes session.
 
-Background health delivery and Always-authorized background location still require physical-device validation on iPhone. Simulator testing covers onboarding, foreground sync, and the app-side outbox, but not HealthKit background wakes.
+## Current limitations
+
+- Talk mode bootstrap and persistence are implemented, but true barge-in interruption is still incomplete in the app layer.
+- Inline code diffs are connector-generated from git-visible filesystem changes, not a Hermes-native structured diff API.
+- Background health delivery and Always-authorized location still require physical-device validation.

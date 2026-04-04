@@ -1,69 +1,134 @@
-# Build Summary: HermesMobile
+# Hermes Mobile: Current Build State
 
-## What Was Built
+## What Exists Today
 
-A complete iOS 26+ companion app for a persistent Hermes AI agent. 6 screens, all with full Liquid Glass styling, warm cream/beige design, and mock data that feels real.
+Hermes Mobile is now a real Hermes companion stack, not a mock shell.
 
-### Screens (6)
-1. **ChatScreen** — Conversation-first messaging with glass user bubbles, "H" avatar for Hermes messages, glass input bar (pen icon, text field, send arrow), glass circle navigation buttons (hamburger for conversations, compose for new), connection status indicator in toolbar
-2. **TalkModeScreen** — Voice orb with physics-based pulse animations that respond to state (idle/listening/thinking/speaking/disconnected), transcript area, session timer, mute and end controls in a glass effect container, mock mode indicator
-3. **InboxScreen** — Scrollable list of actionable items with type-colored icons (approval=orange, notification=blue, reminder=purple, suggestion=teal, alert=red), approve/dismiss buttons, unread indicators, empty state with ContentUnavailableView
-4. **SettingsScreen** — Grouped sections (Profile, Connection, Environment, Notifications, Privacy, About) with glass card surfaces, toggles with warm gold tint, environment selector, permission navigation
-5. **PermissionsScreen** — Cards for each capability (Location, Health, Notifications, Camera, Photos) with colored icons, explanation text, current status, and action buttons
-6. **CaptureScreen** — Placeholder with ContentUnavailableView and navigation seam back to chat
+The current system has three working pieces:
 
-### Components (10)
-- GlassCircleButton, StatusIndicator, HermesAvatar, MessageBubble, ChatInputBar, VoiceOrb, TranscriptView, InboxItemRow, InboxItemDetailSheet, SettingsSectionView, PermissionCard
+- The iOS app in [`/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile`](/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile)
+- The public relay in [`/Users/dylan-mac-mini/Documents/HermesMobile/relay`](/Users/dylan-mac-mini/Documents/HermesMobile/relay)
+- The host-side connector in [`/Users/dylan-mac-mini/Documents/HermesMobile/connector`](/Users/dylan-mac-mini/Documents/HermesMobile/connector)
 
-### Models (13)
-- Message, Conversation, MessageSender, MessageStatus, VoiceState, PermissionType, PermissionStatus, InboxItem, InboxItemType, ConnectionStatus, UserSettings, SyncStatus, DeviceCapability
+## Core Product Shape
 
-### Services (8 protocols + 8 mocks)
-- HermesClientProtocol, VoiceSessionServiceProtocol, LocationServiceProtocol, HealthServiceProtocol, NotificationServiceProtocol, MediaServiceProtocol, SyncCoordinatorProtocol, SecureStoreProtocol
+### Connector-first pairing
 
-## Architecture Decisions
+- The Hermes host is set up first with `hermes-mobile setup`
+- The connector can generate a short phone pairing code with `hermes-mobile pair-phone`
+- The phone pairs with an 8-character code such as `ABCD-EFGH` or by scanning the QR
+- Release onboarding no longer asks for a relay URL or host enrollment from the phone
 
-1. **MV pattern** — No view models. Views are thin. Services hold business logic via @Observable.
-2. **@MainActor protocols** — All service protocols are @MainActor isolated. This matches the mock implementations (which are @Observable + @MainActor) and avoids Swift 6.2 strict concurrency errors. When wiring real backends, the protocols may need adjustment.
-3. **nonisolated enum DemoData** — Static demo data in a plain enum, not an @Observable service. Avoids unnecessary actor isolation.
-4. **Per-tab NavigationPath** — Each tab owns its own navigation path through TabRouter. No cross-tab navigation pollution.
-5. **Warm background via ZStack** — Each screen uses `Design.Brand.backgroundPrimary` as a background color behind its content. This gives the warm cream tone that shows through glass effects.
+### Chat
 
-## Design Decisions
+- The app talks to the cloud relay, not directly to Hermes
+- The relay persists conversation state and message jobs
+- The connector claims jobs and executes Hermes locally on the user’s machine
+- Chat supports:
+  - synchronous replies when the host is online
+  - queued pending state when the host is offline or slow
+  - SSE streaming progress
+  - tool activity status
+  - inline code diff rendering for coding turns when the connector can detect git-visible file changes
+  - durable message delivery states on user messages
 
-1. **Warm cream/beige palette** — backgroundPrimary is Color(red: 0.98, green: 0.97, blue: 0.94). Deliberately warm, not the cold system white.
-2. **Gold accent** — Brand.warmGold (Color(red: 0.82, green: 0.68, blue: 0.42)) used for the "H" avatar, send button, toggle tints, and checkmarks. Creates a premium, warm feel.
-3. **Glass on content, not background** — Glass effects on elevated surfaces (user message bubbles, input bar, inbox cards, settings sections, permission cards, toolbar buttons). Background stays warm and opaque.
-4. **User bubbles glass, Hermes plain text** — Asymmetric design: user messages get frosted glass bubbles, Hermes responses are clean left-aligned text with an "H" avatar circle. Matches the reference screenshot direction.
-5. **Spring animations throughout** — All interactive state changes use spring physics. Voice orb pulses with breathing animations. Transitions use .combined(with:) for polish.
+### Talk mode
 
-## Known Limitations
+- The app has a real WebRTC-based talk stack for OpenAI Realtime
+- Realtime credentials and model selection live on the connector host, not in the app
+- The relay brokers talk readiness and short-lived session bootstrap
+- Final transcript turns are persisted back to the relay
+- Hermes memory and local sensor summaries are prefetched into a cached voice context snapshot
+- A relay-hosted `hermes_delegate` tool can hand deeper requests back to the Hermes host
 
-- **Simulator preflight issue** — The Xcode 26 beta simulator has a known issue where apps fail preflight checks, preventing test execution. The code compiles and the tests are valid.
-- **No real backend** — All services are mocked. Chat responses are random from a pool. Voice mode cycles through states on a timer.
-- **No persistence** — Messages and settings are in-memory only. Closing the app resets state.
-- **Conversation list sheet** — Shows placeholder text, not a real conversation list.
-- **New conversation sheet** — Shows placeholder text, not a real creation flow.
-- **Capture screen** — Placeholder only, no camera integration.
+### Host tools and sensor context
 
-## Integration Seams for Future Backend
+- The connector can register a native MCP server in `~/.hermes/config.yaml`
+- The `hermes_mobile` MCP server exposes phone-derived context such as location and health freshness
+- The phone keeps a local outbox for sensor data and only clears it after relay/connector ACK
+- Delivered sensor data is stored on the connector host, not on the relay
 
-Each service protocol defines the contract. Replace mock implementations with:
-- `MockHermesClient` -> WebSocket-backed client implementing `HermesClientProtocol`
-- `MockVoiceSessionService` -> OpenAI Realtime Session implementing `VoiceSessionServiceProtocol`
-- `MockLocationService` -> CLLocationManager wrapper implementing `LocationServiceProtocol`
-- `MockHealthService` -> HealthKit query engine implementing `HealthServiceProtocol`
-- `MockNotificationService` -> UNUserNotificationCenter wrapper implementing `NotificationServiceProtocol`
-- `MockMediaService` -> AVCaptureSession + PHPhotoLibrary implementing `MediaServiceProtocol`
-- `MockSyncCoordinator` -> Server sync engine implementing `SyncCoordinatorProtocol`
-- `MockSecureStore` -> Keychain wrapper implementing `SecureStoreProtocol`
+### Background host uptime
 
-## P2 Features Not Built
-- Real WebSocket transport
-- OpenAI Realtime voice session
-- Full HealthKit integration
-- Production location pipeline
-- Push notification backend
-- Camera/canvas full implementation
-- Conversation history and search
-- Account authentication
+- The connector supports managed background execution
+- macOS uses a per-user `launchd` LaunchAgent
+- Windows gateway support is WSL2-only and uses a Windows Scheduled Task to start the WSL-hosted connector
+
+## iOS App Shape
+
+The app is now centered around a single primary chat surface rather than the older multi-tab shell.
+
+Key surfaces:
+
+- [`/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Onboarding/ConnectHermesScreen.swift`](/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Onboarding/ConnectHermesScreen.swift)
+- [`/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Chat/ChatScreen.swift`](/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Chat/ChatScreen.swift)
+- [`/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Talk/TalkModeScreen.swift`](/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Talk/TalkModeScreen.swift)
+- [`/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Inbox/InboxScreen.swift`](/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Inbox/InboxScreen.swift)
+- [`/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Settings/SettingsScreen.swift`](/Users/dylan-mac-mini/Documents/HermesMobile/HermesMobile/Features/Settings/SettingsScreen.swift)
+
+Notable UI features already present:
+
+- compact live thinking and tool-status UI
+- expandable inline diffs for code-editing turns
+- markdown rendering in assistant replies
+- talk transcript state with latency markers
+- host status and connector management entry points
+- permissions and privacy controls
+
+## Connector / Relay Architecture
+
+### Relay
+
+- public always-on control plane
+- pairing and session bootstrap
+- durable message job queue
+- host presence tracking
+- connector WebSocket control channel
+- talk readiness and voice session bootstrap
+- voice turn persistence
+
+### Connector
+
+- owns Hermes execution
+- owns Realtime API configuration
+- owns local MCP registration
+- owns local sensor SQLite store
+- owns background service installation
+- uses Hermes through supported surfaces instead of patching Hermes source
+
+## What Is Still Unfinished
+
+### Product gaps
+
+- Talk mode is not truly barge-in complete yet. The app reacts to speech-start events but does not yet send an explicit Realtime interruption/cancel command back to cut off assistant audio mid-turn.
+- Inline diffs depend on git-visible changes in the Hermes workdir. They are a connector-side inference layer, not a Hermes-native structured diff stream.
+- Camera/capture remains a stub.
+- Terms of Service and Privacy Policy links in Settings are still placeholders.
+
+### Integration gaps
+
+- The app still uses `MockSyncCoordinator` and `MockMediaService` in the main container, so sync/media plumbing is not fully productionized yet.
+- Background health and Always-authorized location still need real-device validation. Simulator coverage is not enough for those capabilities.
+- Talk mode is foreground-only.
+
+### Test gaps
+
+- Connector and relay automated suites are in good shape.
+- Focused iOS state/store tests pass.
+- The full UI test suite is currently stale against the new single-surface app structure and fails until those expectations are updated.
+
+## Verification Snapshot
+
+Latest review pass:
+
+- connector tests: passing
+- relay tests: passing
+- focused iOS state tests: passing
+- full UI test suite: failing because onboarding/navigation expectations still target the old tab-based shell
+
+## Near-term Next Work
+
+1. Finish true talk barging by sending explicit Realtime interruption/cancel events.
+2. Update stale UI tests to the current single-surface navigation model.
+3. Replace placeholder About links with real URLs.
+4. Decide whether inline diffs stay connector-side or move toward a Hermes-native structured diff event path later.

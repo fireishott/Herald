@@ -165,6 +165,90 @@ final class RelayAPIClient {
         return request
     }
 
+    /// Opens an SSE stream to the given path and yields parsed events.
+    ///
+    /// The stream handles `event:` / `data:` lines per the SSE spec,
+    /// ignores keepalive comments (lines starting with `:`), and
+    /// terminates when the server closes the connection.
+    nonisolated func streamEvents(
+        path: String,
+        accessToken: String?
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task { @MainActor in
+                do {
+                    var request = try makeRequest(
+                        path: path,
+                        method: "GET",
+                        accessToken: accessToken,
+                        body: nil
+                    )
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.timeoutInterval = 300
+
+                    let (bytes, response) = try await session.bytes(for: request)
+                    let httpResponse = response as? HTTPURLResponse
+
+                    guard let httpResponse, (200 ..< 300).contains(httpResponse.statusCode) else {
+                        let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+                        if code == 401 {
+                            continuation.finish(throwing: ClientError.unauthorized("Unauthorized"))
+                        } else {
+                            continuation.finish(throwing: ClientError.requestFailed(
+                                "SSE stream failed with status \(code)."
+                            ))
+                        }
+                        return
+                    }
+
+                    var currentEvent = "message"
+                    var currentData = ""
+
+                    for try await line in bytes.lines {
+                        if Task.isCancelled { break }
+
+                        // Keepalive comment
+                        if line.hasPrefix(":") {
+                            continue
+                        }
+
+                        // Empty line = dispatch event
+                        if line.isEmpty {
+                            if !currentData.isEmpty {
+                                continuation.yield(SSEEvent(
+                                    event: currentEvent,
+                                    data: currentData
+                                ))
+                                currentEvent = "message"
+                                currentData = ""
+                            }
+                            continue
+                        }
+
+                        if line.hasPrefix("event:") {
+                            currentEvent = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+                        } else if line.hasPrefix("data:") {
+                            let value = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                            if currentData.isEmpty {
+                                currentData = value
+                            } else {
+                                currentData += "\n" + value
+                            }
+                        }
+                    }
+
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+
     private func send<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await session.data(for: request)
         let httpResponse = response as? HTTPURLResponse

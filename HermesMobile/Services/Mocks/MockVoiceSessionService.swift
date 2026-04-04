@@ -23,7 +23,8 @@ final class MockVoiceSessionService: VoiceSessionServiceProtocol {
             blockedReason: blockedReason,
             statusMessage: statusMessage,
             canStartSession: canStartSession,
-            latencyMetrics: latencyMetrics
+            latencyMetrics: latencyMetrics,
+            voiceSessionID: nil
         )
     }
 

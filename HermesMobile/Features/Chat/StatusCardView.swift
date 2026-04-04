@@ -4,6 +4,7 @@ struct StatusCardView: View {
     let isHostOnline: Bool
     let messageCount: Int
     let conversationID: UUID?
+    let tokenUsage: TokenUsage?
     let dismissAction: () -> Void
 
     var body: some View {
@@ -13,23 +14,34 @@ struct StatusCardView: View {
                     .foregroundStyle(Design.Brand.accent)
                 Text("Session Status")
                     .font(Design.Typography.headline)
+                    .foregroundStyle(Design.Colors.foreground)
                 Spacer()
                 Button(action: dismissAction) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Design.Colors.secondaryForeground)
                 }
             }
 
             Divider()
+                .overlay(Design.Colors.divider)
 
             statusRow("Connection", value: isHostOnline ? "Online" : "Offline")
             statusRow("Messages", value: "\(messageCount)")
             if let id = conversationID {
                 statusRow("Session", value: String(id.uuidString.prefix(8)))
             }
+
+            if let usage = tokenUsage {
+                Divider()
+                    .overlay(Design.Colors.divider)
+                statusRow("Context", value: "\(usage.totalTokens) tokens")
+                statusRow("Prompt", value: "\(usage.promptTokens)")
+                statusRow("Completion", value: "\(usage.completionTokens)")
+            }
         }
         .padding(Design.Spacing.md)
-        .glassEffect(.regular, in: .rect(cornerRadius: Design.CornerRadius.lg))
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
         .padding(.horizontal, Design.Spacing.md)
     }
 
@@ -37,10 +49,11 @@ struct StatusCardView: View {
         HStack {
             Text(label)
                 .font(Design.Typography.callout)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
             Spacer()
             Text(value)
                 .font(Design.Typography.callout)
+                .foregroundStyle(Design.Colors.foreground)
         }
     }
 }

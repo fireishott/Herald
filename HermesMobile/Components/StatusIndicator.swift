@@ -11,7 +11,7 @@ struct StatusIndicator: View {
 
             Text(status.displayLabel)
                 .font(Design.Typography.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Design.Colors.secondaryForeground)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Connection status: \(status.displayLabel)")
