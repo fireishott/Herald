@@ -65,9 +65,9 @@ struct VoiceOverlayScreen: View {
             }
         }
         .onDisappear {
-            // Ensure the session is torn down if the overlay is dismissed
-            // without using the close button (e.g. swipe, programmatic dismiss).
-            if talkStore.isSessionActive {
+            // Only tear down the session if the voice overlay is truly being dismissed,
+            // NOT when a sub-screen (camera overlay, photo picker) appears on top.
+            if talkStore.isSessionActive && !showLiveCameraOverlay && !showAttachmentSheet {
                 Task { await talkStore.endSession() }
             }
         }
