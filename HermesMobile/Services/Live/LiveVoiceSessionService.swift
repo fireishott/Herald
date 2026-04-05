@@ -3,7 +3,7 @@ import Foundation
 import os
 
 #if canImport(WebRTC)
-import WebRTC
+@preconcurrency import WebRTC
 #endif
 
 @MainActor
@@ -113,9 +113,9 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
     #if canImport(WebRTC)
     private static let peerFactory = RTCPeerConnectionFactory()
     private let peerDelegate = RealtimePeerDelegate()
-    private var peerConnection: RTCPeerConnection?
-    private var dataChannel: RTCDataChannel?
-    private var audioTrack: RTCAudioTrack?
+    nonisolated(unsafe) private var peerConnection: RTCPeerConnection?
+    nonisolated(unsafe) private var dataChannel: RTCDataChannel?
+    nonisolated(unsafe) private var audioTrack: RTCAudioTrack?
     #endif
 
     init(
@@ -566,7 +566,9 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         let rtcConfig = RTCConfiguration()
         rtcConfig.sdpSemantics = .unifiedPlan
         let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: nil)
-        let connection = Self.peerFactory.peerConnection(with: rtcConfig, constraints: constraints, delegate: peerDelegate)
+        guard let connection = Self.peerFactory.peerConnection(with: rtcConfig, constraints: constraints, delegate: peerDelegate) else {
+            throw RelayAPIClient.ClientError.requestFailed("Failed to create WebRTC peer connection.")
+        }
         let audioSource = Self.peerFactory.audioSource(with: constraints)
         let track = Self.peerFactory.audioTrack(with: audioSource, trackId: "hermes-mobile-audio")
         _ = connection.add(track, streamIds: ["hermes-mobile-stream"])
@@ -834,17 +836,16 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
 }
 
 #if canImport(WebRTC)
-private final class RealtimePeerDelegate: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDelegate {
+private final class RealtimePeerDelegate: NSObject, RTCPeerConnectionDelegate, RTCDataChannelDelegate, @unchecked Sendable {
     weak var owner: LiveVoiceSessionService?
 
     func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) {
-        Task { @MainActor in
-            guard let owner else { return }
-            if dataChannel.readyState == .open {
-                owner.connectionState = .connected
-                owner.voiceState = .listening
-                owner.statusMessage = "Listening"
-            }
+        let isOpen = dataChannel.readyState == .open
+        Task { @MainActor [weak self] in
+            guard let owner = self?.owner, isOpen else { return }
+            owner.connectionState = .connected
+            owner.voiceState = .listening
+            owner.statusMessage = "Listening"
         }
     }
 
@@ -913,7 +914,7 @@ private extension RTCPeerConnection {
     }
 
     func setLocalDescriptionAsync(_ description: RTCSessionDescription) async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             self.setLocalDescription(description) { error in
                 if let error {
                     continuation.resume(throwing: error)
@@ -925,7 +926,7 @@ private extension RTCPeerConnection {
     }
 
     func setRemoteDescriptionAsync(_ description: RTCSessionDescription) async throws {
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             self.setRemoteDescription(description) { error in
                 if let error {
                     continuation.resume(throwing: error)
