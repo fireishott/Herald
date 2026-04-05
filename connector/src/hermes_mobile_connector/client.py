@@ -728,13 +728,22 @@ class HermesMobileConnector:
         state.realtime_talk = config
         self.state_store.save(state)
 
-        client_secret = session_payload.get("client_secret") or {}
-        session_data = {key: value for key, value in session_payload.items() if key != "client_secret"}
-        expires_at = client_secret.get("expires_at")
+        # The /v1/realtime/client_secrets response puts the ephemeral key at the
+        # top level: {"value": "ek_...", "expires_at": ..., "session": {...}}
+        # Also support the legacy nested format just in case.
+        client_secret = session_payload.get("client_secret")
+        if isinstance(client_secret, dict):
+            secret_value = client_secret.get("value")
+            expires_at = client_secret.get("expires_at")
+            session_data = {k: v for k, v in session_payload.items() if k != "client_secret"}
+        else:
+            secret_value = session_payload.get("value")
+            expires_at = session_payload.get("expires_at")
+            session_data = session_payload.get("session") or {}
         if isinstance(expires_at, (int, float)):
             expires_at = datetime.fromtimestamp(expires_at, timezone.utc).isoformat()
         return {
-            "clientSecret": client_secret.get("value"),
+            "clientSecret": secret_value,
             "expiresAt": expires_at,
             "session": session_data,
             "model": selected_model,

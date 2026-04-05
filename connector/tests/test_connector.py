@@ -268,11 +268,11 @@ def test_configure_realtime_stores_api_key_in_secrets_only(monkeypatch, tmp_path
         "_create_openai_realtime_session",
         lambda **kwargs: (
             {
-                "id": "sess_123",
-                "type": "realtime",
-                "client_secret": {
-                    "value": "ephemeral-secret",
-                    "expires_at": 1_775_001_600,
+                "value": "ephemeral-secret",
+                "expires_at": 1_775_001_600,
+                "session": {
+                    "id": "sess_123",
+                    "type": "realtime",
                 },
             },
             "gpt-realtime-1.5",
@@ -336,11 +336,11 @@ def test_realtime_session_creation_falls_back_to_secondary_model(monkeypatch, tm
         return FakeResponse(
             200,
             {
-                "id": "sess_456",
-                "model": "gpt-realtime",
-                "client_secret": {
-                    "value": "ephemeral-secret",
-                    "expires_at": 1_775_001_600,
+                "value": "ephemeral-secret",
+                "expires_at": 1_775_001_600,
+                "session": {
+                    "id": "sess_456",
+                    "model": "gpt-realtime",
                 },
             },
         )
@@ -360,7 +360,7 @@ def test_realtime_session_creation_falls_back_to_secondary_model(monkeypatch, tm
     assert session_def["audio"]["output"]["voice"] == "verse"
     assert "modalities" not in session_def
     assert selected_model == "gpt-realtime"
-    assert payload["client_secret"]["value"] == "ephemeral-secret"
+    assert payload["value"] == "ephemeral-secret"
 
 
 def test_talk_session_create_normalizes_client_secret_payload(monkeypatch, tmp_path):
@@ -386,18 +386,18 @@ def test_talk_session_create_normalizes_client_secret_payload(monkeypatch, tmp_p
     store.save_secrets(ConnectorSecrets(openai_api_key="sk-test-realtime"))
     connector = HermesMobileConnector(state_store=store, executor=make_executor())
 
-    monkeypatch.setattr(connector, "refresh_voice_context", lambda *, state=None: state or store.load())
+    monkeypatch.setattr(connector, "refresh_voice_context_if_stale", lambda *, state=None: state or store.load())
     monkeypatch.setattr(
         connector,
         "_create_openai_realtime_session",
         lambda **kwargs: (
             {
-                "id": "sess_789",
-                "type": "realtime",
-                "model": "gpt-realtime-1.5",
-                "client_secret": {
-                    "value": "ephemeral-secret",
-                    "expires_at": 1_775_001_600,
+                "value": "ephemeral-secret",
+                "expires_at": 1_775_001_600,
+                "session": {
+                    "id": "sess_789",
+                    "type": "realtime",
+                    "model": "gpt-realtime-1.5",
                 },
             },
             "gpt-realtime-1.5",
