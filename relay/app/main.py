@@ -157,6 +157,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                 stale_ids.append(job_id)
                     for job_id in stale_ids:
                         app.state.job_event_queues.pop(job_id, None)
+                        app.state.job_event_buffers.pop(job_id, None)
                     if stale_ids:
                         logger.info("Cleaned up %d stale job event queues", len(stale_ids))
                 except Exception:
@@ -178,10 +179,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.sensor_delivery_waiters: dict[str, asyncio.Future[bool]] = {}
     app.state.connector_rpc_waiters: dict[str, asyncio.Future[dict]] = {}
     app.state.job_event_queues: dict[str, list[asyncio.Queue]] = {}
+    app.state.job_event_buffers: dict[str, list[dict]] = {}
 
     def subscribe_job_events(job_id: str) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue(maxsize=1024)
         app.state.job_event_queues.setdefault(job_id, []).append(queue)
+        # Replay any events that were buffered before this subscriber connected.
+        for event in app.state.job_event_buffers.pop(job_id, []):
+            try:
+                queue.put_nowait(event)
+            except asyncio.QueueFull:
+                break
         return queue
 
     def unsubscribe_job_events(job_id: str, queue: asyncio.Queue) -> None:
@@ -191,8 +199,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not queues:
             app.state.job_event_queues.pop(job_id, None)
 
+    def ensure_job_event_buffer(job_id: str) -> None:
+        """Pre-create the event queue list so events are buffered even before SSE subscribes."""
+        app.state.job_event_queues.setdefault(job_id, [])
+
     def publish_job_event(job_id: str, event: dict) -> None:
-        for queue in app.state.job_event_queues.get(job_id, []):
+        queues = app.state.job_event_queues.get(job_id, [])
+        if not queues:
+            # No subscribers yet — buffer the event on a replay list so late
+            # SSE subscribers can catch up.
+            app.state.job_event_buffers.setdefault(job_id, []).append(event)
+            return
+        for queue in queues:
             try:
                 queue.put_nowait(event)
             except asyncio.QueueFull:
@@ -1252,6 +1270,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
         if request_settings.hermes_adapter == "connector":
+            # Pre-create the event buffer so streaming events are captured
+            # even before the iOS client opens its SSE connection.
+            ensure_job_event_buffer(job.id)
             host = current_hermes_host_for_user(db, user_id=auth.user.id)
             if host is not None and hermes_host_is_online(db, host=host, settings=request_settings):
                 await wait_for_job_completion(job.id, request_settings.connector_sync_wait_seconds)
