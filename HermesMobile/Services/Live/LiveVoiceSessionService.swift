@@ -957,7 +957,6 @@ private final class RealtimePeerDelegate: NSObject, RTCPeerConnectionDelegate, R
         }
     }
     func peerConnection(_ peerConnection: RTCPeerConnection, didStartReceivingOn transceiver: RTCRtpTransceiver) {}
-    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove receivers: [RTCRtpReceiver]) {}
 }
 
 private extension RTCPeerConnection {
