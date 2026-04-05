@@ -183,14 +183,8 @@ struct MessageBubble: View {
     }
 
     private var streamingPlaceholder: some View {
-        HStack(spacing: Design.Spacing.xxs) {
-            ForEach(0 ..< 3, id: \.self) { index in
-                Circle()
-                    .fill(Design.Colors.secondaryForeground)
-                    .frame(width: 5, height: 5)
-            }
-        }
-        .padding(.vertical, Design.Spacing.sm)
+        TypingDotsView()
+            .padding(.vertical, Design.Spacing.sm)
     }
 
     private func toolActivityPill(_ label: String) -> some View {
