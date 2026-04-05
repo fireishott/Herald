@@ -444,19 +444,35 @@ class SensorStore:
 
     # ── Daily Aggregates ─────────────────────────────────────────
 
+    # Cumulative/windowed metrics where the daily value is the MAX of the
+    # snapshots (each snapshot is a running total, not an increment).
+    _CUMULATIVE_METRICS = {"steps", "active_calories", "distance_walking",
+                           "workout_minutes", "stand_hours", "sleep_duration"}
+
+    # Point-in-time metrics where avg/min/max are meaningful but sum is not.
+    # For these, sum_value is set to NULL.
+
     def _rollup_daily_aggregates(self) -> None:
-        """Roll up health_samples into health_daily for completed days."""
+        """Roll up health_samples into health_daily for completed days.
+
+        Cumulative metrics (steps, calories, etc.) use MAX as the daily total
+        because each sample is a running total since start of day.
+        Point metrics (heart_rate, blood_oxygen, etc.) use AVG/MIN/MAX
+        with sum_value set to NULL (summing heart rates is meaningless).
+        """
         now = utcnow().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         today = utcnow().strftime("%Y-%m-%d")
 
-        # Aggregate all dates EXCEPT today (today's data is still accumulating)
+        # Cumulative metrics: daily value = MAX of the day's snapshots
+        cumulative_list = ",".join(f"'{m}'" for m in self._CUMULATIVE_METRICS)
         self._conn.execute(
-            """
-            INSERT OR REPLACE INTO health_daily (metric, date, sum_value, avg_value, min_value, max_value, count, unit, updated_at)
+            f"""
+            INSERT OR REPLACE INTO health_daily
+                (metric, date, sum_value, avg_value, min_value, max_value, count, unit, updated_at)
             SELECT
                 metric,
                 date(start_at) AS day,
-                SUM(value),
+                MAX(value),   -- daily total = highest running-total snapshot
                 AVG(value),
                 MIN(value),
                 MAX(value),
@@ -464,11 +480,34 @@ class SensorStore:
                 unit,
                 ?
             FROM health_samples
-            WHERE date(start_at) < ?
+            WHERE date(start_at) < ? AND metric IN ({cumulative_list})
             GROUP BY metric, date(start_at)
             """,
             (now, today),
         )
+
+        # Point metrics: avg/min/max are meaningful, sum is not
+        self._conn.execute(
+            f"""
+            INSERT OR REPLACE INTO health_daily
+                (metric, date, sum_value, avg_value, min_value, max_value, count, unit, updated_at)
+            SELECT
+                metric,
+                date(start_at) AS day,
+                NULL,          -- sum is meaningless for point metrics
+                AVG(value),
+                MIN(value),
+                MAX(value),
+                COUNT(*),
+                unit,
+                ?
+            FROM health_samples
+            WHERE date(start_at) < ? AND metric NOT IN ({cumulative_list})
+            GROUP BY metric, date(start_at)
+            """,
+            (now, today),
+        )
+
         self._conn.commit()
 
     # ── Maintenance ──────────────────────────────────────────────
@@ -483,9 +522,12 @@ class SensorStore:
     def prune_health_samples(self, retention_days: int = 90) -> int:
         cutoff_dt = utcnow() - timedelta(days=retention_days)
         cutoff = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        cutoff_date = cutoff_dt.strftime("%Y-%m-%d")
         cursor = self._conn.execute(
             "DELETE FROM health_samples WHERE COALESCE(end_at, start_at) < ?",
             (cutoff,),
         )
+        # Also prune daily aggregates older than retention
+        self._conn.execute("DELETE FROM health_daily WHERE date < ?", (cutoff_date,))
         self._conn.commit()
         return cursor.rowcount

@@ -219,11 +219,8 @@ def query_sensor_data(sql: str, limit: int = 100) -> str:
     store = _get_store()
     try:
         conn = store._conn
-        # Add LIMIT if not already present
-        if "LIMIT" not in stripped:
-            safe_sql = f"{sql.rstrip().rstrip(';')} LIMIT {effective_limit}"
-        else:
-            safe_sql = sql
+        # Always wrap in a subquery with enforced LIMIT, regardless of user's LIMIT
+        safe_sql = f"SELECT * FROM ({sql.rstrip().rstrip(';')}) LIMIT {effective_limit}"
 
         cursor = conn.execute(safe_sql)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
