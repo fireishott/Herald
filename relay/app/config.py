@@ -75,7 +75,7 @@ class Settings:
             hermes_toolsets=os.getenv("HERMES_TOOLSETS") or None,
             hermes_source=os.getenv("HERMES_SOURCE", "tool"),
             hermes_history_limit=int(os.getenv("HERMES_HISTORY_LIMIT", "20")),
-            connector_sync_wait_seconds=int(os.getenv("CONNECTOR_SYNC_WAIT_SECONDS", "25")),
+            connector_sync_wait_seconds=int(os.getenv("CONNECTOR_SYNC_WAIT_SECONDS", "0")),
             connector_job_lease_seconds=int(os.getenv("CONNECTOR_JOB_LEASE_SECONDS", "180")),
             connector_heartbeat_timeout_seconds=int(os.getenv("CONNECTOR_HEARTBEAT_TIMEOUT_SECONDS", "30")),
             connector_idle_poll_interval_seconds=float(os.getenv("CONNECTOR_IDLE_POLL_INTERVAL_SECONDS", "1.0")),
