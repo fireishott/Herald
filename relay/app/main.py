@@ -94,7 +94,7 @@ from .services import (
     process_message_job_with_adapter,
     record_voice_turn,
 )
-from .talk_mcp import build_talk_mcp_app
+from .talk_mcp import register_talk_mcp_routes
 
 
 def success(data: dict) -> dict:
@@ -329,7 +329,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return success_response({"deliveryState": delivery_state}, status_code=status_code)
 
     app.state.send_connector_rpc = send_connector_rpc
-    app.mount("/v1/talk/mcp", build_talk_mcp_app(app))
+    register_talk_mcp_routes(app)
 
     def build_message_response_payload(db: Session, *, conversation_id: str, job_id: str) -> tuple[dict, int]:
         job = get_message_job(db, job_id=job_id)
@@ -851,7 +851,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             user_id=auth.user.id,
             host_id=host.id,
         )
-        relay_mcp_url = f"{request_settings.public_base_url}/talk/mcp/?token={relay_tool_token}"
+        relay_mcp_url = f"{request_settings.public_base_url}/talk/mcp?token={relay_tool_token}"
 
         try:
             bootstrap = await send_connector_rpc(
