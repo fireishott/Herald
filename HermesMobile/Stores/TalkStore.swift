@@ -75,6 +75,13 @@ final class TalkStore {
         applySnapshot(voiceService.snapshot)
     }
 
+    /// Send an image to the Realtime model during an active voice session.
+    @discardableResult
+    func sendImage(_ imageData: Data, triggerResponse: Bool = true) -> Bool {
+        guard isSessionActive else { return false }
+        return voiceService.sendImage(imageData, mimeType: "image/jpeg", triggerResponse: triggerResponse)
+    }
+
     func endSessionIfNeeded() async {
         guard isSessionActive else { return }
         await endSession()

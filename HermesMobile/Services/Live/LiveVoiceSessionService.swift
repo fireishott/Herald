@@ -264,6 +264,40 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         #endif
     }
 
+    @discardableResult
+    func sendImage(_ imageData: Data, mimeType: String = "image/jpeg", triggerResponse: Bool = true) -> Bool {
+        guard connectionState == .connected else { return false }
+
+        let base64 = imageData.base64EncodedString()
+        let dataURL = "data:\(mimeType);base64,\(base64)"
+
+        let sent = sendRealtimeEvent([
+            "type": "conversation.item.create",
+            "event_id": UUID().uuidString,
+            "item": [
+                "type": "message",
+                "role": "user",
+                "content": [
+                    [
+                        "type": "input_image",
+                        "image_url": dataURL,
+                    ] as [String: Any]
+                ],
+            ] as [String: Any],
+        ])
+
+        if sent && triggerResponse {
+            _ = sendRealtimeEvent([
+                "type": "response.create",
+                "event_id": UUID().uuidString,
+            ])
+            // Add thumbnail to transcript so the user sees what they sent
+            transcriptItems.append(TranscriptItem(speaker: .user, text: "", imageData: imageData))
+        }
+
+        return sent
+    }
+
     private func publishSnapshot() {
         eventHub.publish(snapshot: snapshot)
     }
@@ -471,11 +505,6 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
 
     func handleDataChannelEvent(_ payload: [String: Any]) {
         let type = payload["type"] as? String ?? ""
-        // Temporary debug: log all data channel events to see MCP flow
-        if type.contains("mcp") || type.contains("function") || type.contains("response.done") || type.contains("response.created") || type.contains("output_item") {
-            let status = ((payload["response"] as? [String: Any])?["status"] as? String) ?? ""
-            print("🔊 DC EVENT: \(type) \(status.isEmpty ? "" : "status=\(status)")")
-        }
         switch type {
         case "input_audio_buffer.speech_started":
             handleServerVADInterruption()

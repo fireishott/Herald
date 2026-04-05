@@ -276,16 +276,6 @@ final class RelayAPIClient {
             throw makeError("Relay request failed with status \(httpResponse.statusCode).")
         }
 
-        do {
-            return try decoder.decode(Envelope<T>.self, from: data).data
-        } catch {
-            // Temporary debug logging — print the exact decode error and raw JSON
-            let path = request.url?.path ?? "unknown"
-            print("⚠️ DECODE FAILED for \(path): \(error)")
-            if let jsonString = String(data: data, encoding: .utf8) {
-                print("⚠️ RAW JSON (\(data.count) bytes): \(String(jsonString.prefix(2000)))")
-            }
-            throw error
-        }
+        return try decoder.decode(Envelope<T>.self, from: data).data
     }
 }

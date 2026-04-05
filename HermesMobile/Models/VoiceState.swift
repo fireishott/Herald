@@ -83,17 +83,20 @@ struct TranscriptItem: Identifiable, Codable, Hashable, Sendable {
     var speaker: TranscriptSpeaker
     var text: String
     var isPartial: Bool
+    var imageData: Data?  // JPEG thumbnail for display in transcript
 
     init(
         id: UUID = UUID(),
         speaker: TranscriptSpeaker,
         text: String,
-        isPartial: Bool = false
+        isPartial: Bool = false,
+        imageData: Data? = nil
     ) {
         self.id = id
         self.speaker = speaker
         self.text = text
         self.isPartial = isPartial
+        self.imageData = imageData
     }
 }
 

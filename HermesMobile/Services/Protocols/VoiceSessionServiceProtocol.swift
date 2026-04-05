@@ -42,4 +42,5 @@ protocol VoiceSessionServiceProtocol {
     func endSession() async
     func toggleMute() async
     func manuallyInterruptAssistantOutput()
+    @discardableResult func sendImage(_ imageData: Data, mimeType: String, triggerResponse: Bool) -> Bool
 }

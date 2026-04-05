@@ -106,6 +106,11 @@ final class MockVoiceSessionService: VoiceSessionServiceProtocol {
         statusMessage = "Listening"
     }
 
+    @discardableResult
+    func sendImage(_ imageData: Data, mimeType: String = "image/jpeg", triggerResponse: Bool = true) -> Bool {
+        return true
+    }
+
     private func publishSnapshot() {
         eventHub.publish(snapshot: snapshot)
     }
