@@ -377,6 +377,7 @@ class HermesMobileConnector:
         async with websocket_connect(
             state.web_socket_url,
             additional_headers={"Authorization": f"Bearer {state.connector_credential}"},
+            max_size=50 * 1024 * 1024,  # 50 MB — job payloads with image attachments can be large
         ) as websocket:
             await websocket.send(
                 json.dumps(
