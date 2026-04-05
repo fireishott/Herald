@@ -12,7 +12,7 @@ struct TalkModeScreen: View {
             VStack(spacing: Design.Spacing.xl) {
                 Spacer()
 
-                VoiceOrb(voiceState: talkStore.voiceState)
+                VoiceOrb(voiceState: talkStore.voiceState, connectionState: talkStore.connectionState)
                     .onTapGesture {
                         if talkStore.voiceState == .speaking {
                             talkStore.interruptAssistant()

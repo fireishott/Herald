@@ -2,15 +2,25 @@ import SwiftUI
 
 struct VoiceOrb: View {
     let voiceState: VoiceState
+    let connectionState: TalkConnectionState
 
     @State private var pulseScale: CGFloat = 1.0
-    @State private var innerRotation: Double = 0
 
-    private var orbColor: Color { voiceState.displayColor }
+    /// Always blue when connected, muted grey otherwise.
+    private var orbColor: Color {
+        switch connectionState {
+        case .connected: .blue
+        default: .secondary
+        }
+    }
+
+    private var isActive: Bool {
+        connectionState == .connected
+    }
 
     var body: some View {
         ZStack {
-            // Outer pulse ring
+            // Outer pulse ring — only visible when Hermes is responding
             Circle()
                 .fill(orbColor.opacity(0.15))
                 .frame(width: Design.Size.voiceOrbSize * 1.3, height: Design.Size.voiceOrbSize * 1.3)
@@ -28,41 +38,29 @@ struct VoiceOrb: View {
                 .frame(width: Design.Size.voiceOrbSize, height: Design.Size.voiceOrbSize)
                 .glassEffect(.regular, in: Circle())
                 .overlay {
-                    Image(systemName: voiceState.displayIcon)
+                    Image(systemName: "mic.fill")
                         .font(.system(size: Design.Size.iconHero, weight: .light))
                         .foregroundStyle(.white)
-                        .rotationEffect(.degrees(isThinking ? innerRotation : 0))
                 }
         }
-        .onChange(of: voiceState) {
-            updateAnimation()
-        }
+        .onChange(of: voiceState) { updateAnimation() }
+        .onChange(of: connectionState) { updateAnimation() }
         .onAppear { updateAnimation() }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Voice status: \(voiceState.displayLabel)")
     }
 
-    private var isThinking: Bool { voiceState == .thinking }
-
     private func updateAnimation() {
         switch voiceState {
-        case .idle, .disconnected:
-            withAnimation(Design.Motion.gentle) { pulseScale = 1.0 }
-            innerRotation = 0
-        case .listening:
-            withAnimation(Design.Motion.breathe) { pulseScale = 1.08 }
-            innerRotation = 0
-        case .thinking:
-            withAnimation(Design.Motion.pulse) { pulseScale = 1.04 }
-            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                innerRotation = 360
-            }
         case .speaking:
+            // Pulsing when Hermes is talking
             withAnimation(Design.Motion.breathe) { pulseScale = 1.12 }
-            innerRotation = 0
-        case .interrupted:
+        case .thinking:
+            // Gentle pulse when processing
+            withAnimation(Design.Motion.pulse) { pulseScale = 1.04 }
+        default:
+            // Static when idle, listening, or disconnected
             withAnimation(Design.Motion.gentle) { pulseScale = 1.0 }
-            innerRotation = 0
         }
     }
 }

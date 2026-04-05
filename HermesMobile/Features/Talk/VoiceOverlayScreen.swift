@@ -33,7 +33,7 @@ struct VoiceOverlayScreen: View {
                 Spacer()
 
                 // Voice orb
-                VoiceOrb(voiceState: talkStore.voiceState)
+                VoiceOrb(voiceState: talkStore.voiceState, connectionState: talkStore.connectionState)
                     .onTapGesture {
                         if talkStore.voiceState == .speaking {
                             talkStore.interruptAssistant()
@@ -58,6 +58,13 @@ struct VoiceOverlayScreen: View {
             await talkStore.refreshReadiness()
             if talkStore.canStartSession {
                 await talkStore.startSession()
+            }
+        }
+        .onDisappear {
+            // Ensure the session is torn down if the overlay is dismissed
+            // without using the close button (e.g. swipe, programmatic dismiss).
+            if talkStore.isSessionActive {
+                Task { await talkStore.endSession() }
             }
         }
         .statusBarHidden(true)
@@ -116,31 +123,12 @@ struct VoiceOverlayScreen: View {
     private var orbStatusLabel: some View {
         switch (talkStore.connectionState, talkStore.voiceState) {
         case (.failed, _), (.blocked, _):
-            // Error states
-            VStack(spacing: Design.Spacing.xs) {
-                if let blocked = talkStore.blockedReason {
-                    Text(blocked)
-                        .font(Design.Typography.callout)
-                        .foregroundStyle(Design.Colors.secondaryForeground)
-                        .multilineTextAlignment(.center)
-                } else {
-                    Text("Unable to connect")
-                        .font(Design.Typography.callout)
-                        .foregroundStyle(Design.Colors.secondaryForeground)
-                }
-            }
+            Text(talkStore.blockedReason ?? "Unable to connect")
+                .font(Design.Typography.callout)
+                .foregroundStyle(Design.Colors.secondaryForeground)
+                .multilineTextAlignment(.center)
 
-        case (.checking, _), (.idle, _):
-            HStack(spacing: Design.Spacing.xs) {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(Design.Colors.secondaryForeground)
-                Text("Checking\u{2026}")
-                    .font(Design.Typography.callout)
-                    .foregroundStyle(Design.Colors.secondaryForeground)
-            }
-
-        case (.connecting, _):
+        case (.checking, _), (.idle, _), (.connecting, _), (.ready, _):
             HStack(spacing: Design.Spacing.xs) {
                 ProgressView()
                     .controlSize(.small)
@@ -156,14 +144,12 @@ struct VoiceOverlayScreen: View {
                 .foregroundStyle(Design.Colors.secondaryForeground)
 
         case (.connected, .thinking):
-            Text(talkStore.statusMessage ?? "Thinking\u{2026}")
+            Text(talkStore.statusMessage ?? "")
                 .font(Design.Typography.callout)
                 .foregroundStyle(Design.Colors.secondaryForeground)
 
         case (.connected, .speaking):
-            Text("Tap orb to interrupt")
-                .font(Design.Typography.caption)
-                .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.7))
+            EmptyView()
 
         case (_, .disconnected):
             Text("Disconnected")
