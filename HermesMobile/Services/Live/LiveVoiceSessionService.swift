@@ -527,15 +527,15 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
                 voiceState = .thinking
             }
             statusMessage = "Hermes is working on that\u{2026}"
-        case "response.mcp_call.completed",
-             "response.output_item.done" where (payload["item"] as? [String: Any])?["type"] as? String == "mcp_call":
+        case "response.mcp_call.completed":
             // MCP tool call finished — trigger a new response so the model speaks the result.
             // The response lifecycle completes BEFORE the MCP call executes, so no automatic
             // follow-up audio is generated. We must explicitly request one.
-            if sendRealtimeEvent([
-                "type": "response.create",
-                "event_id": UUID().uuidString,
-            ]) {
+            if currentRealtimeResponseID == nil {
+                _ = sendRealtimeEvent([
+                    "type": "response.create",
+                    "event_id": UUID().uuidString,
+                ])
                 voiceState = .thinking
                 statusMessage = "Hermes has the answer\u{2026}"
             }
@@ -575,6 +575,11 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             finalizeUserText(payload["transcript"] as? String ?? "")
         case "error":
             let message = ((payload["error"] as? [String: Any])?["message"] as? String) ?? "Realtime talk failed."
+            // Suppress transient "active response in progress" errors — these are harmless
+            // race conditions from our response.create after MCP tool completion.
+            if message.contains("active response in progress") {
+                break
+            }
             blockedReason = message
             connectionState = .failed
             voiceState = .disconnected
