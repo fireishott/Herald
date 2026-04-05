@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import MapKit
 
 struct SensorOutboxState: Codable, Hashable, Sendable {
     struct PendingLocation: Codable, Hashable, Sendable {
@@ -278,17 +279,33 @@ final class SensorUploadService {
         return await performAuthorizedUpload(path: "device/sensor/location", body: body)
     }
 
-    // CLGeocoder is deprecated in iOS 26 in favor of MKReverseGeocodingRequest,
-    // but the MapKit API is still unstable. Suppress until it stabilizes.
-    @available(iOS, deprecated: 26.0, message: "Migrate to MKReverseGeocodingRequest when API stabilizes")
     private func reverseGeocode(latitude: Double, longitude: Double) async -> String? {
         let location = CLLocation(latitude: latitude, longitude: longitude)
         do {
-            let placemarks = try await CLGeocoder().reverseGeocodeLocation(location)
-            guard let place = placemarks.first else { return nil }
-            let parts = [place.name, place.thoroughfare, place.locality, place.administrativeArea]
-                .compactMap { $0 }
-            return parts.isEmpty ? nil : parts.joined(separator: ", ")
+            if #available(iOS 26.0, *) {
+                guard let request = MKReverseGeocodingRequest(location: location) else {
+                    return nil
+                }
+                let mapItems = try await request.mapItems
+                guard let item = mapItems.first else { return nil }
+                if let shortAddress = item.address?.shortAddress, !shortAddress.isEmpty {
+                    return shortAddress
+                }
+                if let fullAddress = item.address?.fullAddress, !fullAddress.isEmpty {
+                    return fullAddress
+                }
+                if let singleLine = item.addressRepresentations?.fullAddress(includingRegion: false, singleLine: true),
+                   !singleLine.isEmpty {
+                    return singleLine
+                }
+                return item.name
+            } else {
+                let placemarks = try await CLGeocoder().reverseGeocodeLocation(location)
+                guard let place = placemarks.first else { return nil }
+                let parts = [place.name, place.thoroughfare, place.locality, place.administrativeArea]
+                    .compactMap { $0 }
+                return parts.isEmpty ? nil : parts.joined(separator: ", ")
+            }
         } catch {
             return nil
         }

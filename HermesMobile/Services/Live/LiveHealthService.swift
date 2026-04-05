@@ -291,14 +291,14 @@ final class LiveHealthService: HealthServiceProtocol {
         }
     }
 
-    internal static func sleepBucketDay(
+    nonisolated internal static func sleepBucketDay(
         for referenceDate: Date = Date(),
         calendar: Calendar = .current
     ) -> Date {
         calendar.startOfDay(for: referenceDate)
     }
 
-    internal static func aggregateSleepDuration(
+    nonisolated internal static func aggregateSleepDuration(
         intervals: [SleepInterval],
         attributedTo bucketDay: Date,
         calendar: Calendar = .current
