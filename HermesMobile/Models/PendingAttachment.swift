@@ -17,8 +17,9 @@ struct PendingAttachment: Identifiable, Sendable {
         case file
     }
 
-    /// Maximum file size: 5 MB (before base64 encoding).
-    static let maxFileSize = 5 * 1024 * 1024
+    /// Maximum file size: 1 MB (before base64 encoding).
+    /// Kept small because the full base64 payload goes through WebSocket + Hermes API.
+    static let maxFileSize = 1 * 1024 * 1024
     static let maxAttachmentsPerMessage = 4
 
     private static let supportedTextMimeTypes: Set<String> = [
@@ -46,8 +47,8 @@ struct PendingAttachment: Identifiable, Sendable {
         var quality: CGFloat = 0.8
         var targetImage = image
 
-        // Downscale very large images (> 4096px on any side)
-        let maxDimension: CGFloat = 4096
+        // Downscale images to 1024px max — balances quality with API body size
+        let maxDimension: CGFloat = 1024
         if max(image.size.width, image.size.height) > maxDimension {
             let scale = maxDimension / max(image.size.width, image.size.height)
             let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)

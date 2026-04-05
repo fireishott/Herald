@@ -445,8 +445,20 @@ final class LiveHermesClient: HermesClientProtocol {
         }
 
         if donePayload?.status == "failed" {
-            let text = donePayload?.error.map { "Hermes could not process this message: \($0)" }
-                ?? "Hermes could not process this message."
+            let rawError = donePayload?.error ?? ""
+            let text: String
+            if rawError.contains("413") || rawError.lowercased().contains("too large") {
+                text = "The attachment was too large for Hermes to process. Try a smaller image."
+            } else if rawError.isEmpty {
+                text = "Hermes could not process this message."
+            } else {
+                // Strip URLs and technical details for a cleaner message
+                let cleaned = rawError
+                    .replacingOccurrences(of: #"For more information check: \S+"#, with: "", options: .regularExpression)
+                    .replacingOccurrences(of: #"for url '\S+'"#, with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                text = "Hermes could not process this message: \(cleaned)"
+            }
             return Message(sender: .system, content: text, jobID: jobId, status: .failed)
         }
 
