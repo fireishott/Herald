@@ -109,6 +109,7 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
     private var assistantAudioPlaybackStartedAtUptime: TimeInterval?
     private var accumulatedAssistantAudioPlaybackMilliseconds = 0
     private var ignoreCurrentAssistantFinalization = false
+    private var lastImageItemID: String?
 
     #if canImport(WebRTC)
     private static let peerFactory = RTCPeerConnectionFactory()
@@ -240,6 +241,7 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         currentAssistantContentIndex = 0
         resetAssistantAudioPlaybackTracking()
         ignoreCurrentAssistantFinalization = false
+        lastImageItemID = nil
         #if canImport(WebRTC)
         dataChannel?.close()
         dataChannel = nil
@@ -268,13 +270,26 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
     func sendImage(_ imageData: Data, mimeType: String = "image/jpeg", triggerResponse: Bool = true) -> Bool {
         guard connectionState == .connected else { return false }
 
+        // Delete the previous image item so the model only sees the latest one.
+        // Without this, the model references stale camera frames or old photos.
+        if let previousID = lastImageItemID {
+            _ = sendRealtimeEvent([
+                "type": "conversation.item.delete",
+                "event_id": UUID().uuidString,
+                "item_id": previousID,
+            ])
+            lastImageItemID = nil
+        }
+
         let base64 = imageData.base64EncodedString()
         let dataURL = "data:\(mimeType);base64,\(base64)"
+        let imageItemID = "img_\(UUID().uuidString)"
 
         let sent = sendRealtimeEvent([
             "type": "conversation.item.create",
             "event_id": UUID().uuidString,
             "item": [
+                "id": imageItemID,
                 "type": "message",
                 "role": "user",
                 "content": [
@@ -285,6 +300,10 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
                 ],
             ] as [String: Any],
         ])
+
+        if sent {
+            lastImageItemID = imageItemID
+        }
 
         if sent && triggerResponse {
             // Only trigger response if no response is already in-flight
