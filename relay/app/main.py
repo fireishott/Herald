@@ -1291,6 +1291,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # skips SSE and never sees streaming events.
         if request_settings.hermes_adapter == "connector":
             payload_data["replyState"] = "pending"
+            payload_data.pop("message", None)  # don't leak the result — SSE will deliver it
             status_code = status.HTTP_202_ACCEPTED
         record_audit(
             db,

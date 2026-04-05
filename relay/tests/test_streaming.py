@@ -551,14 +551,6 @@ def test_result_message_carries_job_id(tmp_path):
             thread.join(timeout=5)
 
         data = holder["r"].json()["data"]
-        result_message = data["message"]
-        assert result_message is not None
-        assert result_message["jobId"] == job["id"]
-        assert result_message["role"] == "hermes"
-
-        hermes_messages = [
-            m for m in data["conversation"]["messages"]
-            if m["role"] == "hermes"
-        ]
-        assert len(hermes_messages) >= 1
-        assert hermes_messages[-1].get("jobId") == job["id"]
+        # With connector adapter, message is delivered via SSE (not in POST response)
+        assert data["replyState"] == "pending"
+        assert "message" not in data
