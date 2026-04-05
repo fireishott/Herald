@@ -151,8 +151,13 @@ final class CameraCaptureManager: NSObject {
         guard !isRunning else { return }
         isRunning = true
 
+        // CRITICAL: prevent AVCaptureSession from reconfiguring the audio session.
+        // WebRTC owns the audio session for voice — if the capture session touches
+        // it, the peer connection drops and the data channel dies.
+        session.automaticallyConfiguresApplicationAudioSession = false
+
         session.beginConfiguration()
-        session.sessionPreset = .medium // 480p
+        session.sessionPreset = .high // 720p — good preview quality
 
         // Add video input (no audio — mic stays on WebRTC)
         let position: AVCaptureDevice.Position = front ? .front : .back
