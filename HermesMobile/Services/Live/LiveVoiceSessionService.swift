@@ -476,7 +476,8 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             handleServerVADInterruption()
             voiceState = .listening
             statusMessage = "Listening"
-        case "conversation.item.created":
+        case "conversation.item.created",  // beta
+             "conversation.item.added":      // GA
             if let item = payload["item"] as? [String: Any],
                let role = item["role"] as? String,
                role == "assistant",
@@ -512,12 +513,17 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             voiceState = .thinking
             statusMessage = "Hermes is thinking."
         case "response.function_call_arguments.delta",
-             "response.function_call_arguments.done":
-            // MCP tool call in progress — show "working on it" state
+             "response.function_call_arguments.done",
+             "response.mcp_call_arguments.delta",
+             "response.mcp_call_arguments.done",
+             "response.mcp_call.in_progress":
+            // Tool or MCP call in progress — show "working on it" state
             if voiceState != .thinking {
                 voiceState = .thinking
             }
             statusMessage = "Hermes is working on that\u{2026}"
+        case "response.mcp_call.failed":
+            statusMessage = "A tool call failed — Hermes will try another way."
         case "response.done":
             let doneResponse = payload["response"] as? [String: Any]
             let status = doneResponse?["status"] as? String
@@ -526,7 +532,8 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             if status == "completed" {
                 currentRealtimeResponseID = nil
             }
-        case "response.audio_transcript.delta":
+        case "response.audio_transcript.delta",              // beta
+             "response.output_audio_transcript.delta":         // GA
             assistantTextSource = assistantTextSource ?? "audio"
             if assistantTextSource == "audio" {
                 appendAssistantDelta(payload["delta"] as? String ?? "")
@@ -536,7 +543,8 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             if assistantTextSource == "text" {
                 appendAssistantDelta(payload["delta"] as? String ?? "")
             }
-        case "response.audio_transcript.done":
+        case "response.audio_transcript.done",               // beta
+             "response.output_audio_transcript.done":          // GA
             assistantTextSource = assistantTextSource ?? "audio"
             if assistantTextSource == "audio" {
                 finalizeAssistantText(payload["transcript"] as? String ?? payload["text"] as? String)
