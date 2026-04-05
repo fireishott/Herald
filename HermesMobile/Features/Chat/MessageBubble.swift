@@ -239,9 +239,8 @@ struct MessageBubble: View {
            let uiImage = thumbnailImage {
             Image(uiImage: uiImage)
                 .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(minWidth: 80, minHeight: 80)
-                .frame(maxHeight: 120)
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: 200, maxHeight: 200)
                 .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.md))
         } else {
             HStack(spacing: Design.Spacing.xxs) {
