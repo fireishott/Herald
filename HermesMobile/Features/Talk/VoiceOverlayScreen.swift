@@ -1,10 +1,14 @@
 import SwiftUI
+import UIKit
 
 /// Full-screen voice overlay, inspired by ChatGPT's voice mode.
 /// Auto-starts a voice session on appear and tears it down on dismiss.
 struct VoiceOverlayScreen: View {
     @Environment(TalkStore.self) private var talkStore
     @Environment(TabRouter.self) private var router
+
+    @State private var showAttachmentSheet = false
+    @State private var showLiveCameraOverlay = false
 
     var body: some View {
         ZStack {
@@ -68,6 +72,28 @@ struct VoiceOverlayScreen: View {
             }
         }
         .statusBarHidden(true)
+        .sheet(isPresented: $showAttachmentSheet) {
+            VoiceAttachmentSheet(
+                onPhotoPicked: { imageData in
+                    talkStore.sendImage(imageData)
+                },
+                onCameraRequested: {
+                    showLiveCameraOverlay = true
+                }
+            )
+            .presentationDetents([.height(200)])
+            .presentationDragIndicator(.hidden)
+        }
+        .fullScreenCover(isPresented: $showLiveCameraOverlay) {
+            LiveCameraOverlay(
+                onFrameCaptured: { frameData, isFirst in
+                    talkStore.sendImage(frameData, triggerResponse: isFirst)
+                },
+                onDismiss: {
+                    showLiveCameraOverlay = false
+                }
+            )
+        }
     }
 
     // MARK: - Transcript
@@ -92,14 +118,22 @@ struct VoiceOverlayScreen: View {
         case .user:
             HStack {
                 Spacer()
-                Text(item.text)
-                    .font(Design.Typography.body)
-                    .foregroundStyle(Design.Colors.foreground)
-                    .padding(.horizontal, Design.Spacing.md)
-                    .padding(.vertical, Design.Spacing.sm)
-                    .background(Design.Colors.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
-                    .opacity(item.isPartial ? 0.6 : 1)
+                if let imageData = item.imageData, let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.md))
+                } else if !item.text.isEmpty {
+                    Text(item.text)
+                        .font(Design.Typography.body)
+                        .foregroundStyle(Design.Colors.foreground)
+                        .padding(.horizontal, Design.Spacing.md)
+                        .padding(.vertical, Design.Spacing.sm)
+                        .background(Design.Colors.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+                        .opacity(item.isPartial ? 0.6 : 1)
+                }
             }
         case .hermes:
             HStack {
@@ -166,6 +200,17 @@ struct VoiceOverlayScreen: View {
     private var controlBar: some View {
         HStack(spacing: Design.Spacing.xl) {
             if talkStore.isSessionActive {
+                // Add attachment button
+                Button { showAttachmentSheet = true } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Design.Colors.foreground)
+                        .frame(width: 52, height: 52)
+                        .background(Design.Colors.surface)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("Add image or camera")
+
                 // Mute button
                 Button {
                     Task { await talkStore.toggleMute() }
