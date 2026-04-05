@@ -796,6 +796,7 @@ class HermesMobileConnector:
                 turn_detection: dict = {
                     "type": config.turn_detection_type,
                     "create_response": config.create_response,
+                    "interrupt_response": config.interrupt_response,
                 }
                 if config.turn_detection_type == "semantic_vad":
                     turn_detection["eagerness"] = "medium"
