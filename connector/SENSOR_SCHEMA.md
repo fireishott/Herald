@@ -71,7 +71,11 @@ Daily aggregates computed from `health_samples`. Populated automatically for com
 | unit | TEXT | Unit |
 | updated_at | TEXT | Last rollup time |
 
-Primary key: `(metric, date)`. Indexed on `date DESC`.
+Primary key: `(metric, date)`. Indexed on `date DESC`. Pruned after 90 days (same as raw samples).
+
+**Rollup semantics:**
+- Cumulative metrics (steps, calories, distance, workout_minutes, stand_hours, sleep_duration): `sum_value` = MAX of the day's snapshots (each snapshot is a running total)
+- Point metrics (heart_rate, blood_oxygen, etc.): `sum_value` = NULL (sum is meaningless), `avg_value`/`min_value`/`max_value` are meaningful
 
 ## Available Metrics
 

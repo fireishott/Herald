@@ -20,7 +20,10 @@ struct SensorOutboxState: Codable, Hashable, Sendable {
         private static let windowedMetrics: Set<String> = [
             "steps",
             "active_calories",
-            "distance_walking"
+            "distance_walking",
+            "workout_minutes",
+            "stand_hours",
+            "sleep_duration",
         ]
 
         var dedupeKey: String {
@@ -275,18 +278,19 @@ final class SensorUploadService {
         return await performAuthorizedUpload(path: "device/sensor/location", body: body)
     }
 
+    // CLGeocoder is deprecated in iOS 26 in favor of MKReverseGeocodingRequest,
+    // but the MapKit API is still unstable. Suppress until it stabilizes.
+    @available(iOS, deprecated: 26.0, message: "Migrate to MKReverseGeocodingRequest when API stabilizes")
     private func reverseGeocode(latitude: Double, longitude: Double) async -> String? {
         let location = CLLocation(latitude: latitude, longitude: longitude)
-        let geocoder = CLGeocoder()
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
+            let placemarks = try await CLGeocoder().reverseGeocodeLocation(location)
             guard let place = placemarks.first else { return nil }
-            // Build a concise address: "Name, Street, City, State"
             let parts = [place.name, place.thoroughfare, place.locality, place.administrativeArea]
                 .compactMap { $0 }
             return parts.isEmpty ? nil : parts.joined(separator: ", ")
         } catch {
-            return nil // Geocoding failed — send without address
+            return nil
         }
     }
 
