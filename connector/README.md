@@ -14,7 +14,7 @@ The connector is the durable host boundary for:
 ## Install
 
 ```bash
-cd /Users/dylan-mac-mini/Documents/HermesMobile/connector
+cd connector
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
@@ -43,7 +43,13 @@ export HERMES_MOBILE_CONNECTOR_HOME=~/.hermes-mobile
 Relay target:
 
 ```bash
-export HERMES_MOBILE_RELAY_URL=https://hermes-mobile-relay-dylan.fly.dev/v1
+export HERMES_MOBILE_RELAY_URL=https://your-relay.example.com/v1
+```
+
+Optional setup gate:
+
+```bash
+export CONNECTOR_SETUP_SECRET=replace-me
 ```
 
 ## Setup
@@ -53,6 +59,13 @@ Create or link the relay account from the Hermes host first:
 ```bash
 hermes-mobile setup
 ```
+
+`setup` requires either:
+
+- `--relay-url https://your-relay.example.com/v1`
+- or `HERMES_MOBILE_RELAY_URL` in the environment
+
+If the relay requires a setup secret, export `CONNECTOR_SETUP_SECRET` before running `setup`.
 
 During setup the connector can optionally:
 
@@ -106,6 +119,8 @@ hermes-mobile pair-phone
 ```
 
 Then open Hermes Mobile on the phone and scan the QR code or enter the displayed `ABCD-EFGH` code manually.
+
+The iOS app can now pair against a custom relay URL. Make sure the phone is pointed at the same relay base URL the connector used during setup.
 
 ## Background service
 

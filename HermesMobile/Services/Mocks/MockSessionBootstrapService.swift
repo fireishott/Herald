@@ -8,7 +8,7 @@ final class MockSessionBootstrapService: SessionBootstrapServiceProtocol {
         connectionStatus: .connected,
         syncStatus: .synced,
         isMockMode: true,
-        backendEndpoint: AppEnvironmentPolicy.currentBuild.defaultEnvironment.baseURLString,
+        backendEndpoint: DemoData.sampleUserSettings.relayConfiguration.activeBaseURLString ?? "",
         lastSyncAt: .now,
         pushTokenRegistered: false
     )
@@ -20,7 +20,7 @@ final class MockSessionBootstrapService: SessionBootstrapServiceProtocol {
         state.deviceRegistered = true
         state.connectionStatus = .connected
         state.syncStatus = .synced
-        state.backendEndpoint = request.environment.baseURLString
+        state.backendEndpoint = request.relayBaseURLString
         state.lastSyncAt = .now
 
         return SessionBootstrapResponse(

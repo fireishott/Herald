@@ -1,33 +1,52 @@
 # Hermes Mobile Relay
 
-FastAPI relay for Hermes Mobile. The relay is the public control plane for pairing, auth, persistence, host coordination, talk bootstrap, and inbox flows.
+The relay is the public control plane for HermesMobile:
 
-It is not the Hermes runtime itself in connector mode. Hermes work runs on the user-owned host connector.
+- pairing and auth
+- durable message jobs
+- SSE streaming
+- connector WebSocket control channel
+- voice session bootstrap
+- inbox and push APIs
 
-## Run locally
+In connector mode, the relay does **not** run Hermes itself. Hermes work executes on the user-owned machine through the connector.
 
-1. Create a virtual environment and install dependencies.
-2. Copy `.env.example` to `.env` and adjust values if needed.
-3. Start Postgres and the relay:
-
-```bash
-docker compose up --build
-```
-
-Or run the API directly:
+## Local Development
 
 ```bash
+cd relay
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
+cp .env.example .env
+docker compose up --build
+```
+
+Or run the API directly after setting your env vars:
+
+```bash
 uvicorn app.main:app --reload
 ```
 
-## Deploy to Fly.io
+See [docs/local-dev.md](docs/local-dev.md) for local notes and [../docs/CONFIGURATION.md](../docs/CONFIGURATION.md) for the full config matrix.
 
-Fly deploys from the current working directory, so deploy from [`/Users/dylan-mac-mini/Documents/HermesMobile/relay`](/Users/dylan-mac-mini/Documents/HermesMobile/relay), where [`fly.toml`](/Users/dylan-mac-mini/Documents/HermesMobile/relay/fly.toml) and [`Dockerfile`](/Users/dylan-mac-mini/Documents/HermesMobile/relay/Dockerfile) live.
+## Production Mode
 
-Deployment notes for this relay are documented in [`/Users/dylan-mac-mini/Documents/HermesMobile/relay/docs/fly-io.md`](/Users/dylan-mac-mini/Documents/HermesMobile/relay/docs/fly-io.md).
+For real deployments, use connector mode:
+
+```bash
+HERMES_ADAPTER=connector
+PUBLIC_BASE_URL=https://your-relay.example.com/v1
+CONNECTOR_SETUP_SECRET=
+```
+
+If `CONNECTOR_SETUP_SECRET` is set, every connector must send the same value during `hermes-mobile setup`.
+
+## Fly.io
+
+Fly is just one deployment target. The tracked [fly.toml](fly.toml) now contains generic placeholders and must be customized before deploy.
+
+See [docs/fly-io.md](docs/fly-io.md).
 
 ## API surface
 
@@ -110,6 +129,7 @@ CONNECTOR_SYNC_WAIT_SECONDS=25
 CONNECTOR_JOB_LEASE_SECONDS=180
 CONNECTOR_HEARTBEAT_TIMEOUT_SECONDS=30
 CONNECTOR_IDLE_POLL_INTERVAL_SECONDS=1.0
+CONNECTOR_SETUP_SECRET=
 ```
 
 ## Connector mode behavior
@@ -154,14 +174,16 @@ The relay does not proxy live audio. Media flows directly between the app and Op
 On the machine where Hermes lives:
 
 ```bash
-cd /Users/dylan-mac-mini/Documents/HermesMobile/connector
+cd connector
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
 
 export HERMES_COMMAND=/absolute/path/to/hermes
 export HERMES_WORKDIR=/path/to/your/hermes/project
-export HERMES_MOBILE_RELAY_URL=https://hermes-mobile-relay-dylan.fly.dev/v1
+export HERMES_MOBILE_RELAY_URL=https://your-relay.example.com/v1
+# Optional, if the relay requires it:
+export CONNECTOR_SETUP_SECRET=replace-me
 
 hermes-mobile setup
 hermes-mobile pair-phone

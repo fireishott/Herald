@@ -67,8 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    setup = subparsers.add_parser("setup", help="Register this machine with Hermes Mobile.")
-    setup.add_argument("--relay-url", help="Relay API base URL (default: hosted relay).")
+    setup = subparsers.add_parser("setup", help="Register this machine with a Hermes Mobile relay.")
+    setup.add_argument("--relay-url", help="Relay API base URL. Required unless HERMES_MOBILE_RELAY_URL is set.")
     setup.add_argument(
         "--skip-mcp",
         action="store_true",
@@ -149,8 +149,9 @@ def run_wizard(connector: HermesMobileConnector) -> int:
     # Step 2: Register
     print_header("Step 2 of 4 — Register This Machine")
     print("Registering this machine with the Hermes Mobile relay...")
+    relay_url = connector.default_relay_url() or prompt("Relay API base URL", default=None)
     try:
-        state = connector.setup(configure_mcp=False)
+        state = connector.setup(relay_url=relay_url, configure_mcp=False)
     except Exception as e:
         print(f"Setup failed: {e}")
         return 1

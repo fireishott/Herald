@@ -68,7 +68,7 @@ struct AppStoresTests {
                     connectionStatus: .connected,
                     syncStatus: .synced,
                     isMockMode: false,
-                    backendEndpoint: request.environment.baseURLString,
+                    backendEndpoint: request.relayBaseURLString,
                     lastSyncAt: nil,
                     pushTokenRegistered: false
                 ),
@@ -120,8 +120,8 @@ struct AppStoresTests {
         ) async throws -> PairingRedeemResult {
             PairingRedeemResult(
                 configuration: PairedRelayConfiguration(
-                    baseURLString: request.environment.baseURLString,
-                    hostDisplayName: URL(string: request.environment.baseURLString)?.host ?? request.environment.baseURLString,
+                    baseURLString: request.relayBaseURLString,
+                    hostDisplayName: URL(string: request.relayBaseURLString)?.host ?? request.relayBaseURLString,
                     pairedAt: .now
                 ),
                 state: AppSessionState(
@@ -133,7 +133,7 @@ struct AppStoresTests {
                     connectionStatus: .connected,
                     syncStatus: .synced,
                     isMockMode: false,
-                    backendEndpoint: request.environment.baseURLString,
+                    backendEndpoint: request.relayBaseURLString,
                     lastSyncAt: .now,
                     pushTokenRegistered: false
                 ),
@@ -1436,6 +1436,35 @@ struct AppStoresTests {
         #expect(settingsStore.availableEnvironments == [.production])
     }
 
+    @Test @MainActor
+    func settingsStorePersistsCustomRelayConfiguration() async throws {
+        let suiteName = "settings-store-relay-config-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+
+        let persistence = UserDefaultsAppPersistenceStore(defaults: defaults)
+        let settingsStore = SettingsStore(
+            persistence: persistence,
+            buildConfiguration: AppBuildConfiguration(
+                hostedRelayBaseURL: nil,
+                hostedRelayEnabled: false,
+                supportURL: nil,
+                termsOfServiceURL: nil,
+                privacyPolicyURL: nil
+            )
+        )
+
+        settingsStore.settings.relayConfiguration = RelayConfiguration(
+            relayMode: .custom,
+            customRelayBaseURL: "https://demo.example.com/v1",
+            hostedRelayBaseURL: nil,
+            hostedRelayEnabled: false
+        )
+
+        let reloaded = persistence.loadUserSettings()
+        #expect(reloaded?.relayConfiguration.activeBaseURLString == "https://demo.example.com/v1")
+    }
+
     @Test
     func relayDecoderParsesFractionalSecondsWithoutTimezone() throws {
         let data = #"{"timestamp":"2026-03-31T18:58:36.197800"}"#.data(using: .utf8)!
@@ -1503,15 +1532,16 @@ struct AppStoresTests {
             pairingService: RecordingPairingService(),
             sessionStore: sessionStore,
             persistence: persistence,
-            environmentProvider: { .production }
+            environmentProvider: { .production },
+            relayBaseURLProvider: { "https://relay.example.test/v1" }
         )
 
         let setupCode = makeSetupCode()
         let didPair = await pairingStore.pair(using: setupCode)
 
         #expect(didPair)
-        #expect(pairingStore.pairedRelayConfiguration?.hostDisplayName == "hermes-mobile-relay-dylan.fly.dev")
-        #expect(persistence.loadPairedRelayConfiguration()?.baseURLString == AppEnvironment.production.baseURLString)
+        #expect(pairingStore.pairedRelayConfiguration?.hostDisplayName == "relay.example.test")
+        #expect(persistence.loadPairedRelayConfiguration()?.baseURLString == "https://relay.example.test/v1")
         #expect(await secureStore.retrieve(key: "session.accessToken") == "paired-access-token-ABCDEFGH")
         #expect(sessionStore.state.displayName == "Morgan")
     }
@@ -1568,7 +1598,8 @@ struct AppStoresTests {
             pairingService: RecordingPairingService(),
             sessionStore: sessionStore,
             persistence: persistence,
-            environmentProvider: { .production }
+            environmentProvider: { .production },
+            relayBaseURLProvider: { "https://relay.example.test/v1" }
         )
 
         let setupCode = makeSetupCode()

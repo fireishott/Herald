@@ -29,8 +29,11 @@ Carthage/Build/
 
 # Secrets
 .env
+*.env.local
 *.key
 credentials.json
+relay/fly.local.toml
+Config/*.local.xcconfig
 
 # Claude
 .claude/task-output/

@@ -39,7 +39,6 @@ from .state import (
 )
 from .talk_support import DEFAULT_REALTIME_MODELS, DEFAULT_REALTIME_VOICE, build_voice_context_snapshot
 
-DEFAULT_RELAY_URL = "https://hermes-mobile-relay-dylan.fly.dev/v1"
 OPENAI_REALTIME_CLIENT_SECRETS_URL = "https://api.openai.com/v1/realtime/client_secrets"
 
 
@@ -106,7 +105,7 @@ class HermesMobileConnector:
         )
 
     def default_relay_url(self) -> str:
-        return os.getenv("HERMES_MOBILE_RELAY_URL", DEFAULT_RELAY_URL).rstrip("/")
+        return (os.getenv("HERMES_MOBILE_RELAY_URL") or "").rstrip("/")
 
     def setup(
         self,
@@ -121,6 +120,10 @@ class HermesMobileConnector:
             )
 
         resolved_relay_url = (relay_url or self.default_relay_url()).rstrip("/")
+        if not resolved_relay_url:
+            raise RuntimeError(
+                "Relay URL is required. Pass --relay-url or set HERMES_MOBILE_RELAY_URL."
+            )
         setup_body: dict = {
             "connector": {
                 "platform": metadata.platform,

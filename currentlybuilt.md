@@ -1,4 +1,6 @@
-# HermesMobile — Current Build Status
+# HermesMobile — Internal Build Status
+
+This file is an implementation snapshot for maintainers. It is not the primary onboarding guide for open-source users.
 
 **Last updated:** April 5, 2026
 

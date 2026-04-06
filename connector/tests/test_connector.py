@@ -133,6 +133,62 @@ def test_setup_creates_connector_state(monkeypatch, tmp_path):
     assert state.mcp_last_test_error is None
 
 
+def test_setup_includes_installation_secret_from_env(monkeypatch, tmp_path):
+    store = ConnectorStateStore(state_dir=tmp_path / "connector-setup-secret")
+    connector = HermesMobileConnector(state_store=store, executor=make_executor())
+    monkeypatch.setattr(HermesCLIExecutor, "detect_version", lambda self: "Hermes 1.2.3")
+    monkeypatch.setattr(HermesCLIExecutor, "resolved_command_path", lambda self: "/usr/local/bin/hermes")
+    monkeypatch.setenv("CONNECTOR_SETUP_SECRET", "setup-secret")
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "data": {
+                    "user": {"id": "user-123", "displayName": "Taylor"},
+                    "host": {"id": "host-123", "userId": "user-123"},
+                    "connectorCredential": "secret-token",
+                    "webSocketURL": "wss://relay.example.com/v1/hosts/ws",
+                    "relayURL": "https://relay.example.com/v1",
+                }
+            }
+
+    def fake_post(url, json=None, timeout=None, headers=None):  # noqa: ANN001
+        assert json["installationSecret"] == "setup-secret"
+        return FakeResponse()
+
+    monkeypatch.setattr("hermes_mobile_connector.client.httpx.post", fake_post)
+    monkeypatch.setattr(
+        "hermes_mobile_connector.client.register_native_mcp_server",
+        lambda state_dir: MCPRegistrationStatus(
+            server_name="hermes_mobile",
+            hermes_home=tmp_path / ".hermes",
+            config_path=tmp_path / ".hermes" / "config.yaml",
+            command_path="/tmp/hermes-mobile-mcp",
+            registered=True,
+        ),
+    )
+    monkeypatch.setattr("hermes_mobile_connector.client.validate_native_mcp_server", lambda hermes_command, server_name: None)
+    monkeypatch.setattr("hermes_mobile_connector.client.validate_native_mcp_tools", lambda server_name: None)
+
+    connector.setup(relay_url="https://relay.example.com/v1")
+
+
+def test_setup_requires_explicit_relay_url_when_env_missing(monkeypatch, tmp_path):
+    store = ConnectorStateStore(state_dir=tmp_path / "connector-setup-missing-relay")
+    connector = HermesMobileConnector(state_store=store, executor=make_executor())
+    monkeypatch.setattr(HermesCLIExecutor, "detect_version", lambda self: "Hermes 1.2.3")
+    monkeypatch.delenv("HERMES_MOBILE_RELAY_URL", raising=False)
+
+    try:
+        connector.setup()
+        raise AssertionError("Expected setup() to fail without relay URL")
+    except RuntimeError as error:
+        assert "Relay URL is required" in str(error)
+
+
 def test_setup_can_skip_native_mcp_configuration(monkeypatch, tmp_path):
     store = ConnectorStateStore(state_dir=tmp_path / "connector-setup-skip")
     connector = HermesMobileConnector(state_store=store, executor=make_executor())

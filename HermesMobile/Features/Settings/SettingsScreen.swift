@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @Environment(AppSessionStore.self) private var sessionStore
     @Environment(HermesHostStore.self) private var hostStore
     @Environment(PairingStore.self) private var pairingStore
@@ -17,6 +18,7 @@ struct SettingsScreen: View {
             ScrollView {
                 VStack(spacing: Design.Spacing.lg) {
                     connectionSection
+                    relaySection
                     if settingsStore.availableEnvironments.count > 1 {
                         environmentSection
                     }
@@ -88,8 +90,74 @@ struct SettingsScreen: View {
 
     // MARK: - Environment
 
+    private var relaySection: some View {
+        SettingsSectionView(title: "Relay") {
+            VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+                if pairingStore.isPaired {
+                    settingsRow(
+                        icon: "point.3.connected.trianglepath.dotted",
+                        iconColor: Design.Brand.accent,
+                        title: "Active Relay",
+                        value: pairingStore.pairedRelayConfiguration?.hostDisplayName ?? relayConfiguration.relayOriginLabel
+                    )
+                    sectionDivider
+                    settingsRow(
+                        icon: "link",
+                        iconColor: .secondary,
+                        title: "Base URL",
+                        value: pairingStore.pairedRelayConfiguration?.baseURLString ?? relayConfiguration.activeBaseURLString ?? "Not configured"
+                    )
+                    Text("Disconnect Hermes before changing the relay configuration.")
+                        .font(Design.Typography.caption)
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                        .padding(.top, Design.Spacing.xs)
+                } else {
+                    if relayConfiguration.canUseHosted {
+                        Picker("Relay Mode", selection: relayModeBinding) {
+                            Text(RelayMode.custom.displayLabel).tag(RelayMode.custom)
+                            Text(RelayMode.hosted.displayLabel).tag(RelayMode.hosted)
+                        }
+                        .pickerStyle(.segmented)
+
+                        sectionDivider
+                    }
+
+                    if relayConfiguration.relayMode == .custom {
+                        VStack(alignment: .leading, spacing: Design.Spacing.xs) {
+                            TextField("https://your-relay.example.com/v1", text: customRelayURLBinding)
+                                .textInputAutocapitalization(.never)
+                                .keyboardType(.URL)
+                                .autocorrectionDisabled()
+                                .font(Design.Typography.callout.monospaced())
+                                .foregroundStyle(Design.Colors.foreground)
+                                .padding(Design.Spacing.md)
+                                .background(Design.Colors.background, in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+
+                            Text("Enter the relay API base URL your connector will use.")
+                                .font(Design.Typography.caption)
+                                .foregroundStyle(Design.Colors.secondaryForeground)
+                        }
+                    } else if let hostedRelayBaseURL = relayConfiguration.hostedRelayBaseURL {
+                        settingsRow(
+                            icon: "cloud",
+                            iconColor: Design.Brand.accent,
+                            title: "Hosted Relay",
+                            value: hostedRelayBaseURL
+                        )
+                    }
+
+                    if let relayValidationMessage {
+                        Text(relayValidationMessage)
+                            .font(Design.Typography.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+        }
+    }
+
     private var environmentSection: some View {
-        SettingsSectionView(title: "Environment") {
+        SettingsSectionView(title: "Internal Environment") {
             VStack(spacing: 0) {
                 ForEach(Array(settingsStore.availableEnvironments.enumerated()), id: \.element) { index, env in
                     Button {
@@ -182,7 +250,7 @@ struct SettingsScreen: View {
                     iconColor: .secondary,
                     title: "Terms of Service"
                 ) {
-                    // TODO: Open URL
+                    openConfiguredURL(settingsStore.buildConfiguration.termsOfServiceURL)
                 }
 
                 sectionDivider
@@ -192,7 +260,19 @@ struct SettingsScreen: View {
                     iconColor: .secondary,
                     title: "Privacy Policy"
                 ) {
-                    // TODO: Open URL
+                    openConfiguredURL(settingsStore.buildConfiguration.privacyPolicyURL)
+                }
+
+                if settingsStore.buildConfiguration.supportURL != nil {
+                    sectionDivider
+
+                    settingsNavRow(
+                        icon: "questionmark.circle",
+                        iconColor: .secondary,
+                        title: "Support"
+                    ) {
+                        openConfiguredURL(settingsStore.buildConfiguration.supportURL)
+                    }
                 }
             }
         }
@@ -218,6 +298,36 @@ struct SettingsScreen: View {
         Binding(
             get: { settingsStore.settings.hapticFeedbackEnabled },
             set: { settingsStore.settings.hapticFeedbackEnabled = $0 }
+        )
+    }
+
+    private var relayConfiguration: RelayConfiguration {
+        settingsStore.settings.relayConfiguration
+    }
+
+    private var relayValidationMessage: String? {
+        relayConfiguration.validationMessage
+    }
+
+    private var relayModeBinding: Binding<RelayMode> {
+        Binding(
+            get: { settingsStore.settings.relayConfiguration.relayMode },
+            set: { newValue in
+                var relayConfiguration = settingsStore.settings.relayConfiguration
+                relayConfiguration.relayMode = newValue
+                settingsStore.settings.relayConfiguration = relayConfiguration
+            }
+        )
+    }
+
+    private var customRelayURLBinding: Binding<String> {
+        Binding(
+            get: { settingsStore.settings.relayConfiguration.customRelayBaseURL },
+            set: { newValue in
+                var relayConfiguration = settingsStore.settings.relayConfiguration
+                relayConfiguration.customRelayBaseURL = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                settingsStore.settings.relayConfiguration = relayConfiguration
+            }
         )
     }
 
@@ -304,5 +414,10 @@ struct SettingsScreen: View {
         }
         .tint(Design.Brand.accent)
         .frame(minHeight: Design.Size.minTapTarget)
+    }
+
+    private func openConfiguredURL(_ url: URL?) {
+        guard let url else { return }
+        openURL(url)
     }
 }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConnectHermesScreen: View {
     @Environment(PairingStore.self) private var pairingStore
+    @Environment(SettingsStore.self) private var settingsStore
 
     @State private var setupCode = ""
     @State private var isScannerPresented = false
@@ -17,6 +18,7 @@ struct ConnectHermesScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Design.Spacing.lg) {
                     heroSection
+                    relayConfigurationCard
                     entryOptions
 
                     if isManualEntryVisible {
@@ -48,12 +50,57 @@ struct ConnectHermesScreen: View {
                 .font(Design.Typography.heroTitle)
                 .foregroundStyle(Design.Colors.foreground)
 
-            Text("On the machine running Hermes, finish connector setup and run `hermes-mobile pair-phone`. Then scan the QR code or enter the 8-character code here.")
+            Text("Self-hosted is the default. Enter your relay URL below, then on the machine running Hermes finish connector setup and run `hermes-mobile pair-phone`. After that, scan the QR code or enter the 8-character code here.")
                 .font(Design.Typography.body)
                 .foregroundStyle(Design.Colors.secondaryForeground)
         }
         .padding(Design.Spacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Design.Colors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+    }
+
+    private var relayConfigurationCard: some View {
+        VStack(alignment: .leading, spacing: Design.Spacing.md) {
+            Text("Relay")
+                .font(Design.Typography.sectionTitle)
+                .foregroundStyle(Design.Colors.foreground)
+
+            if relayConfiguration.canUseHosted {
+                Picker("Relay Mode", selection: relayModeBinding) {
+                    Text(RelayMode.custom.displayLabel).tag(RelayMode.custom)
+                    Text(RelayMode.hosted.displayLabel).tag(RelayMode.hosted)
+                }
+                .pickerStyle(.segmented)
+            }
+
+            if relayConfiguration.relayMode == .custom {
+                TextField("https://your-relay.example.com/v1", text: customRelayURLBinding)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    .autocorrectionDisabled()
+                    .font(Design.Typography.callout.monospaced())
+                    .foregroundStyle(Design.Colors.foreground)
+                    .padding(Design.Spacing.md)
+                    .background(Design.Colors.surface, in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+                    .accessibilityLabel("Relay URL")
+
+                Text("This should be your relay API base URL. The app will append pairing and chat endpoints to it.")
+                    .font(Design.Typography.caption)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
+            } else if let hostedRelayBaseURL = relayConfiguration.hostedRelayBaseURL {
+                Text(hostedRelayBaseURL)
+                    .font(Design.Typography.callout.monospaced())
+                    .foregroundStyle(Design.Colors.secondaryForeground)
+            }
+
+            if let relayValidationMessage {
+                Text(relayValidationMessage)
+                    .font(Design.Typography.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(Design.Spacing.lg)
         .background(Design.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
@@ -72,6 +119,8 @@ struct ConnectHermesScreen: View {
             }
             .background(Design.Brand.accent)
             .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+            .disabled(!isRelayConfigurationValid)
+            .opacity(isRelayConfigurationValid ? 1 : 0.5)
             .accessibilityLabel("Scan QR Code")
 
             Button {
@@ -89,6 +138,8 @@ struct ConnectHermesScreen: View {
             }
             .background(Design.Colors.surface)
             .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+            .disabled(!isRelayConfigurationValid)
+            .opacity(isRelayConfigurationValid ? 1 : 0.5)
             .accessibilityLabel("Enter Setup Code")
         }
     }
@@ -126,8 +177,8 @@ struct ConnectHermesScreen: View {
             .padding(.vertical, Design.Spacing.sm)
             .background(Design.Brand.accent)
             .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
-            .disabled(pairingStore.isWorking || !PhonePairingCode.isComplete(setupCode))
-            .opacity(pairingStore.isWorking || !PhonePairingCode.isComplete(setupCode) ? 0.5 : 1)
+            .disabled(pairingStore.isWorking || !PhonePairingCode.isComplete(setupCode) || !isRelayConfigurationValid)
+            .opacity(pairingStore.isWorking || !PhonePairingCode.isComplete(setupCode) || !isRelayConfigurationValid ? 0.5 : 1)
             .accessibilityLabel("Connect Hermes")
         }
         .padding(Design.Spacing.lg)
@@ -183,7 +234,45 @@ struct ConnectHermesScreen: View {
         pairingStore.lastErrorMessage ?? localErrorMessage
     }
 
+    private var relayConfiguration: RelayConfiguration {
+        settingsStore.settings.relayConfiguration
+    }
+
+    private var relayValidationMessage: String? {
+        relayConfiguration.validationMessage
+    }
+
+    private var isRelayConfigurationValid: Bool {
+        relayValidationMessage == nil
+    }
+
+    private var relayModeBinding: Binding<RelayMode> {
+        Binding(
+            get: { settingsStore.settings.relayConfiguration.relayMode },
+            set: { newValue in
+                var relayConfiguration = settingsStore.settings.relayConfiguration
+                relayConfiguration.relayMode = newValue
+                settingsStore.settings.relayConfiguration = relayConfiguration
+            }
+        )
+    }
+
+    private var customRelayURLBinding: Binding<String> {
+        Binding(
+            get: { settingsStore.settings.relayConfiguration.customRelayBaseURL },
+            set: { newValue in
+                var relayConfiguration = settingsStore.settings.relayConfiguration
+                relayConfiguration.customRelayBaseURL = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                settingsStore.settings.relayConfiguration = relayConfiguration
+            }
+        )
+    }
+
     private func completePairing(using rawCode: String) async {
+        guard isRelayConfigurationValid else {
+            localErrorMessage = relayValidationMessage
+            return
+        }
         let didPair = await pairingStore.pair(using: rawCode)
         if didPair {
             localErrorMessage = nil
