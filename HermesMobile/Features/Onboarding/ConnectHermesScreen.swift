@@ -18,10 +18,10 @@ struct ConnectHermesScreen: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Design.Spacing.lg) {
                     heroSection
-                    relayConfigurationCard
                     entryOptions
 
                     if isManualEntryVisible {
+                        relayConfigurationCard
                         manualEntryCard
                     }
 
@@ -119,8 +119,6 @@ struct ConnectHermesScreen: View {
             }
             .background(Design.Brand.accent)
             .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
-            .disabled(!isRelayConfigurationValid)
-            .opacity(isRelayConfigurationValid ? 1 : 0.5)
             .accessibilityLabel("Scan QR Code")
 
             Button {
@@ -130,7 +128,7 @@ struct ConnectHermesScreen: View {
                 }
                 isSetupCodeFocused = true
             } label: {
-                Label("Enter Pairing Code", systemImage: "number")
+                Label("Enter Code Manually", systemImage: "number")
                     .font(Design.Typography.headline)
                     .foregroundStyle(Design.Colors.foreground)
                     .frame(maxWidth: .infinity)
@@ -138,9 +136,7 @@ struct ConnectHermesScreen: View {
             }
             .background(Design.Colors.surface)
             .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
-            .disabled(!isRelayConfigurationValid)
-            .opacity(isRelayConfigurationValid ? 1 : 0.5)
-            .accessibilityLabel("Enter Setup Code")
+            .accessibilityLabel("Enter Code Manually")
         }
     }
 
