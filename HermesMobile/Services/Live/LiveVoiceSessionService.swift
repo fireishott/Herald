@@ -524,7 +524,14 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
 
     private func configureAudioSession() throws {
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        // Use .default mode instead of .voiceChat — voiceChat mode's DSP aggressively
+        // compresses dynamic range, making output sound very quiet on speaker.
+        // WebRTC handles its own echo cancellation via the Voice Processing I/O unit.
+        try audioSession.setCategory(
+            .playAndRecord,
+            mode: .default,
+            options: [.defaultToSpeaker, .allowBluetoothA2DP, .allowBluetooth]
+        )
         try audioSession.setActive(true)
     }
 
@@ -924,12 +931,21 @@ private final class RealtimePeerDelegate: NSObject, RTCPeerConnectionDelegate, R
     weak var owner: LiveVoiceSessionService?
 
     func dataChannelDidChangeState(_ dataChannel: RTCDataChannel) {
-        let isOpen = dataChannel.readyState == .open
+        let state = dataChannel.readyState
         Task { @MainActor [weak self] in
-            guard let owner = self?.owner, isOpen else { return }
-            owner.connectionState = .connected
-            owner.voiceState = .listening
-            owner.statusMessage = "Listening"
+            guard let owner = self?.owner else { return }
+            switch state {
+            case .open:
+                owner.connectionState = .connected
+                owner.voiceState = .listening
+                owner.statusMessage = "Listening"
+            case .closed, .closing:
+                owner.connectionState = .failed
+                owner.voiceState = .disconnected
+                owner.statusMessage = "Connection lost."
+            default:
+                break
+            }
         }
     }
 
