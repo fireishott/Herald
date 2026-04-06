@@ -20,29 +20,34 @@
 	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
-	<key>APP_HOSTED_RELAY_ENABLED</key>
-	<false/>
-	<key>APP_HOSTED_RELAY_URL</key>
-	<string></string>
-	<key>APP_PRIVACY_URL</key>
-	<string></string>
-	<key>APP_SUPPORT_URL</key>
-	<string></string>
-	<key>APP_TERMS_URL</key>
-	<string></string>
 	<key>NSCameraUsageDescription</key>
 	<string>Hermes uses the camera to capture photos and documents for analysis.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>Hermes reads your health data to offer personalized wellness insights.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Hermes does not write health data, but this permission is required by the system.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Hermes uses your location in the background to provide contextual awareness and proactive suggestions.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Hermes uses your location to provide contextual recommendations and nearby suggestions.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Hermes uses the microphone for voice conversations in Talk Mode.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Hermes uses motion data to understand your current activity for contextual awareness.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hermes accesses your photo library to help organize and search your photos.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Hermes uses speech recognition for voice commands and local transcription.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>processing</string>
+		<string>location</string>
+		<string>remote-notification</string>
+		<string>audio</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>

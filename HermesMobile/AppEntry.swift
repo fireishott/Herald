@@ -6,10 +6,44 @@ final class HermesAppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        // Register for remote (silent push) notifications
+        application.registerForRemoteNotifications()
+
         Task { @MainActor in
             await AppContainer.sharedDefault().handleSystemLaunch()
         }
         return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        Task { @MainActor in
+            // Store the push token for future relay registration
+            UserDefaults.standard.set(token, forKey: "hermes.apns.deviceToken")
+        }
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        // Push token registration failed — this is normal on simulators
+    }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        // Handle silent push: trigger sensor upload and conversation refresh
+        Task { @MainActor in
+            let container = AppContainer.sharedDefault()
+            await container.handleAppDidBecomeActive()
+            completionHandler(.newData)
+        }
     }
 }
 

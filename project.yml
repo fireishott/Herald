@@ -70,8 +70,33 @@ targets:
         NSCameraUsageDescription: "Hermes uses the camera to capture photos and documents for analysis."
         NSPhotoLibraryUsageDescription: "Hermes accesses your photo library to help organize and search your photos."
         NSMicrophoneUsageDescription: "Hermes uses the microphone for voice conversations in Talk Mode."
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Hermes uses your location in the background to provide contextual awareness and proactive suggestions."
+        NSMotionUsageDescription: "Hermes uses motion data to understand your current activity for contextual awareness."
+        NSSpeechRecognitionUsageDescription: "Hermes uses speech recognition for voice commands and local transcription."
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
         UIBackgroundModes:
           - processing
+          - location
+          - remote-notification
+          - audio
+
+  HermesMobileWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: HermesMobileWidgets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.hermesmobile.HermesMobile.Widgets
+        PRODUCT_NAME: HermesMobileWidgets
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_CFBundleDisplayName: Hermes Widgets
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        SWIFT_VERSION: "6.2"
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        TARGETED_DEVICE_FAMILY: "1,2"
 
   HermesMobileTests:
     type: bundle.unit-test
