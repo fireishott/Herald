@@ -1,6 +1,6 @@
-# Hermes Mobile Relay
+# Hermes iOS Relay
 
-The relay is the public control plane for HermesMobile:
+The relay is the public control plane for Hermes iOS:
 
 - pairing and auth
 - durable message jobs

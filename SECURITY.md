@@ -2,7 +2,7 @@
 
 ## Reporting Vulnerabilities
 
-If you discover a security vulnerability in HermesMobile, please report it responsibly:
+If you discover a security vulnerability in Hermes iOS, please report it responsibly:
 
 1. **Do not** open a public GitHub issue for security vulnerabilities
 2. Email security concerns to the maintainers directly

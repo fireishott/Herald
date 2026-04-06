@@ -1,6 +1,6 @@
 # iOS Capabilities Reference
 
-A living document tracking every iOS capability integrated into Hermes Mobile — what's working, what's next, and how each feeds into the Hermes agent's context awareness.
+A living document tracking every iOS capability integrated into Hermes iOS — what's working, what's next, and how each feeds into the Hermes agent's context awareness.
 
 ---
 

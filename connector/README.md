@@ -1,6 +1,6 @@
-# Hermes Mobile Connector
+# Hermes iOS Connector
 
-`hermes-mobile` is the host-side process that runs next to a local Hermes install and bridges it to a public Hermes Mobile relay.
+`hermes-mobile` is the host-side process that runs next to a local Hermes install and bridges it to a public Hermes iOS relay.
 
 The connector is the durable host boundary for:
 
@@ -118,7 +118,7 @@ After setup, generate a short-lived phone pairing code and QR:
 hermes-mobile pair-phone
 ```
 
-Then open Hermes Mobile on the phone and scan the QR code or enter the displayed `ABCD-EFGH` code manually.
+Then open Hermes iOS on the phone and scan the QR code or enter the displayed `ABCD-EFGH` code manually.
 
 The iOS app can now pair against a custom relay URL. Make sure the phone is pointed at the same relay base URL the connector used during setup.
 
