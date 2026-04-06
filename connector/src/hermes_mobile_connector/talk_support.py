@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 
-from .sensor_store import SensorStore
+from .sensor_store import SensorStore, freshness_metadata
 from .state import VoiceContextSnapshot
 
 DEFAULT_REALTIME_MODELS = ["gpt-realtime-1.5", "gpt-realtime"]
@@ -57,7 +57,32 @@ def summarize_sensor_freshness(sensor_store: SensorStore) -> str:
         f"{health.get('staleCount', 0)} stale metrics, "
         f"and {health.get('count', 0)} total metrics."
     )
-    return f"{location_summary} {health_summary}"
+    # Activity context from CoreMotion
+    activity_labels = {0: "stationary", 1: "walking", 2: "running", 3: "driving", 4: "cycling", 5: "unknown"}
+    try:
+        activity_row = sensor_store._read_conn.execute(
+            "SELECT value, recorded_at, updated_at FROM health_latest WHERE metric = 'user_activity'"
+        ).fetchone()
+        if activity_row:
+            activity_meta = freshness_metadata(
+                recorded_at=activity_row["recorded_at"],
+                updated_at=activity_row["updated_at"],
+                stale_after_seconds=900,
+            )
+            if not activity_meta["stale"]:
+                label = activity_labels.get(int(activity_row["value"]), "unknown")
+                activity_summary = f"User is currently {label}."
+            else:
+                activity_summary = ""
+        else:
+            activity_summary = ""
+    except Exception:
+        activity_summary = ""
+
+    parts = [location_summary, health_summary]
+    if activity_summary:
+        parts.append(activity_summary)
+    return " ".join(parts)
 
 
 def summarize_memory_provider(*, hermes_command: str | None, hermes_home: str | None) -> str:

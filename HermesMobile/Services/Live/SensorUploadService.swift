@@ -119,6 +119,7 @@ final class SensorUploadService {
     private let isPairedProvider: @MainActor () -> Bool
     private let locationService: LiveLocationService
     private let healthService: LiveHealthService
+    private let motionService: LiveMotionService?
 
     private var isActive = false
     private var isDraining = false
@@ -137,7 +138,8 @@ final class SensorUploadService {
         persistence: AppPersistenceStoreProtocol,
         isPairedProvider: @escaping @MainActor () -> Bool,
         locationService: LiveLocationService,
-        healthService: LiveHealthService
+        healthService: LiveHealthService,
+        motionService: LiveMotionService? = nil
     ) {
         self.apiClient = apiClient
         self.accessTokenProvider = accessTokenProvider
@@ -146,6 +148,7 @@ final class SensorUploadService {
         self.isPairedProvider = isPairedProvider
         self.locationService = locationService
         self.healthService = healthService
+        self.motionService = motionService
         self.outboxState = persistence.loadSensorOutboxState()
     }
 
@@ -170,8 +173,26 @@ final class SensorUploadService {
             }
         }
 
+        motionService?.onActivityUpdate = { [weak self] activityCode in
+            guard let self else { return }
+            Task { @MainActor in
+                let now = Date()
+                let sample = HealthSnapshot.Sample(
+                    metric: "user_activity",
+                    value: Double(activityCode.rawValue),
+                    unit: "activity_code",
+                    startAt: now,
+                    endAt: nil
+                )
+                self.outboxState.enqueue(healthSamples: [sample])
+                self.persistOutboxState()
+                await self.drainOutboxIfPossible()
+            }
+        }
+
         locationService.startMonitoring()
         healthService.startMonitoring()
+        motionService?.startMonitoring()
     }
 
     func stop() {

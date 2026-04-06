@@ -168,6 +168,35 @@ def get_health_metrics_list() -> str:
         store.close()
 
 
+ACTIVITY_LABELS = {0: "stationary", 1: "walking", 2: "running", 3: "automotive", 4: "cycling", 5: "unknown"}
+
+
+@mcp.tool()
+def get_user_activity() -> str:
+    """Get the user's current physical activity (stationary, walking, running, driving, cycling).
+
+    Returns the latest activity classification from the device's motion sensors,
+    with freshness metadata. Stale if older than 15 minutes.
+    """
+    store = _get_store()
+    try:
+        row = store._read_conn.execute(
+            "SELECT * FROM health_latest WHERE metric = 'user_activity'"
+        ).fetchone()
+        if row is None:
+            return json.dumps({"activity": "unknown", "available": False})
+        activity_code = int(row["value"])
+        label = ACTIVITY_LABELS.get(activity_code, "unknown")
+        meta = freshness_metadata(
+            recorded_at=row["recorded_at"],
+            updated_at=row["updated_at"],
+            stale_after_seconds=LOCATION_STALE_AFTER_SECONDS,
+        )
+        return json.dumps({"activity": label, "activityCode": activity_code, **meta})
+    finally:
+        store.close()
+
+
 @mcp.tool()
 def get_sensor_schema() -> str:
     """Return the SQLite schema for the sensor database.
