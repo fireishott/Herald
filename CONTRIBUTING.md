@@ -1,6 +1,6 @@
 # Contributing to HermesMobile
 
-Thanks for your interest in contributing! This project is an iOS companion app for the [Hermes Agent](https://github.com/hermes-ai/hermes-agent), with a self-hosted relay and connector architecture.
+Thanks for your interest in contributing! This project is an independent iOS companion app for the [Hermes Agent](https://github.com/NousResearch/hermes-agent) framework, with a self-hosted relay and connector architecture.
 
 ## Getting Started
 

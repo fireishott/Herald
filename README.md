@@ -1,5 +1,7 @@
 # HermesMobile
 
+> **Note:** HermesMobile is an independent community project. It is not affiliated with, endorsed by, or part of [Nous Research](https://nousresearch.com/) or the official [Hermes Agent](https://github.com/NousResearch/hermes-agent) project.
+
 HermesMobile is a self-hosted-first iOS companion for a user-owned Hermes runtime.
 
 The stack has three parts:
@@ -18,9 +20,9 @@ iOS App ──HTTP/SSE──▶ Relay ──WebSocket──▶ Connector ──�
 
 The relay is not the Hermes runtime. In connector mode, Hermes work runs on the user-owned machine where the connector is installed.
 
-## Official Product Shape
+## Deployment Model
 
-The official distribution model is now **self-hosted first**:
+The distribution model is **self-hosted first**:
 
 - users run their own relay
 - users run their own connector on the machine where Hermes lives

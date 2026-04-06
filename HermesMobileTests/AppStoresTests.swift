@@ -1370,10 +1370,10 @@ struct AppStoresTests {
               "host":{
                 "id":"\#(hostID.uuidString)",
                 "displayName":"Home Mac mini",
-                "hostname":"dylans-mac-mini",
+                "hostname":"test-host",
                 "platform":"macos",
                 "connectorVersion":"0.1.0",
-                "hermesCommand":"/Users/dylan/.local/bin/hermes",
+                "hermesCommand":"/usr/local/bin/hermes",
                 "hermesVersion":"hermes 0.7.0",
                 "lastSeenAt":"2026-04-03T21:15:00Z",
                 "lastConnectedAt":"2026-04-03T21:10:00Z",
@@ -1552,7 +1552,7 @@ struct AppStoresTests {
         service.currentHost = HermesHostStatus(
             id: UUID(),
             displayName: "Home Mac mini",
-            hostname: "dylans-mac-mini",
+            hostname: "test-host",
             platform: "macos",
             connectorVersion: "0.1.0",
             hermesCommand: "hermes",
