@@ -58,10 +58,11 @@ struct VoiceOverlayScreen: View {
             }
         }
         .task {
-            await talkStore.refreshReadiness()
-            if talkStore.canStartSession {
-                await talkStore.startSession()
-            }
+            // Skip the readiness check — go straight to session create.
+            // If the host is offline or unconfigured, session create fails
+            // with a clear error. This saves 2-4s of startup latency
+            // (the prewarm RPC rebuilds voice context from disk + subprocess).
+            await talkStore.startSessionDirectly()
         }
         .onDisappear {
             // Always clean up the voice session when the overlay disappears.

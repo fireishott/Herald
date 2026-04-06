@@ -283,7 +283,7 @@ class HermesMobileConnector:
             state.realtime_talk = config
             return self.state_store.save(state)
 
-    _VOICE_CONTEXT_FRESH_SECONDS = 10.0
+    _VOICE_CONTEXT_FRESH_SECONDS = 60.0  # prewarm rebuilds context; session create reuses if fresh
 
     def refresh_voice_context_if_stale(self, *, state: ConnectorState | None = None) -> ConnectorState:
         """Refresh voice context only if the snapshot is older than _VOICE_CONTEXT_FRESH_SECONDS."""
