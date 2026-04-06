@@ -85,9 +85,22 @@ def summarize_sensor_freshness(sensor_store: SensorStore) -> str:
     return " ".join(parts)
 
 
+_memory_provider_cache: tuple[float, str] = (0.0, "")
+_MEMORY_PROVIDER_CACHE_TTL = 300.0  # 5 minutes — rarely changes
+
+
 def summarize_memory_provider(*, hermes_command: str | None, hermes_home: str | None) -> str:
+    global _memory_provider_cache
+
     if not hermes_command:
         return "Memory provider status unavailable."
+
+    # Return cached result if fresh — avoids spawning a subprocess on every call
+    import time
+    now = time.monotonic()
+    cached_at, cached_result = _memory_provider_cache
+    if cached_result and (now - cached_at) < _MEMORY_PROVIDER_CACHE_TTL:
+        return cached_result
 
     env = os.environ.copy()
     if hermes_home:
@@ -98,7 +111,7 @@ def summarize_memory_provider(*, hermes_command: str | None, hermes_home: str | 
             [hermes_command, "memory", "status"],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=5,  # reduced from 10s — if it takes longer, use stale cache
             check=False,
             env=env,
         )
@@ -120,7 +133,9 @@ def summarize_memory_provider(*, hermes_command: str | None, hermes_home: str | 
     ]
     if not relevant:
         relevant = cleaned_lines[:4]
-    return " ".join(relevant)
+    result = " ".join(relevant)
+    _memory_provider_cache = (now, result)
+    return result
 
 
 def build_voice_context_snapshot(

@@ -40,10 +40,22 @@ final class TalkStore {
         applySnapshot(voiceService.snapshot)
     }
 
+    /// Start without a prior readiness check — goes straight to session create.
+    func startSessionDirectly() async {
+        canStartSession = true
+        connectionState = .connecting
+        voiceState = .thinking
+        statusMessage = "Connecting..."
+        await voiceService.startSession()
+        applySnapshot(voiceService.snapshot)
+        if isSessionActive {
+            liveActivity.startVoiceSession()
+        }
+    }
+
     func startSession() async {
         await voiceService.startSession()
         applySnapshot(voiceService.snapshot)
-        // Start Live Activity on Lock Screen / Dynamic Island
         if isSessionActive {
             liveActivity.startVoiceSession()
         }
