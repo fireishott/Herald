@@ -524,15 +524,25 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
 
     private func configureAudioSession() throws {
         let audioSession = AVAudioSession.sharedInstance()
-        // Use .default mode instead of .voiceChat — voiceChat mode's DSP aggressively
-        // compresses dynamic range, making output sound very quiet on speaker.
-        // WebRTC handles its own echo cancellation via the Voice Processing I/O unit.
+        // Use .default mode — voiceChat mode's DSP crushes output volume.
+        // WebRTC handles echo cancellation via its own Voice Processing I/O unit.
         try audioSession.setCategory(
             .playAndRecord,
             mode: .default,
             options: [.defaultToSpeaker, .allowBluetoothA2DP, .allowBluetooth]
         )
         try audioSession.setActive(true)
+
+        // Force output to the speaker for maximum volume — but only when no
+        // headphones or Bluetooth audio device is connected. Headsets handle
+        // their own volume and don't need the override.
+        let hasExternalOutput = audioSession.currentRoute.outputs.contains { output in
+            [.headphones, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .airPlay, .carAudio]
+                .contains(output.portType)
+        }
+        if !hasExternalOutput {
+            try audioSession.overrideOutputAudioPort(.speaker)
+        }
     }
 
     func handleDataChannelEvent(_ payload: [String: Any]) {
