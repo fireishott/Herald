@@ -1,4 +1,4 @@
-# Hermes Mobile Sensor Database Schema
+# Hermes iOS Sensor Database Schema
 
 SQLite database at `~/.hermes-mobile/state/sensors.db` (WAL mode).
 
@@ -107,7 +107,7 @@ Primary key: `(metric, date)`. Indexed on `date DESC`. Pruned after 90 days (sam
 
 ## Architecture Notes
 
-The connector is a bridge: it receives sensor data via WebSocket from the relay and writes to SQLite. A future native Hermes iOS integration would:
+The connector is a bridge: it receives sensor data via WebSocket from the relay and writes to SQLite. A future native integration would:
 1. Write to the same `sensors.db` schema directly (bypassing the relay/connector)
 2. Expose the same MCP tool interface
 3. Use the same table structure for web tools and dashboards
