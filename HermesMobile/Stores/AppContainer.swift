@@ -149,6 +149,7 @@ final class AppContainer {
         let liveLocationService = LiveLocationService()
         liveLocationService.updateSyncPreference(settingsStore.settings.locationSyncPreference)
         let liveHealthService = LiveHealthService(persistence: persistence)
+        let liveMotionService = LiveMotionService()
         let sensorUploadService: SensorUploadService? = usesMockPairingService ? nil : SensorUploadService(
             apiClient: apiClient,
             accessTokenProvider: { await sessionStore.currentAccessToken() },
@@ -159,7 +160,8 @@ final class AppContainer {
             persistence: persistence,
             isPairedProvider: { activePairingStore?.isPaired == true },
             locationService: liveLocationService,
-            healthService: liveHealthService
+            healthService: liveHealthService,
+            motionService: liveMotionService
         )
         let voiceService: any VoiceSessionServiceProtocol = if usesMockPairingService {
             MockVoiceSessionService()
@@ -189,7 +191,8 @@ final class AppContainer {
                 locationService: liveLocationService,
                 healthService: liveHealthService,
                 notificationService: notificationService,
-                mediaService: processEnvironment["UITEST_PAIRING_MODE"] != nil ? MockMediaService() : LiveMediaService()
+                mediaService: processEnvironment["UITEST_PAIRING_MODE"] != nil ? MockMediaService() : LiveMediaService(),
+                motionService: liveMotionService
             ),
             settingsStore: settingsStore,
             talkStore: TalkStore(voiceService: voiceService),
@@ -250,6 +253,7 @@ final class AppContainer {
         await permissionsStore.reloadCapabilities()
         await hostStore.refresh()
         await sensorUploadService?.handleAppDidBecomeActive()
+        talkStore.handleAppDidBecomeActive()
         await talkStore.refreshReadiness()
     }
 

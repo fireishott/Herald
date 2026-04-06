@@ -40,6 +40,11 @@ final class TalkStore {
         applySnapshot(voiceService.snapshot)
     }
 
+    /// Re-sync Live Activity state when returning from background.
+    func handleAppDidBecomeActive() {
+        liveActivity.handleAppDidBecomeActive()
+    }
+
     /// Start without a prior readiness check — goes straight to session create.
     func startSessionDirectly() async {
         canStartSession = true

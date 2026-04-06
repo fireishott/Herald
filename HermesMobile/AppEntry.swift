@@ -70,9 +70,12 @@ struct HermesMobileApp: App {
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
                         Task { await container.handleAppDidBecomeActive() }
-                    } else if newPhase == .background {
-                        Task { await container.talkStore.endSessionIfNeeded() }
                     }
+                    // Note: voice sessions are NOT ended on background.
+                    // The "audio" background mode keeps WebRTC alive so
+                    // the user can continue talking while the app is
+                    // backgrounded. The session ends only when the user
+                    // explicitly closes the voice overlay.
                 }
         }
     }

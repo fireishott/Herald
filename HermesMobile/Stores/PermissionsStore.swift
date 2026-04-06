@@ -10,17 +10,20 @@ final class PermissionsStore {
     private let healthService: any HealthServiceProtocol
     private let notificationService: any NotificationServiceProtocol
     private let mediaService: any MediaServiceProtocol
+    private let motionService: LiveMotionService?
 
     init(
         locationService: any LocationServiceProtocol,
         healthService: any HealthServiceProtocol,
         notificationService: any NotificationServiceProtocol,
-        mediaService: any MediaServiceProtocol
+        mediaService: any MediaServiceProtocol,
+        motionService: LiveMotionService? = nil
     ) {
         self.locationService = locationService
         self.healthService = healthService
         self.notificationService = notificationService
         self.mediaService = mediaService
+        self.motionService = motionService
         self.capabilities = currentCapabilities()
     }
 
@@ -43,6 +46,8 @@ final class PermissionsStore {
             _ = await mediaService.requestCameraAuthorization()
         case .photos:
             _ = await mediaService.requestPhotosAuthorization()
+        case .motion:
+            _ = await motionService?.requestAuthorization()
         }
 
         capabilities = currentCapabilities()
@@ -90,6 +95,7 @@ final class PermissionsStore {
             DeviceCapability(permissionType: .microphone, status: microphoneAuthorizationStatus()),
             DeviceCapability(permissionType: .camera, status: mediaService.cameraAuthorizationStatus),
             DeviceCapability(permissionType: .photos, status: mediaService.photosAuthorizationStatus),
+            DeviceCapability(permissionType: .motion, status: motionService?.authorizationStatus ?? .unsupported),
         ]
     }
 

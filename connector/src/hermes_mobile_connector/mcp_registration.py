@@ -20,6 +20,9 @@ MCP_TOOL_NAMES = [
     "get_health_summary",
     "get_health_metric",
     "get_health_metrics_list",
+    "get_user_activity",
+    "get_sensor_schema",
+    "query_sensor_data",
 ]
 
 
