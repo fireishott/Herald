@@ -13,8 +13,8 @@ final class MockPairingService: PairingServiceProtocol {
         let normalizedCode = try normalizePairingCode(normalizedCode)
         return PairingRedeemResult(
             configuration: PairedRelayConfiguration(
-                baseURLString: request.environment.baseURLString,
-                hostDisplayName: URL(string: request.environment.baseURLString)?.host ?? request.environment.baseURLString,
+                baseURLString: request.relayBaseURLString,
+                hostDisplayName: URL(string: request.relayBaseURLString)?.host ?? request.relayBaseURLString,
                 pairedAt: .now
             ),
             state: AppSessionState(
@@ -26,7 +26,7 @@ final class MockPairingService: PairingServiceProtocol {
                 connectionStatus: .connected,
                 syncStatus: .synced,
                 isMockMode: false,
-                backendEndpoint: request.environment.baseURLString,
+                backendEndpoint: request.relayBaseURLString,
                 lastSyncAt: .now,
                 pushTokenRegistered: false
             ),

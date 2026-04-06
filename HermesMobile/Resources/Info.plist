@@ -20,6 +20,16 @@
 	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>APP_HOSTED_RELAY_ENABLED</key>
+	<false/>
+	<key>APP_HOSTED_RELAY_URL</key>
+	<string></string>
+	<key>APP_PRIVACY_URL</key>
+	<string></string>
+	<key>APP_SUPPORT_URL</key>
+	<string></string>
+	<key>APP_TERMS_URL</key>
+	<string></string>
 	<key>NSCameraUsageDescription</key>
 	<string>Hermes uses the camera to capture photos and documents for analysis.</string>
 	<key>NSHealthShareUsageDescription</key>

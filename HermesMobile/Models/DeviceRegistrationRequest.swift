@@ -10,13 +10,15 @@ struct DeviceRegistrationRequest: Codable, Hashable, Sendable {
     let deviceModel: String
     let systemVersion: String
     let environment: AppEnvironment
+    let relayBaseURLString: String
 }
 
 extension DeviceRegistrationRequest {
     @MainActor
     static func current(
         installationID: UUID,
-        environment: AppEnvironment
+        environment: AppEnvironment,
+        relayBaseURLString: String? = nil
     ) -> DeviceRegistrationRequest {
         let device = UIDevice.current
         let bundle = Bundle.main
@@ -29,7 +31,8 @@ extension DeviceRegistrationRequest {
             bundleID: bundle.bundleIdentifier ?? "com.appfactory.HermesMobile",
             deviceModel: device.model,
             systemVersion: device.systemVersion,
-            environment: environment
+            environment: environment,
+            relayBaseURLString: relayBaseURLString ?? environment.baseURLString
         )
     }
 }

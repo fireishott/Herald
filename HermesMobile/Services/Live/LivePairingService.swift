@@ -57,7 +57,7 @@ final class LivePairingService: PairingServiceProtocol {
         _ normalizedCode: String,
         request: DeviceRegistrationRequest
     ) async throws -> PairingRedeemResult {
-        let apiClient = RelayAPIClient(baseURLProvider: { request.environment.baseURLString })
+        let apiClient = RelayAPIClient(baseURLProvider: { request.relayBaseURLString })
         let response: PairingRedeemResponse = try await apiClient.post(
             path: "phone-pairing/redeem",
             body: PairingRedeemBody(
@@ -78,8 +78,8 @@ final class LivePairingService: PairingServiceProtocol {
 
         return PairingRedeemResult(
             configuration: PairedRelayConfiguration(
-                baseURLString: request.environment.baseURLString,
-                hostDisplayName: URL(string: request.environment.baseURLString)?.host ?? request.environment.baseURLString,
+                baseURLString: response.session.backendEndpoint,
+                hostDisplayName: URL(string: response.session.backendEndpoint)?.host ?? response.session.backendEndpoint,
                 pairedAt: .now
             ),
             state: AppSessionState(

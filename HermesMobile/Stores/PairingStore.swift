@@ -15,17 +15,20 @@ final class PairingStore {
     private let sessionStore: AppSessionStore
     private let persistence: any AppPersistenceStoreProtocol
     private let environmentProvider: @MainActor () -> AppEnvironment
+    private let relayBaseURLProvider: @MainActor () -> String?
 
     init(
         pairingService: any PairingServiceProtocol,
         sessionStore: AppSessionStore,
         persistence: any AppPersistenceStoreProtocol,
-        environmentProvider: @escaping @MainActor () -> AppEnvironment
+        environmentProvider: @escaping @MainActor () -> AppEnvironment,
+        relayBaseURLProvider: @escaping @MainActor () -> String?
     ) {
         self.pairingService = pairingService
         self.sessionStore = sessionStore
         self.persistence = persistence
         self.environmentProvider = environmentProvider
+        self.relayBaseURLProvider = relayBaseURLProvider
         self.pairedRelayConfiguration = persistence.loadPairedRelayConfiguration()
         self.needsPermissionsOnboarding = UserDefaults.standard.bool(forKey: Self.onboardingKey)
     }
@@ -46,9 +49,14 @@ final class PairingStore {
 
         do {
             let normalizedCode = try pairingService.normalizePairingCode(rawSetupCode)
+            guard let relayBaseURLString = RelayConfiguration.normalizeBaseURL(relayBaseURLProvider()) else {
+                lastErrorMessage = "Enter a valid relay URL ending with /v1 before pairing."
+                return false
+            }
             let request = DeviceRegistrationRequest.current(
                 installationID: sessionStore.state.installationID,
-                environment: environmentProvider()
+                environment: environmentProvider(),
+                relayBaseURLString: relayBaseURLString
             )
             let result = try await pairingService.redeemPairingCode(
                 normalizedCode,

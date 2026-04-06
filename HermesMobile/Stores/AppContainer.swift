@@ -57,10 +57,14 @@ final class AppContainer {
         }
 
         let persistence = UserDefaultsAppPersistenceStore(defaults: resolvedDefaults)
+        let buildConfiguration = AppBuildConfiguration.current()
         let secureStore = KeychainSecureStore(
             serviceName: processEnvironment["UITEST_KEYCHAIN_SERVICE"] ?? "com.appfactory.HermesMobile.session"
         )
-        let settingsStore = SettingsStore(persistence: persistence)
+        let settingsStore = SettingsStore(
+            persistence: persistence,
+            buildConfiguration: buildConfiguration
+        )
         let syncCoordinator = MockSyncCoordinator()
         let notificationService = LiveNotificationService()
         let allowMockFallbacks = AppEnvironmentPolicy.currentBuild.allowsEnvironmentOverrides
@@ -76,7 +80,8 @@ final class AppContainer {
 
         let apiClient = RelayAPIClient {
             activePairingStore?.pairedRelayConfiguration?.baseURLString
-                ?? settingsStore.settings.environment.baseURLString
+                ?? settingsStore.settings.relayConfiguration.activeBaseURLString
+                ?? ""
         }
 
         let sessionBootstrapService = ResilientSessionBootstrapService(
@@ -104,7 +109,8 @@ final class AppContainer {
             pairingService: pairingService,
             sessionStore: sessionStore,
             persistence: persistence,
-            environmentProvider: { settingsStore.settings.environment }
+            environmentProvider: { settingsStore.settings.environment },
+            relayBaseURLProvider: { settingsStore.settings.relayConfiguration.activeBaseURLString }
         )
         activePairingStore = runtimePairingStore
 
@@ -190,10 +196,21 @@ final class AppContainer {
             sensorUploadService: sensorUploadService
         )
 
-        settingsStore.onEnvironmentChanged = { [weak sessionStore, weak container] _ in
+        let refreshUnpairedRelayContext: @MainActor () async -> Void = { [weak sessionStore, weak container] in
             guard container?.pairingStore.isPaired == false else { return }
+            await sessionStore?.clearSession()
+            guard let relayBaseURL = container?.settingsStore.settings.relayConfiguration.activeBaseURLString,
+                  !relayBaseURL.isEmpty else { return }
+            _ = relayBaseURL
             await sessionStore?.bootstrap(forceRegistration: true)
             await container?.inboxStore.loadInbox(force: true)
+        }
+
+        settingsStore.onEnvironmentChanged = { _ in
+            await refreshUnpairedRelayContext()
+        }
+        settingsStore.onRelayConfigurationChanged = { _ in
+            await refreshUnpairedRelayContext()
         }
 
         runtimePairingStore.onPairingChanged = { [weak container] isPaired in

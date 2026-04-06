@@ -1,6 +1,8 @@
 name: HermesMobile
 options:
-  bundleIdPrefix: com.appfactory
+  # Public-safe defaults. Replace locally if you regenerate the project
+  # for a private deployment with your own signing/bundle identifiers.
+  bundleIdPrefix: io.hermesmobile
   deploymentTarget:
     iOS: "26.0"
   xcodeVersion: "26.3"
@@ -42,7 +44,7 @@ targets:
       - package: WebRTC
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.appfactory.HermesMobile
+        PRODUCT_BUNDLE_IDENTIFIER: io.hermesmobile.HermesMobile
         PRODUCT_NAME: HermesMobile
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
@@ -73,7 +75,7 @@ targets:
       - target: HermesMobile
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.appfactory.HermesMobile.tests
+        PRODUCT_BUNDLE_IDENTIFIER: io.hermesmobile.HermesMobile.tests
         TEST_TARGET_NAME: HermesMobile
         GENERATE_INFOPLIST_FILE: true
 
@@ -86,6 +88,6 @@ targets:
       - target: HermesMobile
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.appfactory.HermesMobile.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: io.hermesmobile.HermesMobile.uitests
         TEST_TARGET_NAME: HermesMobile
         GENERATE_INFOPLIST_FILE: true
