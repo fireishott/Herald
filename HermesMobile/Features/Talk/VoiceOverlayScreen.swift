@@ -8,7 +8,6 @@ struct VoiceOverlayScreen: View {
     @Environment(TabRouter.self) private var router
 
     @State private var showLiveCameraOverlay = false
-    @State private var isExplicitlyDismissing = false
 
     var body: some View {
         ZStack {
@@ -65,12 +64,18 @@ struct VoiceOverlayScreen: View {
             }
         }
         .onDisappear {
-            // Only tear down if the user explicitly closed the voice overlay.
-            // Do NOT end session when sheets/covers appear on top (iOS fires
-            // onDisappear for those too).
-            guard isExplicitlyDismissing else { return }
+            // Always clean up the voice session when the overlay disappears.
+            // Use a short delay to avoid killing the session when the camera
+            // fullScreenCover appears (which triggers onDisappear transiently).
             if talkStore.isSessionActive {
-                Task { await talkStore.endSession() }
+                Task {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    // Re-check — if the overlay was re-presented (camera dismiss),
+                    // the session is still wanted. Only end if truly gone.
+                    if !showLiveCameraOverlay {
+                        await talkStore.endSession()
+                    }
+                }
             }
         }
         .statusBarHidden(true)
@@ -239,7 +244,6 @@ struct VoiceOverlayScreen: View {
                 // Close button
                 Button {
                     Task {
-                        isExplicitlyDismissing = true
                         await talkStore.endSession()
                         router.isVoiceOverlayPresented = false
                     }
@@ -257,7 +261,6 @@ struct VoiceOverlayScreen: View {
 
                 // Close button when not active (e.g. failed to start)
                 Button {
-                    isExplicitlyDismissing = true
                     router.isVoiceOverlayPresented = false
                 } label: {
                     Image(systemName: "xmark")
