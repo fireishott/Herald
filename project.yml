@@ -48,6 +48,7 @@ targets:
         optional: true
     dependencies:
       - package: WebRTC
+      - target: HermesMobileWidgets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.hermesmobile.HermesMobile

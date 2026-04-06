@@ -486,7 +486,9 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             if voiceState == .interrupted {
                 voiceState = .listening
             }
-            statusMessage = "Audio route changed."
+            // Re-assert speaker output when a device is removed (e.g. headphones unplugged)
+            // or the route is reconfigured by the system / WebRTC.
+            forceSpeakerIfNeeded()
         default:
             break
         }
@@ -538,7 +540,7 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         try audioSession.setCategory(
             .playAndRecord,
             mode: .default,
-            options: [.defaultToSpeaker, .allowBluetoothA2DP, .allowBluetooth]
+            options: [.defaultToSpeaker, .allowBluetoothA2DP, .allowBluetoothHFP]
         )
         try audioSession.setActive(true)
 
@@ -551,6 +553,23 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         }
         if !hasExternalOutput {
             try audioSession.overrideOutputAudioPort(.speaker)
+        }
+    }
+
+    /// Re-assert the speaker override after WebRTC (or any other subsystem) may
+    /// have reset the audio route.  Safe to call at any time — skips the override
+    /// when headphones, Bluetooth, AirPlay, or CarPlay are connected.
+    private func forceSpeakerIfNeeded() {
+        let audioSession = AVAudioSession.sharedInstance()
+        let hasExternalOutput = audioSession.currentRoute.outputs.contains { output in
+            [.headphones, .bluetoothA2DP, .bluetoothHFP, .bluetoothLE, .airPlay, .carAudio]
+                .contains(output.portType)
+        }
+        guard !hasExternalOutput else { return }
+        do {
+            try audioSession.overrideOutputAudioPort(.speaker)
+        } catch {
+            Self.logger.warning("forceSpeakerIfNeeded: override failed — \(error.localizedDescription)")
         }
     }
 
@@ -720,6 +739,19 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         blockedReason = nil
         canStartSession = true
         statusMessage = "Listening"
+
+        // Re-assert speaker override AFTER WebRTC finishes its audio setup.
+        // WebRTC's RTCPeerConnectionFactory reconfigures the audio session
+        // internally, which can reset our overrideOutputAudioPort(.speaker).
+        forceSpeakerIfNeeded()
+
+        // WebRTC may continue adjusting the audio route asynchronously after
+        // setRemoteDescription returns. Fire another override after a short
+        // delay as a safety net.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            self?.forceSpeakerIfNeeded()
+        }
     }
 
     private func exchangeSDP(localSDP: String, clientSecret: String, model: String?) async throws -> String {

@@ -129,4 +129,12 @@ final class LiveActivityService {
         )
         updateActivity(with: state)
     }
+
+    /// Called when the app returns to foreground — re-sync the elapsed time
+    /// and restart the timer (Timers are suspended while backgrounded).
+    func handleAppDidBecomeActive() {
+        guard currentActivity != nil, startedAt != nil else { return }
+        tickElapsedTime()
+        startUpdateTimer()
+    }
 }

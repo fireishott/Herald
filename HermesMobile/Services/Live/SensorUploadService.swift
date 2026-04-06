@@ -200,8 +200,10 @@ final class SensorUploadService {
         isDraining = false
         locationService.onLocationUpdate = nil
         healthService.onHealthUpdate = nil
+        motionService?.onActivityUpdate = nil
         locationService.stopMonitoring()
         healthService.stopMonitoring()
+        motionService?.stopMonitoring()
     }
 
     func resetOutbox() {

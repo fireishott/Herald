@@ -7,6 +7,7 @@ enum PermissionType: String, Codable, CaseIterable, Identifiable, Hashable, Send
     case microphone
     case camera
     case photos
+    case motion
 
     var id: String { rawValue }
 
@@ -18,6 +19,7 @@ enum PermissionType: String, Codable, CaseIterable, Identifiable, Hashable, Send
         case .microphone: "Microphone"
         case .camera: "Camera"
         case .photos: "Photos"
+        case .motion: "Motion & Activity"
         }
     }
 
@@ -29,6 +31,7 @@ enum PermissionType: String, Codable, CaseIterable, Identifiable, Hashable, Send
         case .microphone: "mic.fill"
         case .camera: "camera.fill"
         case .photos: "photo.fill"
+        case .motion: "figure.walk"
         }
     }
 
@@ -40,6 +43,7 @@ enum PermissionType: String, Codable, CaseIterable, Identifiable, Hashable, Send
         case .microphone: .indigo
         case .camera: .purple
         case .photos: .green
+        case .motion: .teal
         }
     }
 
@@ -57,9 +61,11 @@ enum PermissionType: String, Codable, CaseIterable, Identifiable, Hashable, Send
             "Capture photos and documents for Hermes to analyze, annotate, or organize."
         case .photos:
             "Access your photo library to help organize, search, and create albums based on your preferences."
+        case .motion:
+            "Hermes uses motion data to understand your current activity for contextual awareness."
         }
     }
 
     /// Permissions shown during onboarding. Camera and Photos are deferred to Settings.
-    static let onboardingPermissions: [PermissionType] = [.location, .notifications, .health, .microphone]
+    static let onboardingPermissions: [PermissionType] = [.location, .notifications, .health, .microphone, .motion]
 }
