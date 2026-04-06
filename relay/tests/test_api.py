@@ -27,7 +27,7 @@ def register_device(client: TestClient):
                 "deviceName": "Test iPhone",
                 "appVersion": "1.0.0",
                 "buildNumber": "1",
-                "bundleId": "com.appfactory.HermesMobile",
+                "bundleId": "io.hermesmobile.HermesMobile",
                 "installationId": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
                 "deviceModel": "iPhone17,2",
                 "systemVersion": "26.4",
@@ -76,7 +76,7 @@ def test_push_and_inbox_roundtrip(tmp_path):
                 "deviceId": device_id,
                 "apnsToken": "deadbeef",
                 "pushEnvironment": "sandbox",
-                "bundleId": "com.appfactory.HermesMobile",
+                "bundleId": "io.hermesmobile.HermesMobile",
             },
         )
         assert push_response.status_code == 200

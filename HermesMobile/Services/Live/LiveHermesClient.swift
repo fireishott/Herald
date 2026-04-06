@@ -3,7 +3,7 @@ import os
 
 @MainActor
 final class LiveHermesClient: HermesClientProtocol {
-    private static let logger = Logger(subsystem: "com.appfactory.HermesMobile", category: "LiveHermesClient")
+    private static let logger = Logger(subsystem: "io.hermesmobile.HermesMobile", category: "LiveHermesClient")
     private static let maxRequestBodyBytes = 1_000_000
     private struct ConversationResponse: Decodable {
         let conversation: RelayConversation

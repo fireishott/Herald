@@ -240,7 +240,7 @@ struct SettingsScreen: View {
                     icon: "info.circle",
                     iconColor: .secondary,
                     title: "Version",
-                    value: "1.0.0 (1)"
+                    value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0") (\(Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "1"))"
                 )
 
                 sectionDivider

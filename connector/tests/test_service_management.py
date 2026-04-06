@@ -165,7 +165,7 @@ def test_windows_wsl_install_and_lifecycle_commands_use_scheduled_task(tmp_path)
     manager = WindowsWSLServiceManager(
         store,
         command_runner=runner,
-        environment={"WSL_DISTRO_NAME": "Ubuntu-24.04", "USER": "dylan"},
+        environment={"WSL_DISTRO_NAME": "Ubuntu-24.04", "USER": "testuser"},
     )
 
     assert f"Installed Windows Scheduled Task `{WINDOWS_TASK_NAME}`." == manager.install(force=True)
@@ -178,7 +178,7 @@ def test_windows_wsl_install_and_lifecycle_commands_use_scheduled_task(tmp_path)
     assert create_command[:4] == ["schtasks.exe", "/Create", "/TN", WINDOWS_TASK_NAME]
     assert "/TR" in create_command
     action = create_command[create_command.index("/TR") + 1]
-    assert "wsl.exe -d Ubuntu-24.04 -u dylan --" in action
+    assert "wsl.exe -d Ubuntu-24.04 -u testuser --" in action
 
     assert ["schtasks.exe", "/Run", "/TN", WINDOWS_TASK_NAME] in commands
     assert ["schtasks.exe", "/End", "/TN", WINDOWS_TASK_NAME] in commands
@@ -192,7 +192,7 @@ def test_windows_wsl_status_parses_query_output(tmp_path):
     manager = WindowsWSLServiceManager(
         store,
         command_runner=lambda command: subprocess.CompletedProcess(command, 0, "Status: Running\n", ""),
-        environment={"WSL_DISTRO_NAME": "Ubuntu", "USER": "dylan"},
+        environment={"WSL_DISTRO_NAME": "Ubuntu", "USER": "testuser"},
     )
 
     status = manager.status()

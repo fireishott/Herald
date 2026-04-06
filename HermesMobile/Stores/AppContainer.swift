@@ -59,7 +59,7 @@ final class AppContainer {
         let persistence = UserDefaultsAppPersistenceStore(defaults: resolvedDefaults)
         let buildConfiguration = AppBuildConfiguration.current()
         let secureStore = KeychainSecureStore(
-            serviceName: processEnvironment["UITEST_KEYCHAIN_SERVICE"] ?? "com.appfactory.HermesMobile.session"
+            serviceName: processEnvironment["UITEST_KEYCHAIN_SERVICE"] ?? "io.hermesmobile.HermesMobile.session"
         )
         let settingsStore = SettingsStore(
             persistence: persistence,
