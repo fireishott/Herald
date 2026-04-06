@@ -55,19 +55,9 @@ iOS App ──HTTP/SSE──▶ Relay (self-hosted) ◀──WebSocket──▶ 
 
 ---
 
-## Known Issues (from code review)
+## Known Issues
 
-| Severity | Issue |
-|----------|-------|
-| **Critical** | Voice session `performAuthorizedRequest` discards refreshed token on retry |
-| **High** | Force-unwraps on optional conversation in ChatStore streaming loop |
-| **High** | WebRTC properties (`nonisolated(unsafe)`) accessed cross-thread without sync |
-| **High** | `query_sensor_data` SQL injection — safety checks bypassable |
-| **High** | SensorStore SQLite shared across threads without locking |
-| Medium | CIContext per-frame, UIGraphicsImageRenderer on background queue |
-| Medium | Synchronous file I/O in MessageBubble attachment cell |
-| Medium | Unbounded event buffer in relay, attachment staging never cleaned |
-| Low | Static streaming dots, placeholder ToS/Privacy buttons |
+See the project's issue tracker for current bugs and improvements. Security-sensitive issues are handled via the process described in [SECURITY.md](SECURITY.md).
 
 ---
 
@@ -75,7 +65,7 @@ iOS App ──HTTP/SSE──▶ Relay (self-hosted) ◀──WebSocket──▶ 
 
 | Suite | Tests | Status |
 |-------|-------|--------|
-| Connector | 76 | All passing |
+| Connector | 78 | All passing |
 | Relay | 44 | All passing |
 | iOS AppStoresTests | ~15 | Passing (streaming, attachments, sleep) |
 | iOS UI Tests | Stale | Not maintained |

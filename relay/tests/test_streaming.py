@@ -395,9 +395,9 @@ def test_sse_rejects_job_owned_by_different_user(tmp_path):
             "hostDisplayName": "Alex's Mac",
             "connector": {
                 "platform": "macos",
-                "hostname": "alexs-mac",
+                "hostname": "test-host",
                 "connectorVersion": "0.1.0",
-                "hermesCommand": "/Users/alex/.local/bin/hermes",
+                "hermesCommand": "/usr/local/bin/hermes",
                 "hermesVersion": "hermes 1.2.3",
             },
         }).json()["data"]
