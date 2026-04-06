@@ -52,9 +52,9 @@ CONNECTOR_SETUP = {
     "hostDisplayName": "Home Mac mini",
     "connector": {
         "platform": "macos",
-        "hostname": "dylans-mac-mini",
+        "hostname": "test-host",
         "connectorVersion": "0.1.0",
-        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+        "hermesCommand": "/usr/local/bin/hermes",
         "hermesVersion": "hermes 1.2.3",
     },
 }
@@ -63,9 +63,9 @@ HELLO_PAYLOAD = {
     "type": "hello",
     "connector": {
         "platform": "macos",
-        "hostname": "dylans-mac-mini",
+        "hostname": "test-host",
         "connectorVersion": "0.1.0",
-        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+        "hermesCommand": "/usr/local/bin/hermes",
         "hermesVersion": "hermes 1.2.3",
     },
 }
@@ -79,7 +79,7 @@ def phone_pairing_payload(code, installation_id):
             "deviceName": "Taylor's iPhone",
             "appVersion": "1.0.0",
             "buildNumber": "1",
-            "bundleId": "com.appfactory.HermesMobile",
+            "bundleId": "io.hermesmobile.HermesMobile",
             "installationId": installation_id,
             "deviceModel": "iPhone17,2",
             "systemVersion": "26.2",

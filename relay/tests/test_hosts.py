@@ -40,9 +40,9 @@ def connector_setup_payload(owner_display_name: str = "Taylor") -> dict:
         "hostDisplayName": "Home Mac mini",
         "connector": {
             "platform": "macos",
-            "hostname": "dylans-mac-mini",
+            "hostname": "test-host",
             "connectorVersion": "0.1.0",
-            "hermesCommand": "/Users/dylan/.local/bin/hermes",
+            "hermesCommand": "/usr/local/bin/hermes",
             "hermesVersion": "hermes 1.2.3",
         },
     }
@@ -56,7 +56,7 @@ def phone_pairing_payload(code: str, installation_id: str) -> dict:
             "deviceName": "Taylor's iPhone",
             "appVersion": "1.0.0",
             "buildNumber": "1",
-            "bundleId": "com.appfactory.HermesMobile",
+            "bundleId": "io.hermesmobile.HermesMobile",
             "installationId": installation_id,
             "deviceModel": "iPhone17,2",
             "systemVersion": "26.2",
@@ -198,9 +198,9 @@ def test_connected_host_gets_job_and_preserves_session_resume(tmp_path):
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                         "displayName": "Home Mac mini",
                     },
@@ -280,9 +280,9 @@ def test_completed_job_events_include_usage_and_result_message(tmp_path):
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                     },
                 }
@@ -349,9 +349,9 @@ def test_failed_job_response_and_conversation_include_job_id(tmp_path):
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                     },
                 }
@@ -406,9 +406,9 @@ def test_talk_readiness_reflects_connector_configuration(tmp_path):
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                     },
                 }
@@ -474,9 +474,9 @@ def test_talk_session_create_and_end_roundtrip(tmp_path):
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                     },
                 }
@@ -575,9 +575,9 @@ def test_talk_turn_endpoint_persists_final_turns_and_is_idempotent(tmp_path):
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                     },
                 }
@@ -668,9 +668,9 @@ def test_talk_session_end_is_idempotent(tmp_path):
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                     },
                 }
@@ -757,9 +757,9 @@ def test_talk_session_returns_conflict_when_connector_is_unconfigured(tmp_path):
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                     },
                 }
@@ -821,9 +821,9 @@ def test_sensor_delivery_returns_retry_offline_and_delivered_after_connector_ack
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                     },
                 }
@@ -878,9 +878,9 @@ def test_stale_connector_disconnect_does_not_remove_newer_live_socket(tmp_path):
                     "type": "hello",
                     "connector": {
                         "platform": "macos",
-                        "hostname": "dylans-mac-mini",
+                        "hostname": "test-host",
                         "connectorVersion": "0.1.0",
-                        "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                        "hermesCommand": "/usr/local/bin/hermes",
                         "hermesVersion": "hermes 1.2.3",
                     },
                 }
@@ -896,9 +896,9 @@ def test_stale_connector_disconnect_does_not_remove_newer_live_socket(tmp_path):
                         "type": "hello",
                         "connector": {
                             "platform": "macos",
-                            "hostname": "dylans-mac-mini",
+                            "hostname": "test-host",
                             "connectorVersion": "0.1.0",
-                            "hermesCommand": "/Users/dylan/.local/bin/hermes",
+                            "hermesCommand": "/usr/local/bin/hermes",
                             "hermesVersion": "hermes 1.2.3",
                         },
                     }

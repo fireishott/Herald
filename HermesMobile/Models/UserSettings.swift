@@ -318,8 +318,8 @@ enum AppEnvironment: String, Codable, CaseIterable, Hashable, Sendable {
 
     var baseURLString: String {
         switch self {
-        case .production: "https://relay.example.com/v1"
-        case .staging: "https://staging.relay.example.com/v1"
+        case .production: ""  // Use custom relay URL from RelayConfiguration
+        case .staging: ""     // Use custom relay URL from RelayConfiguration
         case .development: "http://127.0.0.1:8000/v1"
         }
     }

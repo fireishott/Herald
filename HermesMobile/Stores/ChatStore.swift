@@ -201,12 +201,14 @@ final class ChatStore {
 
         // Finalize current streaming message with content received so far
         if let sid = streamingMessageID,
-           let idx = conversation?.messages.firstIndex(where: { $0.id == sid }) {
-            conversation?.messages[idx].isStreaming = false
-            conversation?.messages[idx].status = .delivered
-            for i in conversation!.messages[idx].toolActivities.indices {
-                conversation?.messages[idx].toolActivities[i].isActive = false
+           var conv = conversation,
+           let idx = conv.messages.firstIndex(where: { $0.id == sid }) {
+            conv.messages[idx].isStreaming = false
+            conv.messages[idx].status = .delivered
+            for i in conv.messages[idx].toolActivities.indices {
+                conv.messages[idx].toolActivities[i].isActive = false
             }
+            conversation = conv
         }
         streamingMessageID = nil
         pendingMessageSentAt = nil

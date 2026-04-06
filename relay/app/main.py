@@ -138,6 +138,13 @@ class ConnectorSession:
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
+
+    if settings.internal_api_key == "replace-me" and settings.environment != "development":
+        logger.warning(
+            "SECURITY: INTERNAL_API_KEY is set to the default 'replace-me'. "
+            "Set a strong random value via the INTERNAL_API_KEY env var."
+        )
+
     database = Database(settings.database_url)
 
     @asynccontextmanager

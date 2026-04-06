@@ -7,14 +7,14 @@ This file is an implementation snapshot for maintainers. It is not the primary o
 ## Architecture
 
 ```
-iOS App ──HTTP/SSE──▶ Relay (Fly.io) ◀──WebSocket──▶ Connector (Mac mini) ──▶ Hermes Agent
-                                      ◀──────────────▶ OpenAI Realtime API (voice, via iOS WebRTC)
+iOS App ──HTTP/SSE──▶ Relay (self-hosted) ◀──WebSocket──▶ Connector (user host) ──▶ Hermes Agent
+                                          ◀──────────────▶ OpenAI Realtime API (voice, via iOS WebRTC)
 ```
 
 - **iOS App**: SwiftUI, iOS 26, Swift 6.2 strict concurrency
-- **Relay**: FastAPI on Fly.io, SQLite, WebSocket + SSE
-- **Connector**: Python service on Mac mini, bridges relay to Hermes CLI/API
-- **Hermes Agent**: Local agent with tools, memory, MCP, model gpt-5.4-mini via openai-codex
+- **Relay**: FastAPI, SQLite (local) / PostgreSQL (production), WebSocket + SSE
+- **Connector**: Python service on the Hermes host, bridges relay to Hermes CLI/API
+- **Hermes Agent**: Local agent with tools, memory, MCP support
 
 ---
 

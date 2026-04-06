@@ -110,11 +110,12 @@ def get_health_metric(metric: str, since: str | None = None, limit: int = 50) ->
     """Get time-series data for a specific health metric.
 
     Returns historical samples for the requested metric ordered newest first.
-    Available metrics include: steps, heart_rate, resting_heart_rate, calories,
-    active_calories, sleep_hours, distance_walking, distance_cycling, workouts.
+    Available metrics: steps, active_calories, distance_walking, heart_rate,
+    resting_heart_rate, blood_oxygen, respiratory_rate, body_mass,
+    workout_minutes, stand_hours, sleep_duration.
 
     Args:
-        metric: The metric name (e.g. "steps", "heart_rate", "sleep_hours")
+        metric: The metric name (e.g. "steps", "heart_rate", "sleep_duration")
         since: ISO8601 timestamp to filter from (e.g. "2026-04-01T00:00:00Z")
         limit: Maximum number of samples to return (default 50)
     """
