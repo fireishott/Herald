@@ -150,6 +150,14 @@
 		FE7522860C6E4CDA2A7AEB11 /* VoiceOrb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C0CE3739DE97A0EED8BF86C /* VoiceOrb.swift */; };
 		FF1CE050B0F7CC3E16212121 /* ChatScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB61078198CA1379D8F50ED /* ChatScreen.swift */; };
 		D1E2F3A4B5C6D7E8F9A0B1C2 /* HermesMobileWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = CB1E16EC7AC1A55E87ED87EA /* HermesMobileWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		3A415263748596A1B2C3D4E5 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293041A2 /* CarPlaySceneDelegate.swift */; };
+		4B526374859607A1B2C3D4E5 /* CarPlayVoiceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6071829304152B3 /* CarPlayVoiceManager.swift */; };
+		5C637485960718A1B2C3D4E5 /* SharedWidgetDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F607182930415263C4 /* SharedWidgetDataStore.swift */; };
+		6D748596071829A1B2C3D4E5 /* HermesWidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4E5F6071829304152637405 /* HermesWidgetData.swift */; };
+		7E859607182930A1B2C3D4E5 /* HermesStatusWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F607182930415263748516 /* HermesStatusWidget.swift */; };
+		8F960718293041A1B2C3D4E5 /* HermesHealthWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6071829304152637485961A /* HermesHealthWidget.swift */; };
+		9A071829304152A1B2C3D4E5 /* HermesTimelineProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 071829304152637485961A2B /* HermesTimelineProvider.swift */; };
+		AB182930415263A1B2C3D4E5 /* HermesWidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1829304152637485961A2B3C /* HermesWidgetData.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -338,6 +346,15 @@
 		F5CD2BC0D1F377A4211097C1 /* GlassCircleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassCircleButton.swift; sourceTree = "<group>"; };
 		F77FB3058B069312B9716844 /* CodeBlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeBlockView.swift; sourceTree = "<group>"; };
 		F9AAD43838EF351D00563C90 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293041A2 /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6071829304152B3 /* CarPlayVoiceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayVoiceManager.swift; sourceTree = "<group>"; };
+		C3D4E5F607182930415263C4 /* SharedWidgetDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedWidgetDataStore.swift; sourceTree = "<group>"; };
+		D4E5F6071829304152637405 /* HermesWidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesWidgetData.swift; sourceTree = "<group>"; };
+		E5F607182930415263748516 /* HermesStatusWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesStatusWidget.swift; sourceTree = "<group>"; };
+		F6071829304152637485961A /* HermesHealthWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesHealthWidget.swift; sourceTree = "<group>"; };
+		071829304152637485961A2B /* HermesTimelineProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesTimelineProvider.swift; sourceTree = "<group>"; };
+		1829304152637485961A2B3C /* HermesWidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesWidgetData.swift; sourceTree = "<group>"; };
+		29304152637485961A2B3C4D /* HermesMobileWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = HermesMobileWidgets.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -404,6 +421,7 @@
 		2C0E0892137AA72D9468922E /* HermesMobile */ = {
 			isa = PBXGroup;
 			children = (
+				BC293041526374A1B2C3D4E5 /* CarPlay */,
 				160088ABCC350E17C2160197 /* Components */,
 				D510518ADBCD6B05B96F1913 /* Core */,
 				09759B69E64061C464874378 /* Features */,
@@ -560,6 +578,7 @@
 				8A1EC7ACC1C76DC2C62A6590 /* Mocks */,
 				4FEB80E534BC8ACE95FB383B /* Protocols */,
 				8B8E000DEAE7C4C24271ABEA /* Support */,
+				C3D4E5F607182930415263C4 /* SharedWidgetDataStore.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -601,8 +620,13 @@
 		D39F61251933889F9F6E8EEE /* HermesMobileWidgets */ = {
 			isa = PBXGroup;
 			children = (
+				CD304152637485A1B2C3D4E5 /* Models */,
 				3ACC623FAF147465BB777E42 /* HermesActivityAttributes.swift */,
+				F6071829304152637485961A /* HermesHealthWidget.swift */,
 				DD51D8251EE8BD9F66B64D2F /* HermesLiveActivity.swift */,
+				29304152637485961A2B3C4D /* HermesMobileWidgets.entitlements */,
+				E5F607182930415263748516 /* HermesStatusWidget.swift */,
+				071829304152637485961A2B /* HermesTimelineProvider.swift */,
 				91C2F6A36BBB87D0B1AD475E /* HermesWidgetBundle.swift */,
 			);
 			path = HermesMobileWidgets;
@@ -658,6 +682,7 @@
 		EB9D79947231ED36180C2C4A /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				D4E5F6071829304152637405 /* HermesWidgetData.swift */,
 				922497E60B94B42BEC2AC2D7 /* AppSessionState.swift */,
 				AE3B66D321B1CAE14ABFE741 /* AuthTokens.swift */,
 				B930D429179DCD2E18B056CF /* CodeDiff.swift */,
@@ -693,6 +718,23 @@
 				D434755EB1B165DD0C31EDEF /* ToolActivity.swift */,
 				33AA48ED37DFFBB2A6757A41 /* UserSettings.swift */,
 				25563E39F08D0F19F538ADD8 /* VoiceState.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		BC293041526374A1B2C3D4E5 /* CarPlay */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60718293041A2 /* CarPlaySceneDelegate.swift */,
+				B2C3D4E5F6071829304152B3 /* CarPlayVoiceManager.swift */,
+			);
+			path = CarPlay;
+			sourceTree = "<group>";
+		};
+		CD304152637485A1B2C3D4E5 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				1829304152637485961A2B3C /* HermesWidgetData.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -841,8 +883,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				A5A13469D1032CCB24C6D9A5 /* HermesActivityAttributes.swift in Sources */,
+				8F960718293041A1B2C3D4E5 /* HermesHealthWidget.swift in Sources */,
 				9FEE3209117EA59B1422B99B /* HermesLiveActivity.swift in Sources */,
+				7E859607182930A1B2C3D4E5 /* HermesStatusWidget.swift in Sources */,
+				9A071829304152A1B2C3D4E5 /* HermesTimelineProvider.swift in Sources */,
 				9E292D04C207E3FF0AA3E16A /* HermesWidgetBundle.swift in Sources */,
+				AB182930415263A1B2C3D4E5 /* HermesWidgetData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -868,6 +914,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3A415263748596A1B2C3D4E5 /* CarPlaySceneDelegate.swift in Sources */,
+				4B526374859607A1B2C3D4E5 /* CarPlayVoiceManager.swift in Sources */,
+				6D748596071829A1B2C3D4E5 /* HermesWidgetData.swift in Sources */,
+				5C637485960718A1B2C3D4E5 /* SharedWidgetDataStore.swift in Sources */,
 				78E916A7C30474717FE1F7DC /* AppContainer.swift in Sources */,
 				48EA1D2ECF55A452C1F6F592 /* AppEntry.swift in Sources */,
 				1EA612E6046B341EBC64339F /* AppPersistenceStoreProtocol.swift in Sources */,

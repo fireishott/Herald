@@ -253,6 +253,7 @@ final class AppContainer {
         await registerStoredPushTokenIfNeeded()
         sensorUploadService?.start()
         await sensorUploadService?.handleAppDidBecomeActive()
+        updateWidgetData()
         isInitialized = true
     }
 
@@ -266,6 +267,7 @@ final class AppContainer {
         await sensorUploadService?.handleAppDidBecomeActive()
         talkStore.handleAppDidBecomeActive()
         await talkStore.refreshReadiness()
+        updateWidgetData()
     }
 
     func handleSystemLaunch() async {
@@ -364,6 +366,25 @@ final class AppContainer {
             return
         }
         await registerPushTokenIfNeeded(storedToken)
+    }
+
+    /// Snapshots current app state into the App Group shared container
+    /// so Home Screen widgets and CarPlay widgets can display it.
+    func updateWidgetData() {
+        let lastMessage = chatStore.conversation?.messages.last
+        var data = HermesWidgetData(
+            hostName: hostStore.currentHost?.resolvedDisplayName,
+            hostOnline: hostStore.isHostOnline,
+            voiceSessionActive: talkStore.isSessionActive,
+            updatedAt: .now
+        )
+        if let msg = lastMessage {
+            data.lastMessagePreview = String(msg.content.prefix(120))
+            data.lastMessageSender = msg.sender.rawValue
+            data.lastMessageAt = msg.createdAt
+        }
+        // Health data is populated from the sensor outbox state if available
+        SharedWidgetDataStore.write(data)
     }
 
     private func handlePairingRemoved() async {

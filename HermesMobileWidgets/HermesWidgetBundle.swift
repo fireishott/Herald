@@ -5,5 +5,7 @@ import WidgetKit
 struct HermesWidgetBundle: WidgetBundle {
     var body: some Widget {
         HermesLiveActivity()
+        HermesStatusWidget()
+        HermesHealthWidget()
     }
 }
