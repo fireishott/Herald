@@ -314,3 +314,62 @@ This skill would be installed in `~/.hermes/skills/ios-context-awareness/` and l
 | `com.apple.developer.healthkit` | `true` |
 | `com.apple.developer.healthkit.access` | `[]` |
 | `com.apple.developer.healthkit.background-delivery` | `true` |
+
+---
+
+## Device Validation Checklist
+
+Physical-device testing required before each capability is considered shippable. Run through this list on a device with the connector running and Hermes agent active.
+
+### CoreMotion
+- [ ] Motion permission prompt appears on first launch / onboarding
+- [ ] `get_user_activity` returns correct activity (try walking, stationary)
+- [ ] Activity changes propagate through sensor pipeline → connector → SQLite within ~30s
+- [ ] Agent can answer "What am I doing right now?" via MCP delegation
+
+### Live Activities
+- [ ] Voice session start → Live Activity appears on Lock Screen
+- [ ] Voice state changes (Listening → Thinking → Speaking) update the Live Activity status
+- [ ] Timer ticks live on Lock Screen without app interaction
+- [ ] Tool call during voice → toolName appears on Live Activity
+- [ ] Voice session end → Live Activity dismisses
+- [ ] Chat tool call → separate Live Activity appears and dismisses on completion
+- [ ] Dynamic Island compact view shows while app is backgrounded (iPhone 14 Pro+)
+- [ ] Long-press Dynamic Island → expanded view with agent name, status, tool name
+- [ ] Tap Dynamic Island → returns to app
+
+### Background Location
+- [ ] Settings → Location → enable "Background Location" toggle
+- [ ] With While In Use auth: blue indicator bar appears when app backgrounds
+- [ ] Location updates continue arriving at relay while app is backgrounded
+- [ ] Agent can answer "Where am I?" after app has been backgrounded for 5+ minutes
+- [ ] Optional: upgrade to Always in iOS Settings → blue bar disappears, updates continue
+- [ ] Disable toggle → background updates stop, blue bar disappears
+
+### Background Audio (Voice Persistence)
+- [ ] Start voice session → swipe home → voice continues playing/listening
+- [ ] Switch to another app (Safari, Maps) → voice session stays active
+- [ ] Return to Hermes → voice overlay still showing, session still connected
+- [ ] Tap Dynamic Island compact → returns to Hermes with active voice session
+- [ ] Phone call interruption → voice session pauses → call ends → session resumes
+- [ ] Speaker volume is loud and clear (forceSpeakerIfNeeded working)
+- [ ] With headphones: audio routes to headphones, no speaker override
+
+### APNs / Remote Notifications
+- [ ] Device token appears in relay's push_tokens table after app launch
+- [ ] Token re-registers after unpairing and re-pairing
+- [ ] (Future) Silent push wakes app and triggers data refresh
+
+### Speech Recognition (Dictation)
+- [ ] Tap mic button in chat composer → permission prompt on first use
+- [ ] Dictation starts, live transcript appears in text field
+- [ ] Stop button commits transcript to text field
+- [ ] Auto-stop (silence timeout) commits transcript without losing text
+- [ ] Send dictated message → agent receives correct text
+
+### HealthKit
+- [ ] HealthKit permission prompt appears during onboarding
+- [ ] Health metrics flow to relay within ~60s of Apple Watch sync
+- [ ] Agent can answer "How many steps today?" via get_health_metric
+- [ ] Sleep data attributed to correct wake-up day
+- [ ] "Give me a health summary" returns all 11 metrics
