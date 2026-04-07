@@ -8,6 +8,9 @@ struct HermesHealthWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: HermesTimelineProvider()) { entry in
             HermesHealthView(entry: entry)
+                .containerBackground(for: .widget) {
+                    Color(.systemBackground)
+                }
         }
         .configurationDisplayName("Hermes Health")
         .description("Daily health metrics at a glance.")
@@ -61,7 +64,6 @@ private struct HermesHealthView: View {
                 )
             }
         }
-        .padding()
         .widgetURL(URL(string: "hermes://health"))
     }
 
