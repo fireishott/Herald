@@ -187,16 +187,36 @@ class APNsClient:
 
 
 def create_apns_client_from_env() -> APNsClient | None:
-    """Create an APNs client from environment variables, or None if not configured."""
-    import os
+    """Create an APNs client from environment variables, or None if not configured.
 
-    key_path = os.getenv("APNS_KEY_PATH")
+    Supports two modes:
+    - File-based: set APNS_KEY_PATH to the .p8 file path
+    - Inline: set APNS_KEY_CONTENTS to the raw .p8 key text (for Fly.io/Heroku/Docker)
+    """
+    import os
+    import tempfile
+
     key_id = os.getenv("APNS_KEY_ID")
     team_id = os.getenv("APNS_TEAM_ID")
 
-    if not all([key_path, key_id, team_id]):
-        logger.info("APNs not configured (missing APNS_KEY_PATH, APNS_KEY_ID, or APNS_TEAM_ID)")
+    if not all([key_id, team_id]):
+        logger.info("APNs not configured (missing APNS_KEY_ID or APNS_TEAM_ID)")
         return None
+
+    key_path = os.getenv("APNS_KEY_PATH")
+    key_contents = os.getenv("APNS_KEY_CONTENTS")
+
+    if not key_path and not key_contents:
+        logger.info("APNs not configured (missing APNS_KEY_PATH or APNS_KEY_CONTENTS)")
+        return None
+
+    # If key contents provided inline, write to a temp file
+    if not key_path and key_contents:
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".p8", delete=False)
+        tmp.write(key_contents)
+        tmp.close()
+        key_path = tmp.name
+        logger.info("APNs key loaded from APNS_KEY_CONTENTS env var")
 
     bundle_id = os.getenv("APNS_BUNDLE_ID", "io.hermesmobile.HermesMobile")
     environment = os.getenv("APNS_ENVIRONMENT", "development")
