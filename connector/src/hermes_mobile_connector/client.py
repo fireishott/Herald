@@ -4,6 +4,7 @@ import base64
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import logging
 import os
 from pathlib import Path
 import platform as platform_module
@@ -12,6 +13,8 @@ import socket
 import subprocess
 import sys
 import uuid
+
+logger = logging.getLogger("hermes.mobile.connector")
 
 import httpx
 from websockets.asyncio.client import connect as websocket_connect
