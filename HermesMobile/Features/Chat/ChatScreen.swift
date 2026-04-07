@@ -94,12 +94,8 @@ struct ChatScreen: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarTrailing) {
-            Button {
+            GlassCircleButton(icon: "gearshape.fill") {
                 router.presentSheet(.settings)
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: Design.Size.iconSmall, weight: .medium))
-                    .foregroundStyle(Design.Colors.foreground)
             }
         }
     }
