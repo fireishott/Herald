@@ -77,6 +77,21 @@ struct HermesMobileApp: App {
                     // backgrounded. The session ends only when the user
                     // explicitly closes the voice overlay.
                 }
+                .onOpenURL { url in
+                    handleDeeplink(url)
+                }
+        }
+    }
+
+    private func handleDeeplink(_ url: URL) {
+        guard url.scheme == "hermes" else { return }
+        switch url.host {
+        case "chat":
+            container.router.selectedTab = .chat
+        case "voice":
+            container.router.isVoiceOverlayPresented = true
+        default:
+            break
         }
     }
 }

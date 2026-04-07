@@ -48,6 +48,7 @@ struct HermesLiveActivity: Widget {
                     .foregroundStyle(.yellow)
             }
         }
+        .supplementalActivityFamilies([.small])
     }
 
     @ViewBuilder

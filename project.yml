@@ -39,6 +39,9 @@ targets:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
         com.apple.developer.healthkit.background-delivery: true
+        com.apple.security.application-groups:
+          - group.io.hermesmobile.HermesMobile
+        com.apple.developer.carplay-voice-based-conversation: true
     sources:
       - path: HermesMobile
         excludes:
@@ -81,12 +84,24 @@ targets:
           - location
           - remote-notification
           - audio
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations:
+            CPTemplateApplicationSceneSessionRoleApplication:
+              - UISceneClassName: CPTemplateApplicationScene
+                UISceneConfigurationName: CarPlay
+                UISceneDelegateClassName: "$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate"
 
   HermesMobileWidgets:
     type: app-extension
     platform: iOS
     sources:
       - path: HermesMobileWidgets
+    entitlements:
+      path: HermesMobileWidgets/HermesMobileWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.io.hermesmobile.HermesMobile
     info:
       path: HermesMobileWidgets/Info.plist
     settings:
