@@ -8,6 +8,9 @@ struct HermesStatusWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: HermesTimelineProvider()) { entry in
             HermesStatusView(entry: entry)
+                .containerBackground(for: .widget) {
+                    Color(.systemBackground)
+                }
         }
         .configurationDisplayName("Hermes Status")
         .description("Connection status and recent messages.")
@@ -80,23 +83,19 @@ private struct HermesStatusView: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding()
         .widgetURL(URL(string: "hermes://chat"))
     }
 
     // MARK: - Accessory Circular (Lock Screen + CarPlay)
 
     private var circularView: some View {
-        ZStack {
-            AccessoryWidgetBackground()
-            VStack(spacing: 2) {
-                Image(systemName: entry.data.voiceSessionActive ? "waveform" : "brain.head.profile")
-                    .font(.title3)
-                    .foregroundStyle(entry.data.voiceSessionActive ? .yellow : .primary)
-                Circle()
-                    .fill(entry.data.hostOnline ? .green : .gray)
-                    .frame(width: 5, height: 5)
-            }
+        VStack(spacing: 2) {
+            Image(systemName: entry.data.voiceSessionActive ? "waveform" : "brain.head.profile")
+                .font(.title3)
+                .widgetAccentable()
+            Circle()
+                .fill(entry.data.hostOnline ? .green : .gray)
+                .frame(width: 5, height: 5)
         }
         .widgetURL(URL(string: "hermes://chat"))
     }
@@ -108,13 +107,14 @@ private struct HermesStatusView: View {
             HStack(spacing: 4) {
                 Image(systemName: "brain.head.profile")
                     .font(.caption)
+                    .widgetAccentable()
                 Text("Hermes")
                     .font(.headline)
                 Spacer()
                 if entry.data.voiceSessionActive {
                     Image(systemName: "waveform")
                         .font(.caption2)
-                        .foregroundStyle(.yellow)
+                        .widgetAccentable()
                 }
             }
 
