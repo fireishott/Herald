@@ -8,6 +8,7 @@ struct HermesHostStatus: Codable, Hashable, Sendable {
     let connectorVersion: String?
     let hermesCommand: String?
     let hermesVersion: String?
+    let hermesModel: String?
     let lastSeenAt: Date?
     let lastConnectedAt: Date?
     let isOnline: Bool
