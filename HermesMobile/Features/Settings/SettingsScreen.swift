@@ -328,7 +328,16 @@ struct SettingsScreen: View {
     private var notificationsBinding: Binding<Bool> {
         Binding(
             get: { settingsStore.settings.notificationsEnabled },
-            set: { settingsStore.settings.notificationsEnabled = $0 }
+            set: { newValue in
+                settingsStore.settings.notificationsEnabled = newValue
+                // Immediately register or deactivate push token on the relay
+                Task {
+                    let container = AppContainer.sharedDefault()
+                    if let token = UserDefaults.standard.string(forKey: "hermes.apns.deviceToken") {
+                        await container.registerPushTokenIfNeeded(token)
+                    }
+                }
+            }
         )
     }
 

@@ -1295,25 +1295,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         active push registrations for the device as inactive so the
         relay stops sending pushes.
         """
-        registration = db.scalar(
+        registrations = db.scalars(
             select(PushRegistration).where(
                 PushRegistration.device_id == auth.device.id,
                 PushRegistration.is_active == True,
             )
-        )
-        if registration is not None:
+        ).all()
+        for registration in registrations:
             registration.is_active = False
+        if registrations:
             record_audit(
                 db,
                 actor_type="app",
                 actor_id=auth.device.id,
                 action="push.deactivate",
                 entity_type="push_registration",
-                entity_id=registration.id,
+                entity_id=registrations[0].id,
             )
             db.commit()
 
-        return success({"deactivated": True})
+        return success({"deactivated": True, "count": len(registrations)})
 
     @app.post("/v1/device/app-state")
     def device_app_state(
