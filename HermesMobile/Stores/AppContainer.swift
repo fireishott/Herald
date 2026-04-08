@@ -340,6 +340,14 @@ final class AppContainer {
               let notificationService
         else { return }
 
+        // Respect the user's in-app notifications toggle.
+        // If disabled, skip registration so the relay won't send pushes.
+        guard settingsStore.settings.notificationsEnabled else {
+            await notificationService.markPushTokenRegistered(false)
+            sessionStore.state.pushTokenRegistered = false
+            return
+        }
+
         let normalizedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalizedToken.isEmpty else { return }
 

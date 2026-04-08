@@ -4,7 +4,16 @@ import WidgetKit
 /// Reads and writes `HermesWidgetData` to the App Group shared container.
 /// The main app writes; the widget extension reads.
 enum SharedWidgetDataStore {
-    static let appGroupID = "group.io.hermesmobile.HermesMobile"
+    /// App Group identifier. Reads from the APP_GROUP_ID Info.plist key if set,
+    /// otherwise falls back to the default. Self-hosted users who change their
+    /// bundle identifier should set APP_GROUP_ID in their build settings or
+    /// local xcconfig to match their App Group.
+    static let appGroupID: String = {
+        if let custom = Bundle.main.object(forInfoDictionaryKey: "APP_GROUP_ID") as? String, !custom.isEmpty {
+            return custom
+        }
+        return "group.io.hermesmobile.HermesMobile"
+    }()
     private static let dataKey = "hermes.widget.data"
 
     static func write(_ data: HermesWidgetData) {
