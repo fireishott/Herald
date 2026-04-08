@@ -150,14 +150,11 @@ struct ChatScreen: View {
             Circle()
                 .stroke(Design.Colors.divider, lineWidth: 2.5)
             Circle()
-                .trim(from: 0, to: progress)
+                .trim(from: 0, to: max(progress, 0.001))
                 .stroke(contextColor(progress), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-            Text("\(Int(progress * 100))")
-                .font(.system(size: 7, weight: .heavy, design: .rounded))
-                .foregroundStyle(Design.Colors.foreground)
         }
-        .frame(width: 22, height: 22)
+        .frame(width: 16, height: 16)
     }
 
     // MARK: - Popover: Context Window X of Y (%)
