@@ -58,12 +58,17 @@ struct ChatScreen: View {
             chatStore.setPollingEnabled(false)
         }
         .onChange(of: chatStore.conversation?.messages.count ?? 0) {
+            guard chatStore.streamingMessageID == nil else { return }
             scrollToBottom()
         }
         .onChange(of: chatStore.pendingMessageSentAt) {
+            guard chatStore.streamingMessageID == nil else { return }
             scrollToBottom()
         }
         .onChange(of: chatStore.streamingMessageID) { old, new in
+            if let new, old == nil {
+                scrollToResponseTop(new)
+            }
             if old != nil && new == nil && settingsStore.settings.hapticFeedbackEnabled {
                 HapticEngine.responseReceived()
             }
@@ -311,7 +316,6 @@ struct ChatScreen: View {
                 }
                 .padding(.vertical, Design.Spacing.md)
             }
-            .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             .redacted(reason: chatStore.isLoading ? .placeholder : [])
             .onTapGesture {
@@ -568,6 +572,16 @@ struct ChatScreen: View {
         }
         withAnimation(Design.Motion.standard) {
             scrollProxy?.scrollTo(targetID, anchor: .bottom)
+        }
+    }
+
+    private func scrollToResponseTop(_ id: UUID) {
+        // Keep the start of the assistant response in view; without this,
+        // a bottom-anchored ScrollView fights the growing message and feels flickery.
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            scrollProxy?.scrollTo(id, anchor: .top)
         }
     }
 }
