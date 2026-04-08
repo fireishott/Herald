@@ -58,38 +58,66 @@ _GATEWAY_COMMANDS: list[dict] = [
 
 
 def _context_window_for(model_name: str) -> int:
-    """Return the context window size for a model name.
-
-    Uses substring matching against known model families.
-    Falls back to 128K for unknown models.
-    """
+    """Return a fallback context window size aligned with Hermes defaults."""
     name = model_name.lower()
-    # Anthropic
-    if "opus" in name and ("4" in name or "5" in name):
+    if (
+        "claude-opus-4-6" in name
+        or "claude-opus-4.6" in name
+        or "claude-sonnet-4-6" in name
+        or "claude-sonnet-4.6" in name
+    ):
         return 1_000_000
-    if "sonnet" in name or "haiku" in name:
-        return 200_000
     if "claude" in name:
         return 200_000
-    # OpenAI
+    if "gpt-4.1" in name:
+        return 1_047_576
     if "gpt-5" in name:
-        return 400_000
-    if "gpt-4.1" in name or "gpt-4o" in name:
-        return 1_000_000
+        return 128_000
     if "gpt-4" in name:
         return 128_000
-    if "o3" in name or "o4" in name:
-        return 200_000
-    if "o1" in name:
-        return 200_000
-    # Google
     if "gemini" in name:
-        return 1_000_000
-    # Meta
-    if "llama" in name:
+        return 1_048_576
+    if "gemma-4-31b" in name or "gemma-4-26b" in name:
+        return 256_000
+    if "gemma-3" in name:
+        return 131_072
+    if "gemma" in name:
+        return 8_192
+    if "deepseek" in name:
         return 128_000
-    # Default
+    if "llama" in name:
+        return 131_072
+    if "qwen" in name:
+        return 131_072
+    if "minimax" in name:
+        return 204_800
+    if "glm" in name:
+        return 202_752
+    if "kimi" in name:
+        return 262_144
+    if "mimo-v2-pro" in name or "mimo-v2-omni" in name:
+        return 1_048_576
     return 128_000
+
+
+def _cached_context_window(hermes_home: Path, model_name: str, base_url: str | None) -> int | None:
+    if not base_url:
+        return None
+    cache_path = hermes_home / "context_length_cache.yaml"
+    if not cache_path.is_file():
+        return None
+    try:
+        import yaml
+
+        with open(cache_path, "r", encoding="utf-8") as f:
+            payload = yaml.safe_load(f) or {}
+        cache = payload.get("context_lengths", {})
+        cached = cache.get(f"{model_name}@{base_url}")
+        if isinstance(cached, int) and cached > 0:
+            return cached
+    except Exception:
+        pass
+    return None
 from .git_diff import capture_diff, capture_snapshot
 from .hermes_api_executor import HermesAPIExecutor
 from .hermes_runner import ConnectorHermesSettings, HermesCLIExecutor
@@ -953,14 +981,28 @@ class HermesMobileConnector:
                 text = config_path.read_text(encoding="utf-8")
                 model_name = None
                 provider = None
+                context_length = None
+                base_url = None
                 for line in text.splitlines():
                     stripped = line.strip()
                     if stripped.startswith("default:") and model_name is None:
                         model_name = stripped.split(":", 1)[1].strip()
                     if stripped.startswith("provider:") and provider is None:
                         provider = stripped.split(":", 1)[1].strip()
+                    if stripped.startswith("context_length:") and context_length is None:
+                        try:
+                            context_length = int(stripped.split(":", 1)[1].strip())
+                        except ValueError:
+                            context_length = None
+                    if stripped.startswith("base_url:") and base_url is None:
+                        base_url = stripped.split(":", 1)[1].strip()
                 if model_name:
-                    return {"name": model_name, "provider": provider, "contextWindow": _context_window_for(model_name)}
+                    resolved_context = (
+                        context_length
+                        or _cached_context_window(hermes_home, model_name, base_url)
+                        or _context_window_for(model_name)
+                    )
+                    return {"name": model_name, "provider": provider, "contextWindow": resolved_context}
             except Exception:
                 pass
             return None
@@ -970,8 +1012,19 @@ class HermesMobileConnector:
             model_section = config.get("model", {})
             model_name = model_section.get("default")
             provider = model_section.get("provider")
+            base_url = model_section.get("base_url")
+            context_length = model_section.get("context_length")
             if model_name:
-                return {"name": model_name, "provider": provider, "contextWindow": _context_window_for(model_name)}
+                try:
+                    resolved_context = int(context_length) if context_length is not None else None
+                except (TypeError, ValueError):
+                    resolved_context = None
+                resolved_context = (
+                    resolved_context
+                    or _cached_context_window(hermes_home, model_name, base_url)
+                    or _context_window_for(model_name)
+                )
+                return {"name": model_name, "provider": provider, "contextWindow": resolved_context}
         except Exception:
             pass
         return None

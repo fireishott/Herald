@@ -5,17 +5,20 @@ struct Conversation: Codable, Identifiable, Hashable, Sendable {
     var title: String
     var messages: [Message]
     var lastActivity: Date
+    var latestUsage: TokenUsage?
 
     init(
         id: UUID = UUID(),
         title: String,
         messages: [Message] = [],
-        lastActivity: Date = .now
+        lastActivity: Date = .now,
+        latestUsage: TokenUsage? = nil
     ) {
         self.id = id
         self.title = title
         self.messages = messages
         self.lastActivity = lastActivity
+        self.latestUsage = latestUsage
     }
 
     var lastMessage: Message? {
