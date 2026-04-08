@@ -477,6 +477,7 @@ final class AppContainer {
             struct ActiveModel: Decodable {
                 let name: String
                 let provider: String?
+                let contextWindow: Int?
             }
         }
 
@@ -542,7 +543,11 @@ final class AppContainer {
             if remoteCommands.isEmpty && skills.isEmpty && personalities.isEmpty && quickCommands.isEmpty {
                 chatStore.resetCommandCatalog()
             } else {
-                chatStore.replaceCommandCatalog(catalog, activeModel: response.activeModel?.name)
+                chatStore.replaceCommandCatalog(
+                    catalog,
+                    activeModel: response.activeModel?.name,
+                    contextWindow: response.activeModel?.contextWindow
+                )
                 lastCommandCatalogRefreshAt = .now
             }
         } catch {

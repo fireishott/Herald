@@ -55,6 +55,41 @@ _GATEWAY_COMMANDS: list[dict] = [
     {"name": "insights", "description": "Show usage insights", "category": "Info", "args": "[days]", "aliases": [], "gatewayOnly": False},
     {"name": "update", "description": "Update Hermes Agent", "category": "Info", "args": None, "aliases": [], "gatewayOnly": True},
 ]
+
+
+def _context_window_for(model_name: str) -> int:
+    """Return the context window size for a model name.
+
+    Uses substring matching against known model families.
+    Falls back to 128K for unknown models.
+    """
+    name = model_name.lower()
+    # Anthropic
+    if "opus" in name and ("4" in name or "5" in name):
+        return 1_000_000
+    if "sonnet" in name or "haiku" in name:
+        return 200_000
+    if "claude" in name:
+        return 200_000
+    # OpenAI
+    if "gpt-5" in name:
+        return 400_000
+    if "gpt-4.1" in name or "gpt-4o" in name:
+        return 1_000_000
+    if "gpt-4" in name:
+        return 128_000
+    if "o3" in name or "o4" in name:
+        return 200_000
+    if "o1" in name:
+        return 200_000
+    # Google
+    if "gemini" in name:
+        return 1_000_000
+    # Meta
+    if "llama" in name:
+        return 128_000
+    # Default
+    return 128_000
 from .git_diff import capture_diff, capture_snapshot
 from .hermes_api_executor import HermesAPIExecutor
 from .hermes_runner import ConnectorHermesSettings, HermesCLIExecutor
@@ -916,7 +951,7 @@ class HermesMobileConnector:
                     if stripped.startswith("provider:") and provider is None:
                         provider = stripped.split(":", 1)[1].strip()
                 if model_name:
-                    return {"name": model_name, "provider": provider}
+                    return {"name": model_name, "provider": provider, "contextWindow": _context_window_for(model_name)}
             except Exception:
                 pass
             return None
@@ -927,7 +962,7 @@ class HermesMobileConnector:
             model_name = model_section.get("default")
             provider = model_section.get("provider")
             if model_name:
-                return {"name": model_name, "provider": provider}
+                return {"name": model_name, "provider": provider, "contextWindow": _context_window_for(model_name)}
         except Exception:
             pass
         return None
