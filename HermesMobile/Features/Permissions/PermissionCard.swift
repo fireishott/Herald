@@ -53,7 +53,7 @@ struct PermissionCard: View {
 
             Spacer()
 
-            if let actionLabel = capability.status.actionLabel {
+            if let actionLabel = actionLabelText {
                 Button {
                     onRequest()
                 } label: {
@@ -71,6 +71,14 @@ struct PermissionCard: View {
 
     private var statusLabelText: String {
         capability.statusDetail ?? capability.status.displayLabel
+    }
+
+    private var actionLabelText: String? {
+        if capability.permissionType == .health,
+           capability.status == .denied || capability.status == .restricted {
+            return nil
+        }
+        return capability.status.actionLabel
     }
 
     private var statusIcon: String {
