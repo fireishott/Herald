@@ -80,12 +80,22 @@ def _find_flyctl() -> str | None:
     return None
 
 
-def _run_fly(flyctl: str, args: list[str], *, cwd: str | Path | None = None) -> subprocess.CompletedProcess:
-    """Run a flyctl command, printing output live."""
+def _run_fly(
+    flyctl: str,
+    args: list[str],
+    *,
+    cwd: str | Path | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess:
+    """Run a flyctl command, printing output live.
+
+    Raises subprocess.CalledProcessError on non-zero exit when check=True (default).
+    """
     return subprocess.run(
         [flyctl, *args],
         cwd=cwd,
         text=True,
+        check=check,
     )
 
 
@@ -156,38 +166,51 @@ def deploy_relay_to_fly() -> tuple[str, str]:
     try:
         # 8. Create app
         print(f"\nCreating Fly app: {app_name}...")
-        result = _run_fly(flyctl, ["apps", "create", app_name])
-        if result.returncode != 0:
-            print(f"App creation failed. It may already exist — continuing.")
+        try:
+            _run_fly(flyctl, ["apps", "create", app_name])
+        except subprocess.CalledProcessError:
+            print("  App creation failed — it may already exist. Continuing.")
 
-        # 9. Create Postgres (Managed Postgres — current Fly recommendation)
+        # 9. Create Postgres (try Managed Postgres first, fall back to legacy)
         db_name = f"{app_name}-db"
-        print(f"\nCreating Managed Postgres database: {db_name}...")
+        print(f"\nCreating Postgres database: {db_name}...")
+        print("  Trying Managed Postgres (fly mpg) first...")
         print("  See: https://fly.io/docs/mpg/overview/")
         try:
-            _run_fly(flyctl, [
-                "mpg", "create",
-                "--name", db_name,
-                "--region", region,
-            ])
-        except Exception:
-            # Fall back to legacy postgres create if mpg isn't available
-            print("  Managed Postgres not available, trying legacy postgres create...")
-            _run_fly(flyctl, [
-                "postgres", "create",
-                "--name", db_name,
-                "--region", region,
-                "--vm-size", "shared-cpu-1x",
-                "--initial-cluster-size", "1",
-                "--volume-size", "1",
-            ])
+            _run_fly(flyctl, ["mpg", "create", "--name", db_name, "--region", region])
+            print("  Managed Postgres created.")
+        except subprocess.CalledProcessError:
+            print("  Managed Postgres failed. Falling back to legacy Fly Postgres...")
+            try:
+                _run_fly(flyctl, [
+                    "postgres", "create",
+                    "--name", db_name,
+                    "--region", region,
+                    "--vm-size", "shared-cpu-1x",
+                    "--initial-cluster-size", "1",
+                    "--volume-size", "1",
+                ])
+                print("  Legacy Postgres created.")
+            except subprocess.CalledProcessError as e:
+                print(f"  ERROR: Postgres creation failed: {e}")
+                print("  You may need to create the database manually:")
+                print(f"    fly mpg create --name {db_name} --region {region}")
+                raise
 
         # 10. Attach Postgres
         print(f"\nAttaching database to app...")
         try:
             _run_fly(flyctl, ["mpg", "attach", db_name, "-a", app_name])
-        except Exception:
-            _run_fly(flyctl, ["postgres", "attach", db_name, "-a", app_name])
+            print("  Database attached (managed).")
+        except subprocess.CalledProcessError:
+            try:
+                _run_fly(flyctl, ["postgres", "attach", db_name, "-a", app_name])
+                print("  Database attached (legacy).")
+            except subprocess.CalledProcessError as e:
+                print(f"  ERROR: Database attach failed: {e}")
+                print("  You may need to attach manually:")
+                print(f"    fly mpg attach {db_name} -a {app_name}")
+                raise
 
         # 11. Set secrets
         print("\nSetting secrets...")
