@@ -1,17 +1,25 @@
 # Hermes iOS Relay
 
-The relay is the public control plane for Hermes iOS:
+The relay is the public control plane for Hermes iOS. It handles pairing, auth, jobs, SSE, push registration, and the connector WebSocket, but it does **not** run Hermes itself in connector mode.
 
-- pairing and auth
-- durable message jobs
-- SSE streaming
-- connector WebSocket control channel
-- voice session bootstrap
-- inbox and push APIs
+## What the relay does
 
-In connector mode, the relay does **not** run Hermes itself. Hermes work executes on the user-owned machine through the connector.
+- device registration, auth, refresh, and session lifecycle
+- connector-first pairing and host management
+- durable message jobs with SSE progress streaming
+- talk readiness and voice-session bootstrap
+- inbox APIs and APNs registration/delivery
 
-## Local Development
+In production, Hermes execution stays on the user-owned host through the connector.
+
+## Requirements
+
+- Python 3.11+
+- PostgreSQL for production
+- HTTPS base URL for public deployments
+- a strong `INTERNAL_API_KEY`
+
+## Quick start (local development)
 
 ```bash
 cd relay
@@ -19,36 +27,63 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -e .[dev]
 cp .env.example .env
-docker compose up --build
-```
-
-Or run the API directly after setting your env vars:
-
-```bash
 uvicorn app.main:app --reload
 ```
 
-See [docs/local-dev.md](docs/local-dev.md) for local notes and [../docs/CONFIGURATION.md](../docs/CONFIGURATION.md) for the full config matrix.
+You can also use Docker Compose from the same directory if you want a local Postgres-backed stack.
 
-## Production Mode
+For same-network device testing, see [docs/local-dev.md](docs/local-dev.md).
 
-For real deployments, use connector mode:
+## Production checklist
+
+> [!IMPORTANT]
+> The relay must not run in production with `INTERNAL_API_KEY=replace-me`. Current code treats that as a startup error outside development/test.
+
+Minimum production configuration:
 
 ```bash
-HERMES_ADAPTER=connector
-PUBLIC_BASE_URL=https://your-relay.example.com/v1
-CONNECTOR_SETUP_SECRET=
+export RELAY_ENVIRONMENT=production
+export PUBLIC_BASE_URL=https://your-relay.example.com/v1
+export DATABASE_URL=postgresql+psycopg://...
+export INTERNAL_API_KEY=replace-with-a-real-secret
+export HERMES_ADAPTER=connector
 ```
 
-If `CONNECTOR_SETUP_SECRET` is set, every connector must send the same value during `hermes-mobile setup`.
+Optional but recommended:
 
-## Fly.io
+```bash
+export CONNECTOR_SETUP_SECRET=replace-with-a-bootstrap-secret
+```
 
-Fly is just one deployment target. The tracked [fly.toml](fly.toml) now contains generic placeholders and must be customized before deploy.
+If `CONNECTOR_SETUP_SECRET` is set, every connector must provide the same value during `hermes-mobile setup`.
 
-See [docs/fly-io.md](docs/fly-io.md).
+The full variable matrix lives in [../docs/CONFIGURATION.md](../docs/CONFIGURATION.md).
 
-## API surface
+## Deploy to Fly.io
+
+The tracked [fly.toml](fly.toml) contains placeholders only. Replace the app name and `PUBLIC_BASE_URL`, then deploy.
+
+Two supported paths:
+
+- **Guided path**: run `hermes-mobile setup` on the connector host and choose the Fly deployment option
+- **Manual path**: follow [docs/fly-io.md](docs/fly-io.md)
+
+The relay docs assume Fly Managed Postgres for new deployments.
+
+## Local Hermes execution modes
+
+The relay supports three modes:
+
+- `HERMES_ADAPTER=mock`
+  - deterministic demo behavior
+- `HERMES_ADAPTER=cli`
+  - runs Hermes locally from the relay process
+- `HERMES_ADAPTER=connector`
+  - production-oriented path where a connected host claims and executes jobs
+
+For public/self-hosted users, `connector` mode is the intended deployment model.
+
+## API overview
 
 ### Core and auth
 
@@ -59,19 +94,16 @@ See [docs/fly-io.md](docs/fly-io.md).
 - `POST /v1/auth/revoke`
 - `POST /v1/device/register`
 
-### Connector-first pairing and host management
+### Pairing and hosts
 
 - `POST /v1/connector/setup`
 - `POST /v1/connector/phone-pairing-codes`
 - `POST /v1/phone-pairing/redeem`
-- `POST /v1/pairing/redeem` (legacy/dev compatibility)
-- `POST /v1/hosts/enrollment-codes` (legacy/dev compatibility)
-- `POST /v1/hosts/redeem` (legacy/dev compatibility)
 - `GET /v1/hosts/current`
 - `POST /v1/hosts/current/revoke`
 - `GET /v1/hosts/ws` (WebSocket)
 
-### Chat and streaming
+### Chat and jobs
 
 - `GET /v1/conversations/current`
 - `POST /v1/messages`
@@ -89,121 +121,48 @@ See [docs/fly-io.md](docs/fly-io.md).
 - `GET /v1/inbox`
 - `POST /v1/inbox/{id}/action`
 - `POST /v1/push/register`
-- `POST /v1/push/send` *(internal)* — send silent/alert push to user's devices
+- `POST /v1/push/deactivate`
+- `POST /v1/push/send` *(internal)*
 - `POST /internal/inbox/create`
 - `GET /internal/inbox/{id}/actions`
 
-## Hermes execution modes
+## Security notes
 
-The relay supports three Hermes execution modes:
+- Use HTTPS in any deployment the phone will reach over the internet.
+- Set a strong `INTERNAL_API_KEY`.
+- Set `CONNECTOR_SETUP_SECRET` if you do not want arbitrary connectors bootstrapping accounts on your relay.
+- Keep APNs secrets on the relay only, never on the connector.
 
-- `HERMES_ADAPTER=mock`
-  - deterministic local/demo behavior
-- `HERMES_ADAPTER=cli`
-  - the relay shells out to Hermes locally, useful for same-machine development and smoke tests
-- `HERMES_ADAPTER=connector`
-  - production-oriented mode where the relay persists jobs and a connected host connector claims and executes them
+## APNs and CarPlay
 
-For local CLI mode, set:
+APNs and CarPlay are optional platform features. They are documented in [../docs/CONFIGURATION.md](../docs/CONFIGURATION.md).
 
-```bash
-HERMES_ADAPTER=cli
-HERMES_COMMAND=/absolute/path/to/hermes
-HERMES_WORKDIR=/path/to/your/hermes/project
-HERMES_PROVIDER=
-HERMES_MODEL=
-HERMES_TOOLSETS=
-HERMES_SOURCE=tool
-```
+- APNs is fully optional for base setup
+- CarPlay requires Apple approval for the entitlement and is inert when not configured
 
-For connector mode, set:
+## Troubleshooting
 
-```bash
-HERMES_ADAPTER=connector
-PUBLIC_BASE_URL=https://your.public.relay.example/v1
-PHONE_PAIRING_CODE_TTL_SECONDS=600
-PHONE_PAIRING_MAX_ATTEMPTS_PER_CODE=5
-PHONE_PAIRING_MAX_ATTEMPTS_PER_IP=5
-PHONE_PAIRING_RATE_LIMIT_WINDOW_SECONDS=300
-HOST_ENROLLMENT_CODE_TTL_SECONDS=900
-CONNECTOR_SYNC_WAIT_SECONDS=25
-CONNECTOR_JOB_LEASE_SECONDS=180
-CONNECTOR_HEARTBEAT_TIMEOUT_SECONDS=30
-CONNECTOR_IDLE_POLL_INTERVAL_SECONDS=1.0
-CONNECTOR_SETUP_SECRET=
-```
+### Relay won’t start
 
-## Connector mode behavior
+- confirm `DATABASE_URL`
+- confirm `PUBLIC_BASE_URL`
+- confirm `INTERNAL_API_KEY` is not the default in production
 
-In connector mode the relay:
+### Connector can’t claim jobs
 
-- never shells out to Hermes directly
-- persists user messages before queuing work
-- stores message jobs durably in the database
-- lets a connected host claim jobs over WebSocket
-- supports synchronous inline replies when the host finishes within the sync window
-- falls back to pending/queued replies when the host is offline or slow
-- streams job progress over SSE
-- persists final assistant output and optional inline diff metadata
+- verify the host is connected through `/v1/hosts/ws`
+- confirm the relay and connector are using the same base URL
+- confirm `CONNECTOR_SETUP_SECRET` matches on both sides when enabled
 
-## Sensor delivery
+### Push registration works but no alerts arrive
 
-Sensor delivery in connector mode is relay-stateless.
+- check APNs config on the relay
+- verify bundle ID and environment match the device registration
+- confirm the app is not foregrounded when testing reply-triggered alerts
 
-- the phone uploads location and health samples only when paired and authenticated
-- the relay forwards them over the live connector control channel
-- a request is treated as delivered only after the connector ACKs local storage
-- if the host is offline or unavailable, the relay returns `202` with `deliveryState=retry`
-- the phone keeps the payload in its local outbox until a later successful delivery
+## Related docs
 
-## Talk mode
-
-The relay is the control plane for voice sessions.
-
-It currently provides:
-
-- talk readiness checks
-- short-lived Realtime bootstrap from the host connector
-- one active voice session per user in v1
-- relay-hosted `hermes_delegate` MCP bridging for talk sessions
-- persisted final voice turns
-
-The relay does not proxy live audio. Media flows directly between the app and OpenAI Realtime once the session is bootstrapped.
-
-## Connector-first setup
-
-On the machine where Hermes lives:
-
-```bash
-cd connector
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
-
-export HERMES_COMMAND=/absolute/path/to/hermes
-export HERMES_WORKDIR=/path/to/your/hermes/project
-export HERMES_MOBILE_RELAY_URL=https://your-relay.example.com/v1
-# Optional, if the relay requires it:
-export CONNECTOR_SETUP_SECRET=replace-me
-
-hermes-mobile setup
-hermes-mobile pair-phone
-hermes-mobile service install
-hermes-mobile service start
-```
-
-`pair-phone` prints the short-lived manual code plus an ASCII QR. The iOS app expects that connector-generated phone pairing code instead of the older HM1/HC1 flow.
-
-`setup` can also:
-
-- auto-register `mcp_servers.hermes_mobile` in the local Hermes config
-- validate that MCP entry with `hermes mcp test hermes_mobile`
-- configure connector-owned OpenAI Realtime talk settings
-
-If Hermes chat is already open, the connector may report `Reload required`. Run `/reload-mcp` or start a fresh chat before expecting new MCP tools to appear in that active Hermes session.
-
-## Current limitations
-
-- Talk mode bootstrap and persistence are implemented, but true barge-in interruption is still incomplete in the app layer.
-- Inline code diffs are connector-generated from git-visible filesystem changes, not a Hermes-native structured diff API.
-- Background health delivery and Always-authorized location still require physical-device validation.
+- [../README.md](../README.md)
+- [../docs/CONFIGURATION.md](../docs/CONFIGURATION.md)
+- [docs/fly-io.md](docs/fly-io.md)
+- [docs/local-dev.md](docs/local-dev.md)

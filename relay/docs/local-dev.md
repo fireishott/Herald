@@ -1,18 +1,67 @@
-# Local Development
+# Local development
 
-Recommended local flow:
+This is the fastest way to run the relay during development.
 
-1. Start Postgres with Docker Compose from the `relay/` directory.
-2. Run the relay with `PUBLIC_BASE_URL=http://127.0.0.1:8000/v1`.
-3. Point the iOS app at `http://127.0.0.1:8000/v1` using the custom relay configuration in onboarding/settings.
-4. Start the connector with `HERMES_MOBILE_RELAY_URL=http://127.0.0.1:8000/v1`.
+## Start the relay
 
-Important env vars:
+```bash
+cd relay
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .[dev]
+cp .env.example .env
+uvicorn app.main:app --reload
+```
 
-- `DATABASE_URL`
+Or use Docker Compose from the same directory if you want a containerized local stack.
+
+## Choose the right base URL
+
+### Simulator on the same Mac
+
+Use:
+
+```bash
+http://127.0.0.1:8000/v1
+```
+
+### Physical iPhone on the same network
+
+Use your Mac’s LAN IP:
+
+```bash
+http://192.168.x.x:8000/v1
+```
+
+> [!IMPORTANT]
+> `127.0.0.1` and `localhost` do not work on a physical iPhone. They point back to the phone itself.
+
+## Connector local setup
+
+```bash
+cd connector
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .[dev]
+
+export HERMES_COMMAND=/absolute/path/to/hermes
+export HERMES_MOBILE_RELAY_URL=http://127.0.0.1:8000/v1   # simulator
+# or your Mac's LAN IP for a real phone
+
+hermes-mobile setup
+hermes-mobile pair-phone
+```
+
+## Useful env vars
+
 - `PUBLIC_BASE_URL`
+- `DATABASE_URL`
 - `INTERNAL_API_KEY`
 - `HERMES_ADAPTER`
 - `CONNECTOR_SETUP_SECRET` (optional)
 
-For realistic end-to-end local development, prefer `HERMES_ADAPTER=connector`.
+For realistic end-to-end local testing, prefer:
+
+```bash
+HERMES_ADAPTER=connector
+```

@@ -1,15 +1,24 @@
 # Hermes iOS Connector
 
-`hermes-mobile` is the host-side process that runs next to a local Hermes install and bridges it to a public Hermes iOS relay.
+`hermes-mobile` is the host-side bridge between the Hermes iPhone app and a local Hermes runtime. It owns the durable connection to the relay, executes Hermes work on the host machine, exposes phone context through MCP, and keeps the host available when no terminal window is open.
 
-The connector is the durable host boundary for:
+<insert image> Connector CLI setup wizard after validating the Hermes command and prompting for the relay source.
 
-- Hermes execution
-- host enrollment and phone pairing
-- local MCP registration
-- local sensor storage
-- OpenAI Realtime talk configuration
-- background service management
+## What the connector does
+
+- connects to the relay over one authenticated WebSocket
+- runs Hermes jobs on the host through the CLI or configured API runtime
+- registers the local `hermes_mobile` MCP server in `~/.hermes/config.yaml`
+- stores sensor data in `~/.hermes-mobile/state/sensors.db`
+- manages OpenAI Realtime talk configuration for the host
+- installs a background service on macOS and WSL2
+
+## Prerequisites
+
+- Python 3.11+
+- a working Hermes installation (`hermes --version` should succeed)
+- access to the relay you want to pair against
+- for physical-phone testing against a local relay: the phone and Mac on the same network
 
 ## Install
 
@@ -20,9 +29,9 @@ source .venv/bin/activate
 pip install -e .[dev]
 ```
 
-## Runtime configuration
+## Recommended setup flow
 
-The connector persists its runtime configuration after setup, but these environment variables are still the easiest way to define the initial Hermes execution context:
+### 1. Define the Hermes runtime context
 
 ```bash
 export HERMES_COMMAND=/absolute/path/to/hermes
@@ -34,104 +43,89 @@ export HERMES_SOURCE=tool
 export HERMES_HISTORY_LIMIT=20
 ```
 
-Optional connector-local state directory:
+Optional:
 
 ```bash
+export HERMES_HOME=~/.hermes
 export HERMES_MOBILE_CONNECTOR_HOME=~/.hermes-mobile
 ```
 
-Relay target:
-
-```bash
-export HERMES_MOBILE_RELAY_URL=https://your-relay.example.com/v1
-```
-
-Optional setup gate:
-
-```bash
-export CONNECTOR_SETUP_SECRET=replace-me
-```
-
-## Setup
-
-Create or link the relay account from the Hermes host first:
+### 2. Run the setup wizard
 
 ```bash
 hermes-mobile setup
 ```
 
-`setup` requires either:
+The wizard supports three paths:
 
-- `--relay-url https://your-relay.example.com/v1`
-- or `HERMES_MOBILE_RELAY_URL` in the environment
+- **Deploy a new relay on Fly.io**
+- **Use an existing relay URL**
+- **Use a local-network relay for same-network testing**
 
-If the relay requires a setup secret, export `CONNECTOR_SETUP_SECRET` before running `setup`.
+You can also bypass the prompt:
+
+```bash
+hermes-mobile setup --relay-url https://your-relay.example.com/v1
+```
+
+If the relay requires bootstrap protection:
+
+```bash
+export CONNECTOR_SETUP_SECRET=replace-me
+```
+
+> [!IMPORTANT]
+> A physical iPhone cannot reach `127.0.0.1` on your Mac. For same-network testing, use your Mac's LAN IP such as `http://192.168.1.10:8000/v1`.
+
+### 3. Pair the phone
+
+```bash
+hermes-mobile pair-phone
+```
+
+This prints:
+
+- an ASCII QR code
+- a short-lived manual code like `ABCD-EFGH`
+
+Open Hermes iOS, point it at the same relay URL, then scan the QR code or enter the code manually.
+
+<insert image> Connector `pair-phone` output showing the QR code and manual pairing code.
+
+## What setup can configure for you
 
 During setup the connector can optionally:
 
-- configure `mcp_servers.hermes_mobile` in `~/.hermes/config.yaml`
-- validate that MCP entry with `hermes mcp test hermes_mobile`
+- register `mcp_servers.hermes_mobile` in `~/.hermes/config.yaml`
+- validate the MCP entry with `hermes mcp test hermes_mobile`
 - configure OpenAI Realtime talk mode with a connector-owned API key
-- install or start the background connector service
+- install and start the background service
 
-If you want to skip MCP registration during setup:
+If you want to skip MCP registration:
 
 ```bash
 hermes-mobile setup --skip-mcp
 ```
 
-If Hermes chat is already open when setup finishes, the connector may report `Reload required`. Run `/reload-mcp` inside Hermes or start a fresh chat so the new `hermes_mobile` MCP server is loaded into the active session.
-
-If you skip MCP config during setup, you can enable it later:
+Later:
 
 ```bash
 hermes-mobile configure-mcp
 hermes-mobile validate-mcp
 ```
 
-## Realtime talk configuration
-
-Realtime talk configuration is connector-owned, not app-owned.
-
-The connector wizard can configure this during `setup`, or you can do it later:
-
-```bash
-hermes-mobile configure-realtime
-```
-
-This stores the OpenAI API key in a connector-owned secrets file, not in relay state and not on the phone.
-
-Useful related commands:
-
-```bash
-hermes-mobile configure-realtime --clear
-hermes-mobile status
-```
-
-`status` reports whether talk is configured, the selected model preference, and the last validation result without printing secrets.
-
-## Pair a phone
-
-After setup, generate a short-lived phone pairing code and QR:
-
-```bash
-hermes-mobile pair-phone
-```
-
-Then open Hermes iOS on the phone and scan the QR code or enter the displayed `ABCD-EFGH` code manually.
-
-The iOS app can now pair against a custom relay URL. Make sure the phone is pointed at the same relay base URL the connector used during setup.
+If Hermes chat is already open when MCP registration finishes, the connector may report `Reload required`. Run `/reload-mcp` in Hermes or start a fresh chat.
 
 ## Background service
 
-You can keep the connector alive without an open terminal:
+Keep the connector alive without an open terminal:
 
 ```bash
 hermes-mobile service install
 hermes-mobile service start
 ```
 
-Management commands:
+Useful commands:
 
 ```bash
 hermes-mobile service status
@@ -141,54 +135,76 @@ hermes-mobile service logs
 hermes-mobile service uninstall
 ```
 
-If you move to a new venv or Python path, rewrite the service artifacts with:
+If your Python path or venv changes:
 
 ```bash
 hermes-mobile service install --force
 ```
 
-Platform behavior:
+Platform notes:
 
-- macOS uses a per-user `launchd` LaunchAgent and starts after that user logs in.
-- Windows gateway support is WSL2-only. The connector installs a Windows Scheduled Task that launches the WSL-hosted connector after Windows logon.
-- Native Windows Hermes execution is not supported.
+- macOS uses a per-user `launchd` LaunchAgent
+- Windows support is WSL2-only through a Scheduled Task
+- native Windows Hermes execution is not supported
 
-## Foreground debugging
+## Realtime talk configuration
+
+Realtime talk is connector-owned, not app-owned.
+
+Configure it during setup or later:
 
 ```bash
-hermes-mobile run
+hermes-mobile configure-realtime
 ```
 
-`run` is the foreground development/debugging path. For day-to-day uptime, prefer the managed service.
+Helpful commands:
 
-## What the connector does today
+```bash
+hermes-mobile configure-realtime --clear
+hermes-mobile status
+```
 
-- opens one outbound authenticated WebSocket to the relay
-- heartbeats while idle or during long jobs
-- executes one Hermes job at a time
-- preserves Hermes session continuity where possible
-- exposes phone-derived context through a local MCP server
-- supports chat streaming progress and final result delivery
-- can attach git-visible inline diff data for coding turns
-- builds a cached talk-mode voice context from Hermes memory files, memory-provider status, and sensor freshness
+`status` reports whether talk is configured, the selected model, and the last validation result without printing secrets.
 
-## Current limitations
+## Troubleshooting
 
-- Talk mode bootstrap is implemented, but true barge-in interruption is not fully complete in the app yet.
-- Inline diffs depend on git-visible file changes in the configured Hermes workdir.
-- Background health delivery and Always-authorized background location still require a physical iPhone for full validation.
+### Relay setup
 
-## Legacy enroll
+- If you already have a relay, set `HERMES_MOBILE_RELAY_URL` and rerun `hermes-mobile setup`.
+- If the Fly wizard fails, follow the manual steps in [../relay/docs/fly-io.md](../relay/docs/fly-io.md).
+- If you are using a local relay, confirm the phone can reach the Mac's LAN IP.
 
-The legacy host-enrollment path still exists for development and migration:
+### Hermes execution
+
+- `hermes --version` should work before setup.
+- If jobs fail, run:
+
+```bash
+hermes-mobile status
+hermes-mobile service logs
+```
+
+### MCP registration
+
+- If `configure-mcp` says `Reload required`, reload the active Hermes chat session.
+- If `validate-mcp` fails, inspect `~/.hermes/config.yaml` and the connector logs.
+
+## Connector data and schema
+
+The connector keeps sensor and host-side context in SQLite. See [SENSOR_SCHEMA.md](SENSOR_SCHEMA.md) for:
+
+- table definitions
+- health metric coverage
+- daily rollups
+- MCP query tools
+- example SQL use cases
+
+## Advanced / legacy
+
+The legacy host-enrollment flow still exists for development and migration:
 
 ```bash
 hermes-mobile enroll --code 'HC1:...'
 ```
 
-You can inspect the stored enrollment and host config with:
-
-```bash
-hermes-mobile status
-hermes-mobile service status
-```
+For almost all new users, `hermes-mobile setup` + `hermes-mobile pair-phone` is the right path.
