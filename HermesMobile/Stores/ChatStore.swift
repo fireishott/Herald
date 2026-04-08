@@ -154,6 +154,7 @@ final class ChatStore {
                         into: self.hermesClient.currentConversation
                     )
                     self.lastTokenUsage = usage
+                    self.detectModelSwitch(from: finalMessage.content)
                     self.streamingMessageID = nil
                     self.pendingMessageSentAt = nil
                     self.chatLiveActivity.endActivity()
@@ -519,6 +520,45 @@ final class ChatStore {
             .map { "\($0.kind)|\($0.fileName)|\($0.mimeType)" }
             .sorted()
             .joined(separator: "||")
+    }
+
+    // MARK: - Model Switch Detection
+
+    /// Detect a model switch from the agent's response text.
+    /// Updates activeModelName and contextWindow immediately so the
+    /// toolbar chip reflects the change in the same render frame.
+    private func detectModelSwitch(from text: String) {
+        // Match: "Model switched to `claude-sonnet-4-6`" or "Model switched: gpt-4-turbo"
+        // Also handles: "✓ Model switched: gpt-5.4-mini"
+        let patterns: [Regex<(Substring, Substring)>] = [
+            /[Mm]odel\s+switched\s+to\s+`?([A-Za-z0-9._-]+)`?/,
+            /[Mm]odel\s+switched:\s+`?([A-Za-z0-9._-]+)`?/,
+        ]
+        for pattern in patterns {
+            if let match = text.firstMatch(of: pattern) {
+                let newModel = String(match.1)
+                activeModelName = newModel
+                updateContextWindowForModel(newModel)
+                return
+            }
+        }
+    }
+
+    /// Update the context window size based on the model name.
+    /// Uses the same lookup table as the connector.
+    private func updateContextWindowForModel(_ name: String) {
+        let n = name.lowercased()
+        if n.contains("opus") && (n.contains("4") || n.contains("5")) { contextWindow = 1_000_000 }
+        else if n.contains("sonnet") || n.contains("haiku") { contextWindow = 200_000 }
+        else if n.contains("claude") { contextWindow = 200_000 }
+        else if n.contains("gpt-5") { contextWindow = 400_000 }
+        else if n.contains("gpt-4.1") || n.contains("gpt-4o") { contextWindow = 1_000_000 }
+        else if n.contains("gpt-4") { contextWindow = 128_000 }
+        else if n.contains("o3") || n.contains("o4") { contextWindow = 200_000 }
+        else if n.contains("o1") { contextWindow = 200_000 }
+        else if n.contains("gemini") { contextWindow = 1_000_000 }
+        else if n.contains("llama") { contextWindow = 128_000 }
+        else { contextWindow = 128_000 }
     }
 }
 
