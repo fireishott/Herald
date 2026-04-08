@@ -1,6 +1,13 @@
 # iOS Capabilities Reference
 
-A living document tracking every iOS capability integrated into Hermes iOS — what's working, what's next, and how each feeds into the Hermes agent's context awareness.
+This is a maintainer-facing capability ledger for Hermes iOS. It tracks what is wired, what still needs real-device validation, and how each iOS surface feeds into Hermes context.
+
+For end-user setup and configuration, start with:
+
+- [../README.md](../README.md)
+- [../connector/README.md](../connector/README.md)
+- [../relay/README.md](../relay/README.md)
+- [CONFIGURATION.md](CONFIGURATION.md)
 
 ---
 

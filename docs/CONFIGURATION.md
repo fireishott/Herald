@@ -1,179 +1,182 @@
 # Configuration and Deployment
 
-This repo is designed to be public-safe and self-hosted-first.
+This repo is designed to be **public-safe** and **self-hosted first**.
 
-Tracked configuration files should contain generic defaults. Real deployment values should be injected through local env, local config files, or deployment secrets.
+Tracked files should keep generic defaults. Real deployment values belong in local env files, deployment secrets, or untracked local build settings.
 
-## Relay Environment Variables
+## Recommended setup order
 
-Core:
+1. Run the relay
+2. Run `hermes-mobile setup` on the Hermes host
+3. Pair the phone
+4. Add optional APNs or CarPlay later if you need them
 
-- `PUBLIC_BASE_URL`
-- `DATABASE_URL`
-- `INTERNAL_API_KEY`
-- `RELAY_ENVIRONMENT`
+> [!TIP]
+> You do not need APNs or CarPlay to get started. The base app, relay, and connector flow works without them.
 
-Connector mode:
+## Relay environment variables
 
-- `HERMES_ADAPTER=connector`
-- `CONNECTOR_SYNC_WAIT_SECONDS`
-- `CONNECTOR_JOB_LEASE_SECONDS`
-- `CONNECTOR_HEARTBEAT_TIMEOUT_SECONDS`
-- `CONNECTOR_IDLE_POLL_INTERVAL_SECONDS`
-- `CONNECTOR_SETUP_SECRET` (optional)
+### Required in real deployments
 
-Pairing/rate limits:
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `PUBLIC_BASE_URL` | Yes | Public API base URL ending in `/v1` |
+| `DATABASE_URL` | Yes | PostgreSQL in production; SQLite is fine for local dev |
+| `INTERNAL_API_KEY` | Yes | Must be a strong random value outside development/test |
+| `RELAY_ENVIRONMENT` | Recommended | `development`, `test`, or `production` |
 
-- `PHONE_PAIRING_CODE_TTL_SECONDS`
-- `PHONE_PAIRING_MAX_ATTEMPTS_PER_CODE`
-- `PHONE_PAIRING_MAX_ATTEMPTS_PER_IP`
-- `PHONE_PAIRING_RATE_LIMIT_WINDOW_SECONDS`
-- `HOST_ENROLLMENT_CODE_TTL_SECONDS`
+### Connector mode
 
-## Connector Environment Variables
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `HERMES_ADAPTER=connector` | Yes | Production/self-hosted mode |
+| `CONNECTOR_SYNC_WAIT_SECONDS` | Optional | Inline wait window before returning `pending` |
+| `CONNECTOR_JOB_LEASE_SECONDS` | Optional | Job lease duration |
+| `CONNECTOR_HEARTBEAT_TIMEOUT_SECONDS` | Optional | Host online/offline timeout |
+| `CONNECTOR_IDLE_POLL_INTERVAL_SECONDS` | Optional | Connector idle polling interval |
+| `CONNECTOR_SETUP_SECRET` | Optional | Bootstrap gate for new connectors |
 
-Required for real use:
+### Pairing and rate limits
 
-- `HERMES_MOBILE_RELAY_URL`
-- `HERMES_COMMAND`
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `PHONE_PAIRING_CODE_TTL_SECONDS` | Optional | Phone pairing code expiry |
+| `PHONE_PAIRING_MAX_ATTEMPTS_PER_CODE` | Optional | Retry limit per code |
+| `PHONE_PAIRING_MAX_ATTEMPTS_PER_IP` | Optional | Retry limit per IP |
+| `PHONE_PAIRING_RATE_LIMIT_WINDOW_SECONDS` | Optional | Window for IP-based throttling |
+| `HOST_ENROLLMENT_CODE_TTL_SECONDS` | Optional | Legacy host enrollment expiry |
 
-Common runtime context:
+### APNs
 
-- `HERMES_WORKDIR`
-- `HERMES_PROVIDER`
-- `HERMES_MODEL`
-- `HERMES_TOOLSETS`
-- `HERMES_SOURCE`
-- `HERMES_HISTORY_LIMIT`
-- `HERMES_HOME`
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `APNS_KEY_PATH` or `APNS_KEY_CONTENTS` | Optional | `.p8` key path or raw key contents |
+| `APNS_KEY_ID` | Optional | Apple Key ID |
+| `APNS_TEAM_ID` | Optional | Apple Team ID |
+| `APNS_BUNDLE_ID` | Optional | Default app bundle ID for push delivery |
+| `APNS_ENVIRONMENT` | Optional | `development` or `production` |
+| `APP_PRESENCE_STALE_SECONDS` | Optional | Foreground suppression window |
 
-Optional connector-local state:
+## Connector environment variables
 
-- `HERMES_MOBILE_CONNECTOR_HOME`
+### Required for real use
 
-Optional bootstrap protection:
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `HERMES_MOBILE_RELAY_URL` | Usually | Required unless you pass `--relay-url` or use the setup wizard |
+| `HERMES_COMMAND` | Yes | Absolute path or resolvable `hermes` binary |
 
-- `CONNECTOR_SETUP_SECRET`
+### Hermes runtime context
 
-If the relay is configured with `CONNECTOR_SETUP_SECRET`, the connector must provide the same value before `hermes-mobile setup`.
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `HERMES_WORKDIR` | Optional | Git workdir / project root for Hermes |
+| `HERMES_PROVIDER` | Optional | Provider override |
+| `HERMES_MODEL` | Optional | Model override |
+| `HERMES_TOOLSETS` | Optional | Toolset override |
+| `HERMES_SOURCE` | Optional | Defaults to `tool` |
+| `HERMES_HISTORY_LIMIT` | Optional | Defaults to `20` |
+| `HERMES_HOME` | Optional | Hermes config/skills home |
 
-## iOS App Build/Runtime Config
+### Connector-local state
 
-The app reads these values from `Info.plist`:
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `HERMES_MOBILE_CONNECTOR_HOME` | Optional | Defaults to `~/.hermes-mobile` |
+| `CONNECTOR_SETUP_SECRET` | Optional | Must match relay when bootstrap gate is enabled |
 
-- `APP_HOSTED_RELAY_ENABLED`
-- `APP_HOSTED_RELAY_URL`
-- `APP_SUPPORT_URL`
-- `APP_TERMS_URL`
-- `APP_PRIVACY_URL`
+## iOS app build and runtime config
 
-Public-safe tracked defaults should leave hosted relay disabled.
+The app reads these keys from `Info.plist` or local build settings.
 
-The app supports custom relay URLs at runtime through user settings and onboarding. A hosted relay is optional and feature-flagged by the plist values above.
+| Key | Required | Notes |
+| --- | --- | --- |
+| `APP_HOSTED_RELAY_ENABLED` | Optional | Enables a hosted-relay option in the app UI |
+| `APP_HOSTED_RELAY_URL` | Optional | Hosted relay base URL ending in `/v1` |
+| `APP_SUPPORT_URL` | Optional | Support link shown in Settings |
+| `APP_TERMS_URL` | Optional | Terms of Service link |
+| `APP_PRIVACY_URL` | Optional | Privacy Policy link |
+| `APP_GROUP_ID` | Recommended if customizing IDs | App Group for widget/shared state |
 
-## Private Override Strategy
+> [!IMPORTANT]
+> If you change the bundle ID or App Group locally, update `APP_GROUP_ID` to match your real App Group. Otherwise widgets and shared snapshot data will silently stop working.
 
-For personal or private deployments, keep these values out of tracked source:
+## Private override strategy
+
+Keep these values out of tracked source:
 
 - hosted relay URL
 - Fly app name
 - `CONNECTOR_SETUP_SECRET`
-- Apple signing team / bundle IDs if they differ from public-safe defaults
+- Apple signing team and custom bundle IDs
+- APNs `.p8` keys and team secrets
 
 Recommended approach:
 
-- relay: local `.env`, deployment secrets, or untracked `fly.toml` override
-- connector: shell env / service env
-- iOS app: local plist/build-setting override for hosted relay values
+- **relay**: local `.env`, Fly secrets, or another deployment secret store
+- **connector**: shell env, launchd env, systemd env, or Scheduled Task env
+- **iOS app**: local `.xcconfig` or local build settings
 
-## Optional: APNs (Push Notifications)
+## APNs setup
 
-Push notifications allow the relay to wake the app in the background for proactive messages and data refresh. **This is fully optional** — without it, the app refreshes when you open it. No functionality is lost, just proactivity.
+APNs is optional. Without it, the app still works and refreshes when opened.
 
-### Setup (per developer)
+### What APNs enables
 
-1. Go to [Apple Developer Portal → Keys](https://developer.apple.com/account/resources/authkeys/list)
-2. Create a new key with "Apple Push Notifications service (APNs)" enabled
-3. Download the `.p8` file and note the Key ID and your Team ID
-4. Configure the relay with these environment variables:
-   ```
-   APNS_KEY_PATH=/path/to/AuthKey_XXXXXXXXXX.p8
-   APNS_KEY_ID=XXXXXXXXXX
-   APNS_TEAM_ID=YYYYYYYYYY
-   APNS_BUNDLE_ID=io.hermesmobile.HermesMobile  # or your custom bundle ID
-   APNS_ENVIRONMENT=development  # or "production" for TestFlight/App Store
-   ```
-5. The iOS app automatically registers its device token with the relay on launch.
-6. The iOS app also reports `foreground` / `background` state so the relay can suppress pushes while the app is active.
+- alert pushes for Hermes replies when the app is backgrounded
+- relay-side push delivery keyed to the device’s registered bundle ID and environment
+- future proactive notifications
 
-**The relay's APNs pipeline is fully wired:**
-- iOS registers its device token on launch via `POST /v1/push/register`
-- iOS reports app state via `POST /v1/device/app-state`
-- The relay stores tokens in `push_registrations` table
-- Hermes chat replies trigger APNs alert pushes when the app is not foregrounded
-- `POST /v1/push/send` (internal API key required) still exists for explicit silent or alert pushes
-- Invalid tokens (APNs 410 Gone) are automatically marked inactive
+### Setup
 
-The relay uses `PyJWT[crypto]` for ES256 JWT signing and `httpx[http2]` for HTTP/2 APNs transport.
+1. Create an APNs key in the Apple Developer portal.
+2. Keep the `.p8` file private.
+3. Set these on the relay:
 
-### Without APNs
-
-If you don't configure APNs, the app still works normally:
-- Sensor data syncs when the app is in the foreground or on background location updates
-- Conversations refresh when you open the app
-- Voice mode, health, location, and all other features work without push
-
-## Optional: CarPlay
-
-CarPlay provides hands-free voice conversations with Hermes while driving. **This requires an entitlement from Apple** and is the only feature that cannot be self-configured without Apple's approval.
-
-### Setup (per developer)
-
-1. Go to [https://developer.apple.com/contact/carplay/](https://developer.apple.com/contact/carplay/)
-2. Request the **Voice-Based Conversational** category entitlement
-3. Describe your app: "AI assistant companion app with voice-based conversational interface"
-4. Wait for Apple's approval (typically 1-2 weeks)
-5. Once approved, the entitlement is tied to your App ID in the Developer Portal
-6. Add the capability in your local Xcode signing setup or local entitlement override — keep that entitlement change out of tracked source if you're maintaining the public-safe defaults
-7. Rebuild; the code already includes the CarPlay scene delegate and voice control template
-
-### Without CarPlay
-
-If you don't have the CarPlay entitlement:
-- The `CarPlaySceneDelegate` is never called by the system — it's inert
-- No build errors, no runtime errors, no configuration needed
-- Voice mode works normally on the phone
-- All other features are unaffected
-
-### Build Flags
-
-Both APNs and CarPlay are additive features with graceful degradation. No build flags or conditional compilation are needed — the code paths are simply never activated if the infrastructure isn't configured.
-
-## Signing and Local Overrides
-
-The tracked `project.pbxproj` has `DEVELOPMENT_TEAM = ""` and generic bundle IDs. When you open the project in Xcode:
-
-1. Select your development team in Signing & Capabilities
-2. Xcode updates the pbxproj with your team ID — **do not commit this change**
-3. Your local signing config stays as an unstaged modification
-
-If you use XcodeGen, you can add a local `.xcconfig` file (gitignored) to override signing:
-
-```
-// Local.xcconfig (not tracked)
-DEVELOPMENT_TEAM = YOUR_TEAM_ID
-CODE_SIGN_IDENTITY = Apple Development
+```bash
+APNS_KEY_PATH=/path/to/AuthKey_XXXXXXXXXX.p8
+APNS_KEY_ID=XXXXXXXXXX
+APNS_TEAM_ID=YYYYYYYYYY
+APNS_BUNDLE_ID=io.hermesmobile.HermesMobile
+APNS_ENVIRONMENT=development
 ```
 
-Then reference it in project.yml or pass it via `xcodegen generate --config Local.xcconfig`.
+4. Build and run the app on a real device.
+5. Allow notifications in iOS.
 
-## Personal Setup Checklist
+The app will register its token automatically and report foreground/background presence so the relay can suppress alerts while the app is active.
 
-If you are already running a private deployment, verify:
+## CarPlay setup
 
-1. Your relay has the correct `PUBLIC_BASE_URL`.
-2. Your connector service environment includes `HERMES_MOBILE_RELAY_URL`.
-3. If `CONNECTOR_SETUP_SECRET` is enabled on the relay, it is also present in the connector environment before running `hermes-mobile setup`.
-4. If you want the app to expose your hosted relay as an option, set `APP_HOSTED_RELAY_ENABLED=true` and `APP_HOSTED_RELAY_URL` locally in your app config.
-5. (Optional) APNs: Generate a `.p8` key and configure the relay environment variables.
-6. (Optional) CarPlay: Request the voice-based conversational entitlement from Apple.
+CarPlay is optional and requires Apple approval.
+
+### What you need
+
+1. Request the **Voice-Based Conversational** entitlement from Apple.
+2. Wait for approval.
+3. Add the entitlement in your local signing/capabilities setup.
+4. Rebuild the app.
+
+Without approval:
+
+- the app still builds and runs
+- the CarPlay scene stays inert
+- all non-CarPlay features are unaffected
+
+## Same-network local development
+
+If you run the relay on your Mac and test with a physical iPhone:
+
+- use your Mac’s LAN IP, for example `http://192.168.1.10:8000/v1`
+- do **not** use `127.0.0.1` or `localhost`
+
+If you use the simulator on the same Mac, `127.0.0.1` is fine.
+
+## Personal deployment checklist
+
+1. Confirm `PUBLIC_BASE_URL` is correct.
+2. Confirm `INTERNAL_API_KEY` is set and not the default.
+3. Confirm `HERMES_MOBILE_RELAY_URL` is present in the connector environment.
+4. Confirm `CONNECTOR_SETUP_SECRET` matches on relay and connector when enabled.
+5. Confirm `APP_GROUP_ID` matches your local App Group if you changed bundle IDs.
+6. Add APNs only when you are ready to test push on a real device.
