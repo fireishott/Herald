@@ -3,6 +3,7 @@ import SwiftUI
 struct ConnectHermesHostScreen: View {
     @Environment(HermesHostStore.self) private var hostStore
     @Environment(PairingStore.self) private var pairingStore
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ZStack {
@@ -10,14 +11,15 @@ struct ConnectHermesHostScreen: View {
                 .ignoresSafeArea()
 
             ScrollView {
-                VStack(alignment: .leading, spacing: Design.Spacing.lg) {
-                    heroSection
-                    statusSection
-                    setupSection
-                    dangerZoneSection
+                VStack(spacing: Design.Spacing.lg) {
+                    hostStatusCard
+                    if hostStore.currentHost == nil {
+                        setupCard
+                    }
+                    actionsCard
 
                     if let errorMessage = hostStore.lastErrorMessage {
-                        errorCard(message: errorMessage)
+                        errorBanner(message: errorMessage)
                     }
                 }
                 .padding(.horizontal, Design.Spacing.md)
@@ -30,127 +32,197 @@ struct ConnectHermesHostScreen: View {
         }
     }
 
-    private var heroSection: some View {
-        VStack(alignment: .leading, spacing: Design.Spacing.sm) {
-            Text("Connect Your Hermes Host")
-                .font(Design.Typography.heroTitle)
-                .foregroundStyle(Design.Colors.foreground)
+    // MARK: - Host Status
 
-            Text("Host setup now starts from the machine running Hermes. Run `hermes-mobile setup`, then `hermes-mobile pair-phone`, and keep the connector available with either the background service or `hermes-mobile run`.")
-                .font(Design.Typography.body)
-                .foregroundStyle(Design.Colors.secondaryForeground)
-        }
-        .padding(Design.Spacing.lg)
-        .background(Design.Colors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
-    }
+    private var hostStatusCard: some View {
+        VStack(spacing: Design.Spacing.lg) {
+            // Large status icon
+            ZStack {
+                Circle()
+                    .fill(statusColor.opacity(0.12))
+                    .frame(width: 80, height: 80)
+                Image(systemName: statusIcon)
+                    .font(.system(size: 32, weight: .medium))
+                    .foregroundStyle(statusColor)
+            }
+            .padding(.top, Design.Spacing.sm)
 
-    private var statusSection: some View {
-        VStack(alignment: .leading, spacing: Design.Spacing.sm) {
-            Text("Current Host")
-                .font(Design.Typography.sectionTitle)
+            // Status text
+            VStack(spacing: Design.Spacing.xxs) {
+                Text(statusTitle)
+                    .font(Design.Typography.sectionTitle)
+                    .foregroundStyle(Design.Colors.foreground)
 
-            if let host = hostStore.currentHost {
-                hostRow(title: "Name", value: host.resolvedDisplayName)
-                hostRow(title: "Status", value: host.isOnline ? "Online" : "Offline")
-                if let lastSeenAt = host.lastSeenAt {
-                    hostRow(title: "Last Seen", value: lastSeenAt.formatted(date: .abbreviated, time: .shortened))
-                }
-            } else {
-                Text("No Hermes host is connected yet.")
+                Text(statusSubtitle)
                     .font(Design.Typography.callout)
                     .foregroundStyle(Design.Colors.secondaryForeground)
+                    .multilineTextAlignment(.center)
             }
 
+            // Host details (when connected)
+            if let host = hostStore.currentHost {
+                VStack(spacing: 0) {
+                    Divider().overlay(Design.Colors.divider)
+                    detailRow(icon: "desktopcomputer", label: host.resolvedDisplayName)
+                    Divider().overlay(Design.Colors.divider)
+                    detailRow(
+                        icon: "clock",
+                        label: host.lastSeenAt?.formatted(date: .abbreviated, time: .shortened) ?? "Just now"
+                    )
+                }
+                .padding(.top, Design.Spacing.xs)
+            }
         }
         .padding(Design.Spacing.lg)
+        .frame(maxWidth: .infinity)
         .background(Design.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
 
-    private var setupSection: some View {
+    // MARK: - Setup Instructions
+
+    private var setupCard: some View {
         VStack(alignment: .leading, spacing: Design.Spacing.md) {
-            Text("Setup From Your Hermes Machine")
-                .font(Design.Typography.sectionTitle)
-
-            Text("1. On the Hermes host, run `hermes-mobile setup` once.")
-                .font(Design.Typography.callout)
+            Label("Setup", systemImage: "terminal")
+                .font(Design.Typography.headline)
                 .foregroundStyle(Design.Colors.foreground)
 
-            Text("2. Generate a phone code with `hermes-mobile pair-phone`, then scan or enter that code in the app.")
-                .font(Design.Typography.callout)
-                .foregroundStyle(Design.Colors.foreground)
-
-            Text("3. For persistent uptime, run `hermes-mobile service install` and `hermes-mobile service start`.")
-                .font(Design.Typography.callout)
-                .foregroundStyle(Design.Colors.foreground)
-
-            Text("4. Use `hermes-mobile run` when you want foreground debugging instead.")
-                .font(Design.Typography.callout)
-                .foregroundStyle(Design.Colors.foreground)
+            setupStep(number: "1", command: "hermes-mobile setup", detail: "One-time registration")
+            setupStep(number: "2", command: "hermes-mobile pair-phone", detail: "Scan the code in-app")
+            setupStep(number: "3", command: "hermes-mobile service install", detail: "Background uptime")
         }
         .padding(Design.Spacing.lg)
         .background(Design.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
 
-    private var dangerZoneSection: some View {
-        VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+    // MARK: - Actions
+
+    private var actionsCard: some View {
+        VStack(spacing: 0) {
             if hostStore.currentHost != nil {
                 Button(role: .destructive) {
                     Task { await hostStore.revokeCurrentHost() }
                 } label: {
-                    HStack {
-                        Label("Revoke Current Host", systemImage: "desktopcomputer.trianglebadge.exclamationmark")
-                            .font(Design.Typography.callout)
-                            .foregroundStyle(.red)
-                        Spacer()
-                    }
-                    .frame(minHeight: Design.Size.minTapTarget)
+                    actionRow(
+                        icon: "desktopcomputer.trianglebadge.exclamationmark",
+                        label: "Revoke Host",
+                        color: .red
+                    )
                 }
                 .disabled(hostStore.isWorking)
+
+                Divider().overlay(Design.Colors.divider)
             }
 
             Button {
-                Task { await pairingStore.disconnect() }
-            } label: {
-                HStack {
-                    Label("Disconnect Hermes", systemImage: "rectangle.portrait.and.arrow.right")
-                        .font(Design.Typography.callout)
-                        .foregroundStyle(.red)
-                    Spacer()
+                Task {
+                    await pairingStore.disconnect()
+                    dismiss()
                 }
-                .frame(minHeight: Design.Size.minTapTarget)
+            } label: {
+                actionRow(
+                    icon: "rectangle.portrait.and.arrow.right",
+                    label: "Disconnect",
+                    color: .red
+                )
             }
         }
-        .padding(Design.Spacing.lg)
         .background(Design.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
     }
 
-    private func hostRow(title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .font(Design.Typography.callout)
+    // MARK: - Components
+
+    private func detailRow(icon: String, label: String) -> some View {
+        HStack(spacing: Design.Spacing.sm) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
                 .foregroundStyle(Design.Colors.secondaryForeground)
+                .frame(width: 20)
+            Text(label)
+                .font(Design.Typography.callout)
+                .foregroundStyle(Design.Colors.foreground)
             Spacer()
-            Text(value)
-                .font(Design.Typography.callout.monospaced())
-                .multilineTextAlignment(.trailing)
+        }
+        .frame(minHeight: Design.Size.minTapTarget)
+    }
+
+    private func setupStep(number: String, command: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: Design.Spacing.sm) {
+            Text(number)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(Design.Brand.accent)
+                .frame(width: 22, height: 22)
+                .background(Design.Brand.accent.opacity(0.15))
+                .clipShape(Circle())
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(command)
+                    .font(.system(.callout, design: .monospaced))
+                    .foregroundStyle(Design.Colors.foreground)
+                Text(detail)
+                    .font(Design.Typography.caption)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
+            }
         }
     }
 
-    private func errorCard(message: String) -> some View {
-        HStack(alignment: .top, spacing: Design.Spacing.sm) {
+    private func actionRow(icon: String, label: String, color: Color) -> some View {
+        HStack(spacing: Design.Spacing.sm) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(color)
+                .frame(width: 20)
+            Text(label)
+                .font(Design.Typography.callout)
+                .foregroundStyle(color)
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(color.opacity(0.5))
+        }
+        .frame(minHeight: Design.Size.minTapTarget)
+        .padding(.horizontal, Design.Spacing.lg)
+    }
+
+    private func errorBanner(message: String) -> some View {
+        HStack(spacing: Design.Spacing.sm) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
-
             Text(message)
-                .font(Design.Typography.callout)
+                .font(Design.Typography.caption)
                 .foregroundStyle(Design.Colors.foreground)
+                .lineLimit(2)
         }
         .padding(Design.Spacing.md)
         .background(Design.Colors.surface)
         .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+    }
+
+    // MARK: - Status Helpers
+
+    private var statusColor: Color {
+        if hostStore.currentHost?.isOnline == true { return .green }
+        if hostStore.currentHost != nil { return .orange }
+        return Design.Colors.secondaryForeground
+    }
+
+    private var statusIcon: String {
+        if hostStore.currentHost?.isOnline == true { return "checkmark.circle.fill" }
+        if hostStore.currentHost != nil { return "exclamationmark.circle.fill" }
+        return "desktopcomputer"
+    }
+
+    private var statusTitle: String {
+        if hostStore.currentHost?.isOnline == true { return "Connected" }
+        if hostStore.currentHost != nil { return "Offline" }
+        return "No Host"
+    }
+
+    private var statusSubtitle: String {
+        if hostStore.currentHost?.isOnline == true { return "Your Hermes agent is ready" }
+        if hostStore.currentHost != nil { return "Waiting for the connector to come online" }
+        return "Set up from your Hermes machine"
     }
 }
