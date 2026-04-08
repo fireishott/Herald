@@ -26,7 +26,12 @@ struct HermesWidgetEntry: TimelineEntry {
 
 /// Reads the latest snapshot from the App Group shared container.
 struct HermesTimelineProvider: TimelineProvider {
-    private static let appGroupID = "group.io.hermesmobile.HermesMobile"
+    private static let appGroupID: String = {
+        if let custom = Bundle.main.object(forInfoDictionaryKey: "APP_GROUP_ID") as? String, !custom.isEmpty {
+            return custom
+        }
+        return "group.io.hermesmobile.HermesMobile"
+    }()
     private static let dataKey = "hermes.widget.data"
 
     func placeholder(in context: Context) -> HermesWidgetEntry {

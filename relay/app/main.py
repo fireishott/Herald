@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .apns import create_apns_client
+from .apns import PushResult, create_apns_client
 from .config import Settings
 from .database import Database
 from .hermes_adapter import build_hermes_adapter
@@ -145,10 +145,16 @@ class ConnectorSession:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
 
-    if settings.internal_api_key == "replace-me" and settings.environment != "development":
+    if settings.internal_api_key == "replace-me":
+        if settings.environment not in ("development", "test"):
+            raise RuntimeError(
+                "INTERNAL_API_KEY is set to the default 'replace-me'. "
+                "Set a strong random value via the INTERNAL_API_KEY env var before "
+                "running in production. This is a security requirement."
+            )
         logger.warning(
             "SECURITY: INTERNAL_API_KEY is set to the default 'replace-me'. "
-            "Set a strong random value via the INTERNAL_API_KEY env var."
+            "This is acceptable in development but must be changed for production."
         )
 
     database = Database(settings.database_url)
@@ -298,13 +304,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if device_is_foreground(device, stale_seconds=settings.app_presence_stale_seconds):
                 continue
 
-            ok = await apns_client.send_alert_push(
+            result = await apns_client.send_alert_push(
                 registration.apns_token,
                 title="Hermes",
                 body=preview,
+                bundle_id=registration.bundle_id,
+                environment=registration.push_environment,
             )
-            if not ok:
-                logger.warning("APNs delivery failed for device %s", device.id)
+            if result == PushResult.TOKEN_INVALID:
+                registration.is_active = False
+                db.commit()
+                logger.info("Deactivated invalid APNs token for device %s", device.id)
+            elif result != PushResult.SENT:
+                logger.warning("APNs delivery %s for device %s", result.value, device.id)
 
     def resolve_sensor_delivery(delivery_id: str | None, *, delivered: bool) -> None:
         if delivery_id is None:
@@ -1328,14 +1340,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         push_type = payload.get("type", "silent")
 
-        # Find all active push registrations for this user's devices
-        registrations = db.scalars(
-            select(PushRegistration)
-            .join(PushRegistration.__table__.c.device_id == PushRegistration.__table__.c.device_id)
-            .where(PushRegistration.is_active == True)
-        ).all()
-
-        # Simpler query: get all devices for user, then their push registrations
         from .models import Device
         device_ids = [
             d.id for d in db.scalars(
@@ -1357,17 +1361,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         for reg in registrations:
             if push_type == "alert":
                 title = payload.get("title", "Hermes")
-                body = payload.get("body", "New message from Hermes")
-                ok = await apns_client.send_alert_push(
-                    reg.apns_token, title=title, body=body
+                body_text = payload.get("body", "New message from Hermes")
+                result = await apns_client.send_alert_push(
+                    reg.apns_token,
+                    title=title,
+                    body=body_text,
+                    bundle_id=reg.bundle_id,
+                    environment=reg.push_environment,
                 )
             else:
-                ok = await apns_client.send_silent_push(reg.apns_token)
+                result = await apns_client.send_silent_push(
+                    reg.apns_token,
+                    bundle_id=reg.bundle_id,
+                    environment=reg.push_environment,
+                )
 
-            if ok:
+            if result == PushResult.SENT:
                 sent += 1
-            elif not ok:
-                # Mark invalid tokens as inactive (410 Gone)
+            elif result == PushResult.TOKEN_INVALID:
                 reg.is_active = False
                 db.commit()
 
