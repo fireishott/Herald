@@ -105,43 +105,40 @@ struct ChatScreen: View {
 
     @State private var showContextPopover = false
 
+    /// Context usage as 0.0–1.0. Nil if no usage data yet.
+    private var contextProgress: Double? {
+        guard let usage = chatStore.lastTokenUsage,
+              let maxCtx = chatStore.contextWindow, maxCtx > 0
+        else { return nil }
+        return min(Double(usage.totalTokens) / Double(maxCtx), 1.0)
+    }
+
+    // MARK: - Compact chip: 🟢 model-name [ring%]
+
     private var modelStatusChip: some View {
         Button {
-            showContextPopover.toggle()
+            if contextProgress != nil {
+                showContextPopover.toggle()
+            }
         } label: {
             HStack(spacing: 6) {
-                // Model name with status dot
-                HStack(spacing: Design.Spacing.xxs) {
-                    Circle()
-                        .fill(hostStore.isHostOnline ? .green : .gray)
-                        .frame(width: 6, height: 6)
+                Circle()
+                    .fill(hostStore.isHostOnline ? .green : .gray)
+                    .frame(width: 6, height: 6)
 
-                    if let model = chatStore.activeModelName {
-                        Text(model)
-                            .font(.system(size: 12, weight: .medium, design: .monospaced))
-                            .foregroundStyle(Design.Colors.foreground)
-                    }
+                if let model = chatStore.activeModelName {
+                    Text(model)
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Design.Colors.foreground)
+                        .lineLimit(1)
                 }
 
-                // Circular context usage indicator
-                if let usage = chatStore.lastTokenUsage, let maxCtx = chatStore.contextWindow, maxCtx > 0 {
-                    let progress = min(Double(usage.totalTokens) / Double(maxCtx), 1.0)
-                    ZStack {
-                        Circle()
-                            .stroke(Design.Colors.divider, lineWidth: 2)
-                        Circle()
-                            .trim(from: 0, to: progress)
-                            .stroke(contextColor(progress), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                        Text("\(Int(progress * 100))")
-                            .font(.system(size: 7, weight: .bold, design: .rounded))
-                            .foregroundStyle(Design.Colors.foreground)
-                    }
-                    .frame(width: 20, height: 20)
+                if let progress = contextProgress {
+                    contextRing(progress: progress)
                 }
             }
-            .padding(.horizontal, Design.Spacing.xs)
-            .padding(.vertical, Design.Spacing.xxs)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
             .background(.ultraThinMaterial)
             .clipShape(Capsule())
         }
@@ -152,48 +149,41 @@ struct ChatScreen: View {
         }
     }
 
+    private func contextRing(progress: Double) -> some View {
+        ZStack {
+            Circle()
+                .stroke(Design.Colors.divider, lineWidth: 2.5)
+            Circle()
+                .trim(from: 0, to: progress)
+                .stroke(contextColor(progress), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text("\(Int(progress * 100))")
+                .font(.system(size: 7, weight: .heavy, design: .rounded))
+                .foregroundStyle(Design.Colors.foreground)
+        }
+        .frame(width: 22, height: 22)
+    }
+
+    // MARK: - Popover: Context Window X of Y (%)
+
     private var contextPopoverContent: some View {
-        VStack(alignment: .leading, spacing: Design.Spacing.xs) {
-            if let model = chatStore.activeModelName {
-                HStack(spacing: Design.Spacing.xxs) {
-                    Circle()
-                        .fill(hostStore.isHostOnline ? .green : .gray)
-                        .frame(width: 8, height: 8)
-                    Text(model)
-                        .font(.system(.subheadline, design: .monospaced, weight: .semibold))
-                }
-            }
+        VStack(spacing: Design.Spacing.sm) {
+            if let usage = chatStore.lastTokenUsage,
+               let maxCtx = chatStore.contextWindow, maxCtx > 0 {
+                let progress = min(Double(usage.totalTokens) / Double(maxCtx), 1.0)
 
-            if let usage = chatStore.lastTokenUsage, let maxCtx = chatStore.contextWindow, maxCtx > 0 {
-                Divider()
-                HStack {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.caption)
-                        .foregroundStyle(Design.Brand.accent)
-                    Text("Context Window")
-                        .font(Design.Typography.caption)
-                        .foregroundStyle(Design.Colors.secondaryForeground)
-                }
-                Text("\(formatTokenCount(usage.totalTokens)) of \(formatTokenCount(maxCtx))")
+                Text("Context Window")
+                    .font(.system(.caption, weight: .semibold))
+                    .foregroundStyle(Design.Colors.secondaryForeground)
+                    .textCase(.uppercase)
+
+                Text("\(formatTokenCount(usage.totalTokens)) of \(formatTokenCount(maxCtx)) (\(Int(progress * 100))%)")
                     .font(.system(.callout, design: .monospaced, weight: .medium))
-
-                // Visual bar
-                GeometryReader { geo in
-                    let progress = min(Double(usage.totalTokens) / Double(maxCtx), 1.0)
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Design.Colors.divider)
-                        Capsule()
-                            .fill(contextColor(progress))
-                            .frame(width: geo.size.width * progress)
-                    }
-                }
-                .frame(height: 6)
+                    .foregroundStyle(Design.Colors.foreground)
             }
         }
-        .padding(Design.Spacing.md)
-        .frame(minWidth: 180)
-        .background(Design.Colors.surface)
+        .padding(.horizontal, Design.Spacing.lg)
+        .padding(.vertical, Design.Spacing.md)
     }
 
     private func contextColor(_ progress: Double) -> Color {
