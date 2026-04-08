@@ -723,13 +723,24 @@ def inject_voice_transcript(
 
 
 def hermes_host_is_online(db: Session, *, host: HermesHost | None, settings: Settings) -> bool:
-    if host is None or host.revoked_at is not None or host.active_connection_nonce is None or host.last_seen_at is None:
+    if host is None or host.revoked_at is not None or host.last_seen_at is None:
         return False
 
     age = utcnow() - normalize_datetime(host.last_seen_at)
-    if age <= timedelta(seconds=settings.connector_heartbeat_timeout_seconds):
+
+    # If the WebSocket is actively connected, the host is online.
+    if host.active_connection_nonce is not None:
+        if age <= timedelta(seconds=settings.connector_heartbeat_timeout_seconds):
+            return True
+
+    # Grace period: even if the WebSocket disconnected briefly (e.g., during
+    # message processing), consider the host online if it was seen recently.
+    # This prevents the iOS app from flashing "offline" on transient blips.
+    if age <= timedelta(seconds=min(settings.connector_heartbeat_timeout_seconds, 15)):
         return True
 
+    # If a job is actively running, the host is working even if the
+    # WebSocket cycled.
     active_job = db.scalar(
         select(MessageJob.id).where(
             MessageJob.host_id == host.id,
