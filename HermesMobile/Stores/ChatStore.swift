@@ -21,6 +21,8 @@ final class ChatStore {
 
     /// Active model name from the Hermes agent config (e.g., "gpt-5.4-mini").
     private(set) var activeModelName: String?
+    /// Context window size for the active model (e.g., 400000).
+    private(set) var contextWindow: Int?
 
     private let hermesClient: any HermesClientProtocol
     private let chatLiveActivity = LiveActivityService()
@@ -335,14 +337,16 @@ final class ChatStore {
         }
     }
 
-    func replaceCommandCatalog(_ catalog: [SlashCommand], activeModel: String? = nil) {
+    func replaceCommandCatalog(_ catalog: [SlashCommand], activeModel: String? = nil, contextWindow: Int? = nil) {
         commandCatalog = catalog.isEmpty ? SlashCommand.allBuiltIn : catalog
         if let activeModel { activeModelName = activeModel }
+        if let contextWindow { self.contextWindow = contextWindow }
     }
 
     func resetCommandCatalog() {
         commandCatalog = SlashCommand.allBuiltIn
         activeModelName = nil
+        contextWindow = nil
     }
 
     func reset() {

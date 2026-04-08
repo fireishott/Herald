@@ -103,31 +103,103 @@ struct ChatScreen: View {
         }
     }
 
-    private var modelStatusChip: some View {
-        HStack(spacing: Design.Spacing.xxs) {
-            Circle()
-                .fill(hostStore.isHostOnline ? .green : .gray)
-                .frame(width: 6, height: 6)
+    @State private var showContextPopover = false
 
+    private var modelStatusChip: some View {
+        Button {
+            showContextPopover.toggle()
+        } label: {
+            HStack(spacing: 6) {
+                // Model name with status dot
+                HStack(spacing: Design.Spacing.xxs) {
+                    Circle()
+                        .fill(hostStore.isHostOnline ? .green : .gray)
+                        .frame(width: 6, height: 6)
+
+                    if let model = chatStore.activeModelName {
+                        Text(model)
+                            .font(.system(size: 12, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Design.Colors.foreground)
+                    }
+                }
+
+                // Circular context usage indicator
+                if let usage = chatStore.lastTokenUsage, let maxCtx = chatStore.contextWindow, maxCtx > 0 {
+                    let progress = min(Double(usage.totalTokens) / Double(maxCtx), 1.0)
+                    ZStack {
+                        Circle()
+                            .stroke(Design.Colors.divider, lineWidth: 2)
+                        Circle()
+                            .trim(from: 0, to: progress)
+                            .stroke(contextColor(progress), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                        Text("\(Int(progress * 100))")
+                            .font(.system(size: 7, weight: .bold, design: .rounded))
+                            .foregroundStyle(Design.Colors.foreground)
+                    }
+                    .frame(width: 20, height: 20)
+                }
+            }
+            .padding(.horizontal, Design.Spacing.xs)
+            .padding(.vertical, Design.Spacing.xxs)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showContextPopover) {
+            contextPopoverContent
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private var contextPopoverContent: some View {
+        VStack(alignment: .leading, spacing: Design.Spacing.xs) {
             if let model = chatStore.activeModelName {
-                Text(model)
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Design.Colors.foreground)
+                HStack(spacing: Design.Spacing.xxs) {
+                    Circle()
+                        .fill(hostStore.isHostOnline ? .green : .gray)
+                        .frame(width: 8, height: 8)
+                    Text(model)
+                        .font(.system(.subheadline, design: .monospaced, weight: .semibold))
+                }
             }
 
-            if let usage = chatStore.lastTokenUsage {
-                Text("·")
-                    .font(.caption2)
-                    .foregroundStyle(Design.Colors.secondaryForeground)
-                Text(formatTokenCount(usage.totalTokens))
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Design.Colors.secondaryForeground)
+            if let usage = chatStore.lastTokenUsage, let maxCtx = chatStore.contextWindow, maxCtx > 0 {
+                Divider()
+                HStack {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.caption)
+                        .foregroundStyle(Design.Brand.accent)
+                    Text("Context Window")
+                        .font(Design.Typography.caption)
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                }
+                Text("\(formatTokenCount(usage.totalTokens)) of \(formatTokenCount(maxCtx))")
+                    .font(.system(.callout, design: .monospaced, weight: .medium))
+
+                // Visual bar
+                GeometryReader { geo in
+                    let progress = min(Double(usage.totalTokens) / Double(maxCtx), 1.0)
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Design.Colors.divider)
+                        Capsule()
+                            .fill(contextColor(progress))
+                            .frame(width: geo.size.width * progress)
+                    }
+                }
+                .frame(height: 6)
             }
         }
-        .padding(.horizontal, Design.Spacing.xs)
-        .padding(.vertical, Design.Spacing.xxs)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
+        .padding(Design.Spacing.md)
+        .frame(minWidth: 180)
+        .background(Design.Colors.surface)
+    }
+
+    private func contextColor(_ progress: Double) -> Color {
+        if progress > 0.85 { return .red }
+        if progress > 0.65 { return .orange }
+        return Design.Brand.accent
     }
 
     private func formatTokenCount(_ count: Int) -> String {
