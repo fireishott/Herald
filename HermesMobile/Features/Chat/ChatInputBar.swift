@@ -280,18 +280,10 @@ struct ChatInputBar: View {
             dictationBaseText = ""
         } else {
             Task {
-                // Request permission if needed
-                if speechService.authorizationStatus == .notDetermined {
-                    let status = await speechService.requestAuthorization()
-                    guard status == .authorized else { return }
-                }
-                guard speechService.authorizationStatus == .authorized else { return }
-
                 do {
                     dictationBaseText = text.trimmingCharacters(in: .whitespacesAndNewlines)
                     try await speechService.startListening()
                 } catch {
-                    // Speech recognition unavailable — silently ignore
                     dictationBaseText = ""
                 }
             }
