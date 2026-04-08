@@ -124,7 +124,7 @@ struct ChatScreen: View {
                     .fill(hostStore.isHostOnline ? .green : .gray)
                     .frame(width: 6, height: 6)
 
-                if let model = chatStore.activeModelName {
+                if let model = hostStore.currentHost?.hermesModel ?? chatStore.activeModelName {
                     Text(model)
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundStyle(Design.Colors.foreground)
@@ -161,12 +161,18 @@ struct ChatScreen: View {
 
     private var contextPopoverContent: some View {
         VStack(spacing: Design.Spacing.sm) {
+            if let model = hostStore.currentHost?.hermesModel ?? chatStore.activeModelName {
+                Text(model)
+                    .font(.system(.subheadline, design: .monospaced, weight: .semibold))
+                    .foregroundStyle(Design.Colors.foreground)
+            }
+
             if let usage = chatStore.lastTokenUsage,
                let maxCtx = chatStore.contextWindow, maxCtx > 0 {
                 let progress = min(Double(usage.totalTokens) / Double(maxCtx), 1.0)
 
                 Text("Context Window")
-                    .font(.system(.caption, weight: .semibold))
+                    .font(.system(.caption2, weight: .semibold))
                     .foregroundStyle(Design.Colors.secondaryForeground)
                     .textCase(.uppercase)
 

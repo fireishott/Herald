@@ -1757,6 +1757,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     hostname=connector_info.get("hostname", "unknown"),
                     hermes_command=connector_info.get("hermesCommand", "hermes"),
                     hermes_version=connector_info.get("hermesVersion"),
+                    hermes_model=connector_info.get("hermesModel"),
                     display_name=connector_info.get("displayName"),
                 )
                 host_id = activated_host.id

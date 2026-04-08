@@ -490,6 +490,7 @@ def activate_hermes_host_connection(
     hostname: str,
     hermes_command: str,
     hermes_version: str | None,
+    hermes_model: str | None = None,
     display_name: str | None = None,
 ) -> HermesHost:
     host.active_connection_nonce = connection_nonce
@@ -498,6 +499,7 @@ def activate_hermes_host_connection(
     host.hostname = hostname
     host.hermes_command = hermes_command
     host.hermes_version = hermes_version
+    host.hermes_model = hermes_model
     host.display_name = display_name
     host.last_seen_at = utcnow()
     host.last_connected_at = utcnow()
@@ -1415,6 +1417,7 @@ def serialize_hermes_host(db: Session, *, host: HermesHost | None, settings: Set
         "connectorVersion": host.connector_version,
         "hermesCommand": host.hermes_command,
         "hermesVersion": host.hermes_version,
+        "hermesModel": host.hermes_model,
         "lastSeenAt": host.last_seen_at,
         "lastConnectedAt": host.last_connected_at,
         "isOnline": hermes_host_is_online(db, host=host, settings=settings),

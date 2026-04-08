@@ -42,6 +42,10 @@ class Database:
                 else:
                     connection.execute(text("ALTER TABLE devices ADD COLUMN app_state_updated_at TIMESTAMP WITH TIME ZONE"))
 
+            host_columns = {column["name"] for column in inspector.get_columns("hermes_hosts")}
+            if "hermes_model" not in host_columns:
+                connection.execute(text("ALTER TABLE hermes_hosts ADD COLUMN hermes_model TEXT"))
+
             conversation_columns = {column["name"] for column in inspector.get_columns("conversations")}
             if "hermes_session_id" not in conversation_columns:
                 connection.execute(text("ALTER TABLE conversations ADD COLUMN hermes_session_id TEXT"))

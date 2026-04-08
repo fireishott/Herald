@@ -127,6 +127,7 @@ class ConnectorMetadata:
     connector_version: str
     hermes_command: str
     hermes_version: str | None
+    hermes_model: str | None = None
     display_name: str | None = None
 
 
@@ -169,12 +170,17 @@ class HermesMobileConnector:
     ) -> ConnectorMetadata:
         effective_settings = settings or self.executor.settings
         version_executor = HermesCLIExecutor(effective_settings)
+        # Read model name from config
+        hermes_home = self._resolve_hermes_home()
+        model_info = self._read_active_model(hermes_home)
+
         return ConnectorMetadata(
             platform=platform_module.system().lower(),
             hostname=socket.gethostname(),
             connector_version=__version__,
             hermes_command=effective_settings.hermes_command,
             hermes_version=version_executor.detect_version(),
+            hermes_model=model_info["name"] if model_info else None,
             display_name=display_name,
         )
 
@@ -205,6 +211,7 @@ class HermesMobileConnector:
                 "connectorVersion": metadata.connector_version,
                 "hermesCommand": metadata.hermes_command,
                 "hermesVersion": metadata.hermes_version,
+                            "hermesModel": metadata.hermes_model,
             },
         }
         setup_secret = os.getenv("CONNECTOR_SETUP_SECRET")
@@ -253,6 +260,7 @@ class HermesMobileConnector:
                     "connectorVersion": metadata.connector_version,
                     "hermesCommand": metadata.hermes_command,
                     "hermesVersion": metadata.hermes_version,
+                            "hermesModel": metadata.hermes_model,
                 },
             },
             timeout=30.0,
@@ -471,6 +479,7 @@ class HermesMobileConnector:
                             "connectorVersion": metadata.connector_version,
                             "hermesCommand": metadata.hermes_command,
                             "hermesVersion": metadata.hermes_version,
+                            "hermesModel": metadata.hermes_model,
                             "displayName": metadata.display_name,
                         },
                     }

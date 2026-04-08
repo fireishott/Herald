@@ -86,6 +86,7 @@ class HermesHost(Base):
     hostname: Mapped[str | None] = mapped_column(Text)
     hermes_command: Mapped[str | None] = mapped_column(Text)
     hermes_version: Mapped[str | None] = mapped_column(Text)
+    hermes_model: Mapped[str | None] = mapped_column(Text)
     connector_version: Mapped[str | None] = mapped_column(Text)
     connector_token_hash: Mapped[str | None] = mapped_column(Text)
     active_connection_nonce: Mapped[str | None] = mapped_column(Text)
