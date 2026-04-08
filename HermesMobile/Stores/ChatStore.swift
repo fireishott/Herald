@@ -24,6 +24,10 @@ final class ChatStore {
     /// Context window size for the active model (e.g., 400000).
     private(set) var contextWindow: Int?
 
+    var currentContextTokens: Int? {
+        lastTokenUsage?.promptTokens
+    }
+
     private let hermesClient: any HermesClientProtocol
     private let chatLiveActivity = LiveActivityService()
     let persistence: any AppPersistenceStoreProtocol
@@ -40,6 +44,9 @@ final class ChatStore {
     func loadConversationIfNeeded() async {
         if conversation == nil {
             conversation = persistence.loadConversationCache()
+            if let cachedUsage = conversation?.latestUsage {
+                lastTokenUsage = cachedUsage
+            }
         }
         guard conversation == nil else { return }
         await loadConversation()
@@ -53,6 +60,9 @@ final class ChatStore {
             from: cachedConversation,
             into: await hermesClient.loadConversation()
         )
+        if let latestUsage = conversation?.latestUsage {
+            lastTokenUsage = latestUsage
+        }
         if let conversation {
             persistence.saveConversationCache(conversation)
             onConversationChanged?()
@@ -153,7 +163,11 @@ final class ChatStore {
                         from: self.conversation,
                         into: self.hermesClient.currentConversation
                     )
-                    self.lastTokenUsage = usage
+                    if let latestUsage = self.conversation?.latestUsage {
+                        self.lastTokenUsage = latestUsage
+                    } else if let usage {
+                        self.lastTokenUsage = usage
+                    }
                     self.detectModelSwitch(from: finalMessage.content)
                     self.streamingMessageID = nil
                     self.pendingMessageSentAt = nil
@@ -192,6 +206,9 @@ final class ChatStore {
         if needsPollingFallback {
             let refreshed = await hermesClient.loadConversation()
             conversation = mergeConversationMetadata(from: conversation, into: refreshed)
+            if let latestUsage = conversation?.latestUsage {
+                lastTokenUsage = latestUsage
+            }
             streamingMessageID = nil
             restartPendingPollingIfNeeded()
         }
@@ -213,6 +230,7 @@ final class ChatStore {
         chatLiveActivity.endActivity()
         let fresh = try await hermesClient.clearConversation()
         conversation = fresh
+        lastTokenUsage = fresh.latestUsage
         pendingMessageSentAt = nil
         persistence.saveConversationCache(fresh)
         onConversationChanged?()
@@ -249,6 +267,7 @@ final class ChatStore {
         do {
             let updated = try await hermesClient.injectVoiceTranscript(voiceSessionId: voiceSessionId)
             conversation = updated
+            lastTokenUsage = updated.latestUsage
 
             // Set voiceSessionDuration on the system banner message
             if let idx = conversation?.messages.lastIndex(where: {
@@ -358,7 +377,12 @@ final class ChatStore {
         conversation = nil
         isLoading = false
         pendingMessageSentAt = nil
+        lastTokenUsage = nil
         persistence.clearConversationCache()
+    }
+
+    func resolvedContextWindow(fallbackModelName: String?) -> Int? {
+        contextWindow ?? Self.inferredContextWindow(for: fallbackModelName)
     }
 
     private var hasPendingMessages: Bool {
@@ -395,6 +419,9 @@ final class ChatStore {
                 guard !Task.isCancelled else { break }
                 let fresh = await self.hermesClient.loadConversation()
                 self.conversation = self.mergeConversationMetadata(from: self.conversation, into: fresh)
+                if let latestUsage = self.conversation?.latestUsage {
+                    self.lastTokenUsage = latestUsage
+                }
                 if let conversation = self.conversation {
                     self.persistence.saveConversationCache(conversation)
                     self.onConversationChanged?()
@@ -432,6 +459,10 @@ final class ChatStore {
     ) -> Conversation? {
         guard var refreshedConversation else { return localConversation }
         guard let localConversation else { return refreshedConversation }
+
+        if refreshedConversation.latestUsage == nil {
+            refreshedConversation.latestUsage = localConversation.latestUsage
+        }
 
         for index in refreshedConversation.messages.indices {
             let remote = refreshedConversation.messages[index]
@@ -547,18 +578,33 @@ final class ChatStore {
     /// Update the context window size based on the model name.
     /// Uses the same lookup table as the connector.
     private func updateContextWindowForModel(_ name: String) {
-        let n = name.lowercased()
-        if n.contains("opus") && (n.contains("4") || n.contains("5")) { contextWindow = 1_000_000 }
-        else if n.contains("sonnet") || n.contains("haiku") { contextWindow = 200_000 }
-        else if n.contains("claude") { contextWindow = 200_000 }
-        else if n.contains("gpt-5") { contextWindow = 400_000 }
-        else if n.contains("gpt-4.1") || n.contains("gpt-4o") { contextWindow = 1_000_000 }
-        else if n.contains("gpt-4") { contextWindow = 128_000 }
-        else if n.contains("o3") || n.contains("o4") { contextWindow = 200_000 }
-        else if n.contains("o1") { contextWindow = 200_000 }
-        else if n.contains("gemini") { contextWindow = 1_000_000 }
-        else if n.contains("llama") { contextWindow = 128_000 }
-        else { contextWindow = 128_000 }
+        contextWindow = Self.inferredContextWindow(for: name)
+    }
+
+    static func inferredContextWindow(for modelName: String?) -> Int? {
+        guard let modelName, !modelName.isEmpty else { return nil }
+        let n = modelName.lowercased()
+
+        if n.contains("claude-opus-4-6") || n.contains("claude-opus-4.6")
+            || n.contains("claude-sonnet-4-6") || n.contains("claude-sonnet-4.6") {
+            return 1_000_000
+        }
+        if n.contains("claude") { return 200_000 }
+        if n.contains("gpt-4.1") { return 1_047_576 }
+        if n.contains("gpt-5") { return 128_000 }
+        if n.contains("gpt-4") { return 128_000 }
+        if n.contains("gemini") { return 1_048_576 }
+        if n.contains("gemma-4-31b") || n.contains("gemma-4-26b") { return 256_000 }
+        if n.contains("gemma-3") { return 131_072 }
+        if n.contains("gemma") { return 8_192 }
+        if n.contains("deepseek") { return 128_000 }
+        if n.contains("llama") { return 131_072 }
+        if n.contains("qwen") { return 131_072 }
+        if n.contains("minimax") { return 204_800 }
+        if n.contains("glm") { return 202_752 }
+        if n.contains("kimi") { return 262_144 }
+        if n.contains("mimo-v2-pro") || n.contains("mimo-v2-omni") { return 1_048_576 }
+        return 128_000
     }
 }
 

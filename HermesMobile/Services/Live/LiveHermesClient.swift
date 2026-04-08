@@ -24,6 +24,7 @@ final class LiveHermesClient: HermesClientProtocol {
         let title: String
         let updatedAt: Date
         let messages: [RelayMessage]
+        let latestUsage: TokenUsage?
     }
 
     private struct RelayAttachment: Decodable {
@@ -307,7 +308,8 @@ final class LiveHermesClient: HermesClientProtocol {
             id: relayConversation.id,
             title: relayConversation.title,
             messages: relayConversation.messages.map(mapMessage),
-            lastActivity: relayConversation.updatedAt
+            lastActivity: relayConversation.updatedAt,
+            latestUsage: relayConversation.latestUsage
         )
     }
 

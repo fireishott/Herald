@@ -114,12 +114,20 @@ struct ChatScreen: View {
         chatStore.activeModelName ?? hostStore.currentHost?.hermesModel
     }
 
+    private var effectiveContextWindow: Int? {
+        chatStore.resolvedContextWindow(fallbackModelName: displayedModelName)
+    }
+
+    private var currentContextTokens: Int? {
+        chatStore.currentContextTokens
+    }
+
     /// Context usage as 0.0–1.0. Shows 0 when no usage data yet.
     private var contextProgress: Double {
-        guard let usage = chatStore.lastTokenUsage,
-              let maxCtx = chatStore.contextWindow, maxCtx > 0
+        guard let usedTokens = currentContextTokens,
+              let maxCtx = effectiveContextWindow, maxCtx > 0
         else { return 0 }
-        return min(Double(usage.totalTokens) / Double(maxCtx), 1.0)
+        return min(Double(usedTokens) / Double(maxCtx), 1.0)
     }
 
     // MARK: - Compact chip: 🟢 model-name [ring%]
@@ -197,10 +205,7 @@ struct ChatScreen: View {
                 }
             }
 
-            if let usage = chatStore.lastTokenUsage,
-               let maxCtx = chatStore.contextWindow, maxCtx > 0 {
-                let progress = min(Double(usage.totalTokens) / Double(maxCtx), 1.0)
-                let used = formatTokenCount(usage.totalTokens)
+            if let maxCtx = effectiveContextWindow, maxCtx > 0 {
                 let total = formatTokenCount(maxCtx)
 
                 VStack(alignment: .leading, spacing: Design.Spacing.xs) {
@@ -209,41 +214,54 @@ struct ChatScreen: View {
                         .foregroundStyle(Design.Colors.secondaryForeground)
                         .textCase(.uppercase)
 
-                    HStack(alignment: .lastTextBaseline, spacing: 4) {
-                        Text(used)
+                    if let usedTokens = currentContextTokens {
+                        let progress = min(Double(usedTokens) / Double(maxCtx), 1.0)
+                        let used = formatTokenCount(usedTokens)
+
+                        HStack(alignment: .lastTextBaseline, spacing: 4) {
+                            Text(used)
+                                .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Design.Colors.foreground)
+                            Text("/")
+                                .font(.system(size: 18, weight: .medium, design: .monospaced))
+                                .foregroundStyle(Design.Colors.secondaryForeground)
+                            Text(total)
+                                .font(.system(size: 18, weight: .medium, design: .monospaced))
+                                .foregroundStyle(Design.Colors.secondaryForeground)
+                        }
+
+                        HStack(spacing: Design.Spacing.sm) {
+                            Capsule()
+                                .fill(Design.Colors.surface)
+                                .overlay(alignment: .leading) {
+                                    GeometryReader { proxy in
+                                        Capsule()
+                                            .fill(contextColor(progress))
+                                            .frame(width: max(proxy.size.width * progress, 3))
+                                    }
+                                }
+                                .frame(height: 8)
+
+                            Text("\(Int(progress * 100))%")
+                                .font(.system(.caption, design: .monospaced, weight: .semibold))
+                                .foregroundStyle(Design.Colors.secondaryForeground)
+                        }
+
+                        Text("\(max(maxCtx - usedTokens, 0).formatted()) prompt tokens remaining")
+                            .font(Design.Typography.caption)
+                            .foregroundStyle(Design.Colors.secondaryForeground)
+                    } else {
+                        Text(total)
                             .font(.system(size: 24, weight: .semibold, design: .monospaced))
                             .foregroundStyle(Design.Colors.foreground)
-                        Text("/")
-                            .font(.system(size: 18, weight: .medium, design: .monospaced))
-                            .foregroundStyle(Design.Colors.secondaryForeground)
-                        Text(total)
-                            .font(.system(size: 18, weight: .medium, design: .monospaced))
+
+                        Text("Total window available now. Usage appears after the first Hermes response.")
+                            .font(Design.Typography.caption)
                             .foregroundStyle(Design.Colors.secondaryForeground)
                     }
-
-                    HStack(spacing: Design.Spacing.sm) {
-                        Capsule()
-                            .fill(Design.Colors.surface)
-                            .overlay(alignment: .leading) {
-                                GeometryReader { proxy in
-                                    Capsule()
-                                        .fill(contextColor(progress))
-                                        .frame(width: max(proxy.size.width * progress, 3))
-                                }
-                            }
-                            .frame(height: 8)
-
-                        Text("\(Int(progress * 100))%")
-                            .font(.system(.caption, design: .monospaced, weight: .semibold))
-                            .foregroundStyle(Design.Colors.secondaryForeground)
-                    }
-
-                    Text("\(max(maxCtx - usage.totalTokens, 0).formatted()) tokens remaining")
-                        .font(Design.Typography.caption)
-                        .foregroundStyle(Design.Colors.secondaryForeground)
                 }
             } else {
-                Text("Context usage will appear after the first response.")
+                Text("Context window unavailable for the active model.")
                     .font(Design.Typography.caption)
                     .foregroundStyle(Design.Colors.secondaryForeground)
             }

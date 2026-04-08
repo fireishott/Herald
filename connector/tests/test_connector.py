@@ -343,6 +343,61 @@ def _resolve_config_gates():
     ]
 
 
+def test_rpc_commands_catalog_uses_configured_context_length(monkeypatch, tmp_path):
+    hermes_home = tmp_path / ".hermes"
+    hermes_home.mkdir(parents=True)
+    (hermes_home / "config.yaml").write_text(
+        """
+model:
+  default: gpt-5.4-mini
+  provider: openai-codex
+  context_length: 262144
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+
+    connector = HermesMobileConnector(
+        state_store=ConnectorStateStore(state_dir=tmp_path / "connector-state"),
+        executor=make_executor(),
+    )
+
+    catalog = connector._rpc_commands_catalog()
+
+    assert catalog["activeModel"] == {
+        "name": "gpt-5.4-mini",
+        "provider": "openai-codex",
+        "contextWindow": 262144,
+    }
+
+
+def test_rpc_commands_catalog_uses_updated_hermes_fallback_context_length(monkeypatch, tmp_path):
+    hermes_home = tmp_path / ".hermes"
+    hermes_home.mkdir(parents=True)
+    (hermes_home / "config.yaml").write_text(
+        """
+model:
+  default: gpt-5.4-mini
+  provider: openai-codex
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+
+    connector = HermesMobileConnector(
+        state_store=ConnectorStateStore(state_dir=tmp_path / "connector-state"),
+        executor=make_executor(),
+    )
+
+    catalog = connector._rpc_commands_catalog()
+
+    assert catalog["activeModel"] == {
+        "name": "gpt-5.4-mini",
+        "provider": "openai-codex",
+        "contextWindow": 128000,
+    }
+
+
 def test_runtime_adapter_falls_back_to_cli_without_explicit_api_config(monkeypatch, tmp_path):
     store = ConnectorStateStore(state_dir=tmp_path / "connector-runtime")
     state = make_enrolled_state()
