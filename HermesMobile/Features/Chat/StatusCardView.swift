@@ -34,9 +34,9 @@ struct StatusCardView: View {
             if let usage = tokenUsage {
                 Divider()
                     .overlay(Design.Colors.divider)
-                statusRow("Context", value: "\(usage.totalTokens) tokens")
-                statusRow("Prompt", value: "\(usage.promptTokens)")
+                statusRow("Current Context", value: "\(usage.promptTokens) tokens")
                 statusRow("Completion", value: "\(usage.completionTokens)")
+                statusRow("Total", value: "\(usage.totalTokens)")
             }
         }
         .padding(Design.Spacing.md)

@@ -1747,4 +1747,38 @@ struct AppStoresTests {
         let reloaded = persistence.loadSensorOutboxState()
         #expect(reloaded == outbox)
     }
+
+    @Test @MainActor
+    func chatStoreLoadsLatestUsageFromConversationMetadata() async {
+        let hermesClient = RecordingHermesClient()
+        hermesClient.currentConversation = Conversation(
+            title: "Hermes",
+            messages: [
+                Message(sender: .user, content: "Hello"),
+                Message(sender: .hermes, content: "Hi")
+            ],
+            latestUsage: TokenUsage(
+                promptTokens: 3200,
+                completionTokens: 240,
+                totalTokens: 3440
+            )
+        )
+
+        let suiteName = "chat-usage-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        let persistence = UserDefaultsAppPersistenceStore(defaults: defaults)
+
+        let chatStore = ChatStore(hermesClient: hermesClient, persistence: persistence)
+        await chatStore.loadConversation()
+
+        #expect(chatStore.lastTokenUsage?.promptTokens == 3200)
+        #expect(chatStore.currentContextTokens == 3200)
+    }
+
+    @Test
+    func chatStoreInfersHermesAlignedContextWindowFallback() {
+        #expect(ChatStore.inferredContextWindow(for: "gpt-5.4-mini") == 128_000)
+        #expect(ChatStore.inferredContextWindow(for: "claude-sonnet-4.6") == 1_000_000)
+    }
 }
