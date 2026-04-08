@@ -156,8 +156,14 @@ final class PermissionsStore {
     }
 
     private func healthStatusDetail() -> String? {
-        guard healthService.authorizationStatus == .authorized else { return nil }
-        let backgroundStatus = healthService.backgroundDeliveryEnabled ? "Background Sync On" : "Background Sync Off"
-        return "Read Only • \(backgroundStatus)"
+        switch healthService.authorizationStatus {
+        case .authorized:
+            let backgroundStatus = healthService.backgroundDeliveryEnabled ? "Background Sync On" : "Background Sync Off"
+            return "Read Only • \(backgroundStatus)"
+        case .denied, .restricted:
+            return "Manage in Apple Health or Settings > Privacy & Security > Health"
+        default:
+            return nil
+        }
     }
 }
