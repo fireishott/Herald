@@ -57,47 +57,33 @@ _GATEWAY_COMMANDS: list[dict] = [
 ]
 
 
-def _context_window_for(model_name: str) -> int:
-    """Return a fallback context window size aligned with Hermes defaults."""
-    name = model_name.lower()
-    if (
-        "claude-opus-4-6" in name
-        or "claude-opus-4.6" in name
-        or "claude-sonnet-4-6" in name
-        or "claude-sonnet-4.6" in name
-    ):
-        return 1_000_000
-    if "claude" in name:
-        return 200_000
-    if "gpt-4.1" in name:
-        return 1_047_576
-    if "gpt-5" in name:
+def _context_window_for(model_name: str, hermes_home: Path | None = None) -> int:
+    """Resolve context window size using Hermes's own model_metadata.
+
+    Calls the Hermes agent's Python environment directly to use
+    get_model_context_length() — the same resolver the TUI status bar
+    uses. Falls back to 128K if the subprocess fails.
+    """
+    if hermes_home is None:
+        hermes_home = Path.home() / ".hermes"
+    agent_venv_python = hermes_home / "hermes-agent" / "venv" / "bin" / "python3"
+    agent_dir = hermes_home / "hermes-agent"
+
+    if not agent_venv_python.exists():
         return 128_000
-    if "gpt-4" in name:
+
+    try:
+        result = subprocess.run(
+            [
+                str(agent_venv_python), "-c",
+                f"from agent.model_metadata import get_model_context_length; print(get_model_context_length('{model_name}'))",
+            ],
+            cwd=str(agent_dir),
+            capture_output=True, text=True, check=True, timeout=10,
+        )
+        return int(result.stdout.strip())
+    except Exception:
         return 128_000
-    if "gemini" in name:
-        return 1_048_576
-    if "gemma-4-31b" in name or "gemma-4-26b" in name:
-        return 256_000
-    if "gemma-3" in name:
-        return 131_072
-    if "gemma" in name:
-        return 8_192
-    if "deepseek" in name:
-        return 128_000
-    if "llama" in name:
-        return 131_072
-    if "qwen" in name:
-        return 131_072
-    if "minimax" in name:
-        return 204_800
-    if "glm" in name:
-        return 202_752
-    if "kimi" in name:
-        return 262_144
-    if "mimo-v2-pro" in name or "mimo-v2-omni" in name:
-        return 1_048_576
-    return 128_000
 
 
 def _cached_context_window(hermes_home: Path, model_name: str, base_url: str | None) -> int | None:
@@ -1000,7 +986,7 @@ class HermesMobileConnector:
                     resolved_context = (
                         context_length
                         or _cached_context_window(hermes_home, model_name, base_url)
-                        or _context_window_for(model_name)
+                        or _context_window_for(model_name, hermes_home=hermes_home)
                     )
                     return {"name": model_name, "provider": provider, "contextWindow": resolved_context}
             except Exception:
