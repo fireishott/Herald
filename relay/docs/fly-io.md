@@ -1,53 +1,103 @@
 # Fly.io deployment
 
-This relay can be deployed to Fly.io from the `relay` directory.
+This guide is the manual Fly.io path for the Hermes iOS relay.
 
-## What this Fly deployment does
+> [!NOTE]
+> The connector setup wizard can guide you through a Fly deployment. Use this document if you want to do the same steps manually or troubleshoot the wizard.
 
-- Deploys the FastAPI relay as a public HTTPS service.
-- Uses Fly Managed Postgres for persistence through `DATABASE_URL`.
-- Works with user-owned connectors over WebSocket.
+## Prerequisites
 
-The relay does not need a local Hermes install when running in connector mode. Hermes stays on the user-owned host.
+- `flyctl` installed
+- `flyctl auth login` completed
+- a Fly organization/account
+- Python dependencies already installed in `relay/`
 
-## Recommended first deploy
-
-1. Install `flyctl`.
-2. Log in with `flyctl auth login`.
-3. From this `relay` directory, create or confirm the Fly app name.
-4. Create a Managed Postgres cluster.
-5. Attach the app to Postgres so Fly sets `DATABASE_URL`.
-6. Set `INTERNAL_API_KEY` as a Fly secret.
-7. Deploy with `fly deploy`.
-
-## Example commands
+## 1. Create the Fly app
 
 ```bash
 cd relay
-
-# Authenticate first.
-flyctl auth login
-
-# Create an app name that matches your PUBLIC_BASE_URL.
-flyctl apps create hermes-mobile-relay
-
-# Create Managed Postgres in the same primary region.
-flyctl mpg create --name hermes-mobile-relay-db --region iad --plan basic
-
-# List clusters to get the cluster ID, then attach it to the app.
-flyctl mpg list
-flyctl mpg attach <cluster-id> -a hermes-mobile-relay
-
-# Set the relay's internal key as a secret.
-flyctl secrets set INTERNAL_API_KEY=replace-this-with-a-real-secret -a hermes-mobile-relay
-flyctl secrets set CONNECTOR_SETUP_SECRET=replace-this-with-a-bootstrap-secret -a hermes-mobile-relay
-
-# Deploy the relay from this directory.
-flyctl deploy
+flyctl apps create your-relay-app
 ```
+
+Update [fly.toml](../fly.toml) before deploy:
+
+- `app = "your-relay-app"`
+- `PUBLIC_BASE_URL = "https://your-relay-app.fly.dev/v1"`
+
+## 2. Create Managed Postgres
+
+```bash
+flyctl mpg create --name your-relay-db --region iad
+```
+
+List clusters and note the **cluster ID**:
+
+```bash
+flyctl mpg list
+```
+
+## 3. Attach the database
+
+Use the **cluster ID**, not the database name:
+
+```bash
+flyctl mpg attach <CLUSTER_ID> -a your-relay-app
+```
+
+This configures `DATABASE_URL` for the relay app.
+
+## 4. Set secrets
+
+At minimum:
+
+```bash
+flyctl secrets set INTERNAL_API_KEY=replace-with-a-real-secret -a your-relay-app
+flyctl secrets set CONNECTOR_SETUP_SECRET=replace-with-a-bootstrap-secret -a your-relay-app
+```
+
+Optional APNs:
+
+```bash
+flyctl secrets set APNS_KEY_ID=XXXXXXXXXX -a your-relay-app
+flyctl secrets set APNS_TEAM_ID=YYYYYYYYYY -a your-relay-app
+flyctl secrets set APNS_BUNDLE_ID=io.hermesmobile.HermesMobile -a your-relay-app
+flyctl secrets set APNS_ENVIRONMENT=development -a your-relay-app
+```
+
+If you prefer to inject the key contents instead of mounting a file:
+
+```bash
+flyctl secrets set APNS_KEY_CONTENTS="$(cat /path/to/AuthKey_XXXXXXXXXX.p8)" -a your-relay-app
+```
+
+## 5. Deploy
+
+```bash
+flyctl deploy -a your-relay-app
+```
+
+## 6. Verify
+
+```bash
+flyctl status -a your-relay-app
+flyctl logs -a your-relay-app
+curl https://your-relay-app.fly.dev/v1/health
+```
+
+The health endpoint should return a healthy relay response.
+
+## Recommended production settings
+
+- set `min_machines_running = 1` if you do not want cold starts
+- keep `HERMES_ADAPTER=connector`
+- use PostgreSQL, not SQLite
+- set a strong `INTERNAL_API_KEY`
 
 ## After deploy
 
-- `PUBLIC_BASE_URL` in `fly.toml` should match the final Fly app URL.
-- The iOS app should point at the deployed relay URL through its custom relay setting or hosted-relay build config.
-- If you want always-warm Machines instead of cold starts, change `min_machines_running` from `0` to `1`.
+1. Point the connector at `https://your-relay-app.fly.dev/v1`
+2. Run `hermes-mobile setup`
+3. Run `hermes-mobile pair-phone`
+4. Point the iOS app at the same relay URL
+
+If the setup wizard already deployed the relay for you, you can still use this guide to verify or repair the deployment.
