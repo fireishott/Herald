@@ -587,6 +587,34 @@ final class ChatStore {
             }
         }
     }
+
+    /// Fallback-only lookup for cases where the connector has not yet provided
+    /// an explicit context window. This should never overwrite a known value.
+    static func inferredContextWindow(for modelName: String?) -> Int? {
+        guard let modelName, !modelName.isEmpty else { return nil }
+        let n = modelName.lowercased()
+
+        if n.contains("claude-opus-4-6") || n.contains("claude-opus-4.6")
+            || n.contains("claude-sonnet-4-6") || n.contains("claude-sonnet-4.6") {
+            return 1_000_000
+        }
+        if n.contains("claude") { return 200_000 }
+        if n.contains("gpt-4.1") { return 1_047_576 }
+        if n.contains("gpt-5") { return 128_000 }
+        if n.contains("gpt-4") { return 128_000 }
+        if n.contains("gemini") { return 1_048_576 }
+        if n.contains("gemma-4-31b") || n.contains("gemma-4-26b") { return 256_000 }
+        if n.contains("gemma-3") { return 131_072 }
+        if n.contains("gemma") { return 8_192 }
+        if n.contains("deepseek") { return 128_000 }
+        if n.contains("llama") { return 131_072 }
+        if n.contains("qwen") { return 131_072 }
+        if n.contains("minimax") { return 204_800 }
+        if n.contains("glm") { return 202_752 }
+        if n.contains("kimi") { return 262_144 }
+        if n.contains("mimo-v2-pro") || n.contains("mimo-v2-omni") { return 1_048_576 }
+        return 128_000
+    }
 }
 
 private extension Array {
