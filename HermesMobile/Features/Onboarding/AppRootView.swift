@@ -3,6 +3,7 @@ import SwiftUI
 struct AppRootView: View {
     @Environment(AppContainer.self) private var container
     @State private var hasSatisfiedMinimumSplashTime = false
+    private static let minimumSplashDuration: Duration = .milliseconds(250)
 
     var body: some View {
         ZStack {
@@ -25,54 +26,65 @@ struct AppRootView: View {
         .animation(Design.Motion.standard, value: container.pairingStore.needsPermissionsOnboarding)
         .animation(Design.Motion.gentle, value: shouldShowSplash)
         .task {
-            try? await Task.sleep(for: .milliseconds(600))
+            try? await Task.sleep(for: Self.minimumSplashDuration)
             hasSatisfiedMinimumSplashTime = true
         }
     }
 
     private var shouldShowSplash: Bool {
-        !hasSatisfiedMinimumSplashTime || container.shouldShowLaunchSplash
+        container.shouldShowLaunchSplash || (container.pairingStore.isPaired && !hasSatisfiedMinimumSplashTime)
     }
 }
 
 private struct LaunchSplashView: View {
-    private static let caduceus = """
-    ⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⡀⠀⣀⣀⠀⢀⣀⡀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⢀⣠⣴⣾⣿⣿⣇⠸⣿⣿⠇⣸⣿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀
-    ⢀⣠⣴⣶⠿⠋⣩⡿⣿⡿⠻⣿⡇⢠⡄⢸⣿⠟⢿⣿⢿⣍⠙⠿⣶⣦⣄⡀
-    ⠀⠉⠉⠁⠶⠟⠋⠀⠉⠀⢀⣈⣁⡈⢁⣈⣁⡀⠀⠉⠀⠙⠻⠶⠈⠉⠉⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⣴⣿⡿⠛⢁⡈⠛⢿⣿⣦⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠿⣿⣦⣤⣈⠁⢠⣴⣿⠿⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣦⡉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⢷⣦⣈⠛⠃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣴⠦⠈⠙⠿⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⣿⣤⡈⠁⢤⣿⠇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠛⠷⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠑⢶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠁⢰⡆⠈⡿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⠈⣡⠞⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
-    """
+    @State private var animateGlyph = false
 
     var body: some View {
         ZStack {
             Design.Colors.background
                 .ignoresSafeArea()
 
-            Text(Self.caduceus)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 1.0, green: 0.84, blue: 0.0),
-                            Color(red: 0.80, green: 0.50, blue: 0.20),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                .padding(.horizontal, Design.Spacing.xl)
+            Circle()
+                .fill(Design.Brand.accent.opacity(0.18))
+                .frame(width: 280, height: 280)
+                .blur(radius: 48)
+                .scaleEffect(animateGlyph ? 1.06 : 0.94)
+
+            VStack(spacing: Design.Spacing.lg) {
+                ZStack {
+                    Circle()
+                        .fill(Design.Colors.surface)
+                        .frame(width: 108, height: 108)
+                    Circle()
+                        .stroke(Design.Brand.accent.opacity(0.35), lineWidth: 1)
+                        .frame(width: 108, height: 108)
+
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundStyle(Design.Brand.accentGradient)
+                        .scaleEffect(animateGlyph ? 1.04 : 0.96)
+                }
+
+                VStack(spacing: Design.Spacing.xs) {
+                    Text("Hermes")
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .foregroundStyle(Design.Colors.foreground)
+
+                    Text("Mobile companion")
+                        .font(Design.Typography.callout)
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                }
+
+                ProgressView()
+                    .tint(Design.Brand.accent)
+                    .controlSize(.small)
+            }
+            .padding(Design.Spacing.xl)
+        }
+        .task {
+            withAnimation(Design.Motion.breathe) {
+                animateGlyph = true
+            }
         }
     }
 }

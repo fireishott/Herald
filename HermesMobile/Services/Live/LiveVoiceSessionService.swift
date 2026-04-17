@@ -100,16 +100,18 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
     private var voiceSessionID: UUID?
     private var startedAt: Date?
     private var timerTask: Task<Void, Never>?
+    private var transcriptItemIDsByConversationItemID: [String: UUID] = [:]
     private var currentAssistantItemID: UUID?
-    private var currentUserItemID: UUID?
     private var assistantTextSource: String?
     private var currentRealtimeResponseID: String?
     private var currentAssistantConversationItemID: String?
+    private var currentUserConversationItemID: String?
     private var currentAssistantContentIndex = 0
     private var assistantAudioPlaybackStartedAtUptime: TimeInterval?
     private var accumulatedAssistantAudioPlaybackMilliseconds = 0
     private var ignoreCurrentAssistantFinalization = false
     private var lastImageItemID: String?
+    fileprivate var isEndingSession = false
 
     #if canImport(WebRTC)
     private static let peerFactory = RTCPeerConnectionFactory()
@@ -175,6 +177,7 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
 
     func startSession() async {
         latencyMetrics = TalkLatencyMetrics(sessionStartRequestedAt: .now)
+        isEndingSession = false
         // Skip readiness check — already done by VoiceOverlayScreen.task before
         // calling startSession. Removing it saves one HTTP round trip + RPC.
         guard canStartSession else { return }
@@ -191,8 +194,9 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         voiceState = .thinking
         statusMessage = "Starting talk mode."
         transcriptItems = []
+        transcriptItemIDsByConversationItemID = [:]
         currentAssistantItemID = nil
-        currentUserItemID = nil
+        currentUserConversationItemID = nil
         assistantTextSource = nil
 
         do {
@@ -242,12 +246,14 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
     func endSession() async {
         stopTimer()
         startedAt = nil
+        isEndingSession = true
         currentAssistantItemID = nil
-        currentUserItemID = nil
+        currentUserConversationItemID = nil
         assistantTextSource = nil
         currentRealtimeResponseID = nil
         currentAssistantConversationItemID = nil
         currentAssistantContentIndex = 0
+        transcriptItemIDsByConversationItemID = [:]
         resetAssistantAudioPlaybackTracking()
         ignoreCurrentAssistantFinalization = false
         lastImageItemID = nil
@@ -265,7 +271,7 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         connectionState = .idle
         blockedReason = nil
         canStartSession = true
-        statusMessage = "Talk session ended."
+        statusMessage = nil
     }
 
     func toggleMute() async {
@@ -536,12 +542,10 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
 
     private func configureAudioSession() throws {
         let audioSession = AVAudioSession.sharedInstance()
-        // Use .default mode — voiceChat mode's DSP crushes output volume.
-        // WebRTC handles echo cancellation via its own Voice Processing I/O unit.
         try audioSession.setCategory(
             .playAndRecord,
-            mode: .default,
-            options: [.defaultToSpeaker, .allowBluetoothA2DP, .allowBluetoothHFP]
+            mode: .voiceChat,
+            options: [.defaultToSpeaker, .allowBluetoothHFP]
         )
         try audioSession.setActive(true)
 
@@ -581,6 +585,8 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             handleServerVADInterruption()
             voiceState = .listening
             statusMessage = "Listening"
+        case "input_audio_buffer.committed":
+            createPendingUserTranscriptItem(from: payload)
         case "conversation.item.created",  // beta
              "conversation.item.added":      // GA
             if let item = payload["item"] as? [String: Any],
@@ -671,9 +677,20 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             if assistantTextSource == "text" {
                 finalizeAssistantText(payload["transcript"] as? String ?? payload["text"] as? String)
             }
+        case "conversation.item.input_audio_transcription.delta":
+            updateUserTranscriptDelta(
+                for: payload["item_id"] as? String,
+                delta: payload["delta"] as? String ?? ""
+            )
         case "conversation.item.input_audio_transcription.completed":
-            finalizeUserText(payload["transcript"] as? String ?? "")
+            finalizeUserText(
+                itemID: payload["item_id"] as? String,
+                finalText: payload["transcript"] as? String ?? ""
+            )
         case "error":
+            if isEndingSession {
+                break
+            }
             let message = ((payload["error"] as? [String: Any])?["message"] as? String) ?? "Realtime talk failed."
             // Suppress transient "active response in progress" errors — these are harmless
             // race conditions from our response.create after MCP tool completion.
@@ -783,6 +800,9 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         } else {
             let item = TranscriptItem(speaker: .hermes, text: delta, isPartial: true)
             currentAssistantItemID = item.id
+            if let currentAssistantConversationItemID {
+                transcriptItemIDsByConversationItemID[currentAssistantConversationItemID] = item.id
+            }
             transcriptItems.append(item)
         }
     }
@@ -807,6 +827,9 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             }
             transcriptItems[index].isPartial = false
             turnID = transcriptItems[index].id
+            if let currentAssistantConversationItemID {
+                transcriptItemIDsByConversationItemID[currentAssistantConversationItemID] = transcriptItems[index].id
+            }
         } else if let last = transcriptItems.last,
                   last.speaker == .hermes,
                   !last.isPartial,
@@ -816,6 +839,9 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             let item = TranscriptItem(speaker: .hermes, text: text, isPartial: false)
             transcriptItems.append(item)
             turnID = item.id
+            if let currentAssistantConversationItemID {
+                transcriptItemIDsByConversationItemID[currentAssistantConversationItemID] = item.id
+            }
         } else {
             turnID = nil
         }
@@ -835,12 +861,57 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         statusMessage = "Listening"
     }
 
-    private func finalizeUserText(_ finalText: String) {
+    private func createPendingUserTranscriptItem(from payload: [String: Any]) {
+        let itemID = (payload["item_id"] as? String) ?? ((payload["item"] as? [String: Any])?["id"] as? String)
+        guard let itemID else { return }
+        currentUserConversationItemID = itemID
+        guard transcriptItemIDsByConversationItemID[itemID] == nil else { return }
+
+        let placeholder = TranscriptItem(speaker: .user, text: "\u{2026}", isPartial: true)
+        let insertIndex: Int
+        if let previousItemID = payload["previous_item_id"] as? String,
+           let previousTranscriptID = transcriptItemIDsByConversationItemID[previousItemID],
+           let previousIndex = transcriptItems.firstIndex(where: { $0.id == previousTranscriptID }) {
+            insertIndex = min(previousIndex + 1, transcriptItems.count)
+        } else {
+            insertIndex = transcriptItems.count
+        }
+
+        transcriptItems.insert(placeholder, at: insertIndex)
+        transcriptItemIDsByConversationItemID[itemID] = placeholder.id
+    }
+
+    private func updateUserTranscriptDelta(for itemID: String?, delta: String) {
+        guard !delta.isEmpty,
+              let itemID,
+              let transcriptID = transcriptItemIDsByConversationItemID[itemID],
+              let index = transcriptItems.firstIndex(where: { $0.id == transcriptID }) else {
+            return
+        }
+        if transcriptItems[index].text == "\u{2026}" {
+            transcriptItems[index].text = delta
+        } else {
+            transcriptItems[index].text += delta
+        }
+        transcriptItems[index].isPartial = true
+    }
+
+    private func finalizeUserText(itemID: String?, finalText: String) {
         let text = finalText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        let resolvedItemID = itemID ?? currentUserConversationItemID
+        if text.isEmpty {
+            if let resolvedItemID,
+               let transcriptID = transcriptItemIDsByConversationItemID.removeValue(forKey: resolvedItemID),
+               let index = transcriptItems.firstIndex(where: { $0.id == transcriptID }) {
+                transcriptItems.remove(at: index)
+            }
+            currentUserConversationItemID = nil
+            return
+        }
         let turnID: UUID
-        if let currentUserItemID,
-           let index = transcriptItems.firstIndex(where: { $0.id == currentUserItemID }) {
+        if let resolvedItemID,
+           let transcriptID = transcriptItemIDsByConversationItemID[resolvedItemID],
+           let index = transcriptItems.firstIndex(where: { $0.id == transcriptID }) {
             transcriptItems[index].text = text
             transcriptItems[index].isPartial = false
             turnID = transcriptItems[index].id
@@ -851,11 +922,13 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
             return
         } else {
             let item = TranscriptItem(speaker: .user, text: text, isPartial: false)
-            currentUserItemID = item.id
             transcriptItems.append(item)
             turnID = item.id
+            if let resolvedItemID {
+                transcriptItemIDsByConversationItemID[resolvedItemID] = item.id
+            }
         }
-        currentUserItemID = nil
+        currentUserConversationItemID = nil
         if latencyMetrics.firstUserFinalizedAt == nil {
             latencyMetrics.firstUserFinalizedAt = .now
         }
@@ -956,6 +1029,9 @@ final class LiveVoiceSessionService: NSObject, VoiceSessionServiceProtocol {
         if let currentAssistantItemID,
            let index = transcriptItems.firstIndex(where: { $0.id == currentAssistantItemID }) {
             transcriptItems[index].isPartial = false
+            if let currentAssistantConversationItemID {
+                transcriptItemIDsByConversationItemID[currentAssistantConversationItemID] = currentAssistantItemID
+            }
         }
         currentAssistantItemID = nil
         assistantTextSource = nil
@@ -998,6 +1074,9 @@ private final class RealtimePeerDelegate: NSObject, RTCPeerConnectionDelegate, R
         let state = dataChannel.readyState
         Task { @MainActor [weak self] in
             guard let owner = self?.owner else { return }
+            if owner.isEndingSession {
+                return
+            }
             switch state {
             case .open:
                 owner.connectionState = .connected
@@ -1041,6 +1120,9 @@ private final class RealtimePeerDelegate: NSObject, RTCPeerConnectionDelegate, R
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCPeerConnectionState) {
         Task { @MainActor in
             guard let owner else { return }
+            if owner.isEndingSession {
+                return
+            }
             switch stateChanged {
             case .connected:
                 if owner.latencyMetrics.realtimeConnectedAt == nil {
