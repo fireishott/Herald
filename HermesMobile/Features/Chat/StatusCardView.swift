@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct StatusCardView: View {
-    let isHostOnline: Bool
+    let connectionLabel: String
     let messageCount: Int
     let conversationID: UUID?
     let tokenUsage: TokenUsage?
@@ -25,7 +25,7 @@ struct StatusCardView: View {
             Divider()
                 .overlay(Design.Colors.divider)
 
-            statusRow("Connection", value: isHostOnline ? "Online" : "Offline")
+            statusRow("Connection", value: connectionLabel)
             statusRow("Messages", value: "\(messageCount)")
             if let id = conversationID {
                 statusRow("Session", value: String(id.uuidString.prefix(8)))

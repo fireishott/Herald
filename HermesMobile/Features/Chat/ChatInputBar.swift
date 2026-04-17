@@ -92,6 +92,8 @@ struct ChatInputBar: View {
                     text: $text,
                     axis: .vertical
                 )
+                    .accessibilityIdentifier("chat.composer")
+                    .accessibilityLabel("Reply to Hermes")
                     .font(Design.Typography.body)
                     .foregroundStyle(Design.Colors.foreground)
                     .lineLimit(1...5)

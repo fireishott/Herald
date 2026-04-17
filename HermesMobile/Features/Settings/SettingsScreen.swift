@@ -64,10 +64,11 @@ struct SettingsScreen: View {
 
                 if pairingStore.pairedRelayConfiguration != nil {
                     settingsNavRow(
-                        icon: hostStore.isHostOnline ? "desktopcomputer" : "desktopcomputer.trianglebadge.exclamationmark",
-                        iconColor: hostStore.isHostOnline ? .green : .orange,
+                        icon: hostStatusRowIcon,
+                        iconColor: hostStatusRowColor,
                         title: "Hermes Host",
-                        value: hostStore.currentHost?.resolvedDisplayName ?? "Not Connected"
+                        value: hostStatusRowValue,
+                        accessibilityIdentifier: "settings.hermesHost"
                     ) {
                         dismiss()
                         Task {
@@ -154,6 +155,41 @@ struct SettingsScreen: View {
                     }
                 }
             }
+        }
+    }
+
+    private var hostStatusRowIcon: String {
+        switch hostStore.connectionState {
+        case .online:
+            return "desktopcomputer"
+        case .offline:
+            return "desktopcomputer.trianglebadge.exclamationmark"
+        case .unreachable:
+            return "wifi.exclamationmark"
+        case .notConnected:
+            return "desktopcomputer"
+        }
+    }
+
+    private var hostStatusRowColor: Color {
+        switch hostStore.connectionState {
+        case .online:
+            return .green
+        case .offline, .unreachable:
+            return .orange
+        case .notConnected:
+            return Design.Colors.secondaryForeground
+        }
+    }
+
+    private var hostStatusRowValue: String {
+        switch hostStore.connectionState {
+        case .online, .offline:
+            return hostStore.currentHost?.resolvedDisplayName ?? "Hermes Host"
+        case .unreachable:
+            return "Status unavailable"
+        case .notConnected:
+            return "Not Connected"
         }
     }
 
@@ -450,14 +486,16 @@ struct SettingsScreen: View {
         .frame(minHeight: Design.Size.minTapTarget)
     }
 
+    @ViewBuilder
     private func settingsNavRow(
         icon: String,
         iconColor: Color,
         title: String,
         value: String? = nil,
+        accessibilityIdentifier: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
+        let row = Button(action: action) {
             HStack(spacing: Design.Spacing.sm) {
                 Image(systemName: icon)
                     .font(.system(size: 14))
@@ -481,6 +519,12 @@ struct SettingsScreen: View {
                     .foregroundStyle(Design.Colors.secondaryForeground)
             }
             .frame(minHeight: Design.Size.minTapTarget)
+        }
+
+        if let accessibilityIdentifier {
+            row.accessibilityIdentifier(accessibilityIdentifier)
+        } else {
+            row
         }
     }
 

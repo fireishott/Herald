@@ -1,5 +1,12 @@
 import Foundation
 
+enum HermesHostConnectionState: Equatable, Sendable {
+    case online
+    case offline
+    case unreachable
+    case notConnected
+}
+
 @MainActor
 @Observable
 final class HermesHostStore {
@@ -23,6 +30,22 @@ final class HermesHostStore {
 
     var isHostOnline: Bool {
         currentHost?.isOnline == true
+    }
+
+    var connectionState: HermesHostConnectionState {
+        if currentHost?.isOnline == true {
+            return .online
+        }
+
+        if currentHost != nil {
+            return lastErrorMessage == nil ? .offline : .unreachable
+        }
+
+        if lastErrorMessage != nil {
+            return .unreachable
+        }
+
+        return .notConnected
     }
 
     func refresh() async {

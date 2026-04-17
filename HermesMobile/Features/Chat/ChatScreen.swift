@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatScreen: View {
     @Environment(ChatStore.self) private var chatStore
     @Environment(HermesHostStore.self) private var hostStore
+    @Environment(PairingStore.self) private var pairingStore
     @Environment(AppSessionStore.self) private var sessionStore
     @Environment(SettingsStore.self) private var settingsStore
     @Environment(TabRouter.self) private var router
@@ -23,8 +24,8 @@ struct ChatScreen: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                if hostStore.isHostOnline == false {
-                    hostOfflineBanner
+                if pairingStore.isPaired, hostStore.connectionState != .online {
+                    connectionBanner
                 }
                 messageList
                 ChatInputBar(
@@ -102,7 +103,7 @@ struct ChatScreen: View {
             modelStatusChip
         }
         ToolbarItem(placement: .topBarTrailing) {
-            GlassCircleButton(icon: "gearshape") {
+            GlassCircleButton(icon: "gearshape", accessibilityLabel: "Open settings") {
                 router.presentSheet(.settings)
             }
         }
@@ -138,7 +139,7 @@ struct ChatScreen: View {
         } label: {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(hostStore.isHostOnline ? .green : .gray)
+                    .fill(connectionIndicatorColor)
                     .frame(width: 6, height: 6)
 
                 if let model = displayedModelName {
@@ -190,7 +191,7 @@ struct ChatScreen: View {
         VStack(alignment: .leading, spacing: Design.Spacing.md) {
             HStack(spacing: Design.Spacing.xs) {
                 Circle()
-                    .fill(hostStore.isHostOnline ? .green : .gray)
+                    .fill(connectionIndicatorColor)
                     .frame(width: 7, height: 7)
 
                 if let model = displayedModelName {
@@ -299,6 +300,30 @@ struct ChatScreen: View {
         return String(format: "%.1f%@", rounded, suffix)
     }
 
+    private var connectionIndicatorColor: Color {
+        switch hostStore.connectionState {
+        case .online:
+            return .green
+        case .offline, .unreachable:
+            return .orange
+        case .notConnected:
+            return .gray
+        }
+    }
+
+    private var connectionStatusLabel: String {
+        switch hostStore.connectionState {
+        case .online:
+            return "Online"
+        case .offline:
+            return "Offline"
+        case .unreachable:
+            return "Unreachable"
+        case .notConnected:
+            return "Not Connected"
+        }
+    }
+
     // MARK: - Message List
 
     private var messageList: some View {
@@ -323,7 +348,7 @@ struct ChatScreen: View {
 
                     if showStatusCard {
                         StatusCardView(
-                            isHostOnline: hostStore.isHostOnline,
+                            connectionLabel: connectionStatusLabel,
                             messageCount: chatStore.conversation?.messages.count ?? 0,
                             conversationID: chatStore.conversation?.id,
                             tokenUsage: chatStore.lastTokenUsage,
@@ -343,24 +368,24 @@ struct ChatScreen: View {
         }
     }
 
-    private var hostOfflineBanner: some View {
+    private var connectionBanner: some View {
         HStack(alignment: .center, spacing: Design.Spacing.sm) {
-            Image(systemName: "desktopcomputer.trianglebadge.exclamationmark")
-                .foregroundStyle(.orange)
+            Image(systemName: connectionBannerIcon)
+                .foregroundStyle(connectionIndicatorColor)
 
             VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
-                Text("Hermes host offline")
+                Text(connectionBannerTitle)
                     .font(Design.Typography.callout)
                     .foregroundStyle(Design.Colors.foreground)
-                Text("Messages will queue until your Hermes host reconnects.")
+                Text(connectionBannerMessage)
                     .font(Design.Typography.caption)
                     .foregroundStyle(Design.Colors.secondaryForeground)
             }
 
             Spacer()
 
-            Button("Settings") {
-                router.presentSheet(.settings)
+            Button(connectionBannerActionLabel) {
+                connectionBannerAction()
             }
             .font(Design.Typography.caption)
             .foregroundStyle(Design.Brand.accent)
@@ -371,6 +396,63 @@ struct ChatScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
         .padding(.horizontal, Design.Spacing.md)
         .padding(.top, Design.Spacing.md)
+    }
+
+    private var connectionBannerIcon: String {
+        switch hostStore.connectionState {
+        case .online:
+            return "desktopcomputer"
+        case .offline:
+            return "desktopcomputer.trianglebadge.exclamationmark"
+        case .unreachable:
+            return "wifi.exclamationmark"
+        case .notConnected:
+            return "desktopcomputer"
+        }
+    }
+
+    private var connectionBannerTitle: String {
+        switch hostStore.connectionState {
+        case .online:
+            return "Hermes host online"
+        case .offline:
+            return "Hermes host offline"
+        case .unreachable:
+            return "Could not refresh host status"
+        case .notConnected:
+            return "No Hermes host connected"
+        }
+    }
+
+    private var connectionBannerMessage: String {
+        switch hostStore.connectionState {
+        case .online:
+            return "Your Hermes host is connected."
+        case .offline:
+            return "Messages will queue until your Hermes host reconnects."
+        case .unreachable:
+            return hostStore.lastErrorMessage ?? "Check your relay connection or refresh your session."
+        case .notConnected:
+            return "Pair a Hermes host from Settings to send messages through your Mac."
+        }
+    }
+
+    private var connectionBannerActionLabel: String {
+        switch hostStore.connectionState {
+        case .online, .offline, .notConnected:
+            return "Settings"
+        case .unreachable:
+            return "Retry"
+        }
+    }
+
+    private func connectionBannerAction() {
+        switch hostStore.connectionState {
+        case .unreachable:
+            Task { await hostStore.refresh() }
+        case .online, .offline, .notConnected:
+            router.presentSheet(.settings)
+        }
     }
 
     // MARK: - Actions

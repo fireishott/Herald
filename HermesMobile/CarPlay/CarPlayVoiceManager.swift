@@ -2,9 +2,8 @@ import CarPlay
 import UIKit
 
 /// Bridges `TalkStore` voice state to the CarPlay `CPVoiceControlTemplate`.
-/// Provides interactive controls: start session, mute, end, and interrupt.
-/// Per iOS 26.4 Voice-Based Conversational category, `CPVoiceControlTemplate`
-/// is the primary interface with action buttons below the voice visualization.
+/// The current public CarPlay SDK exposes stateful voice control visuals but
+/// not per-state action buttons, so this manager presents status only.
 @MainActor
 final class CarPlayVoiceManager {
     private static let maxTranscriptTitleLength = 80
@@ -14,8 +13,6 @@ final class CarPlayVoiceManager {
     private var observationTask: Task<Void, Never>?
     private var currentSpeakingTitle: String?
     private var lastSyncedStateID: String?
-    private var lastActionSignature: String?
-
     private var talkStore: TalkStore { AppContainer.sharedDefault().talkStore }
 
     // MARK: - Voice Control State Identifiers
@@ -109,97 +106,9 @@ final class CarPlayVoiceManager {
             repeats: false
         )
 
-        let template = CPVoiceControlTemplate(
+        return CPVoiceControlTemplate(
             voiceControlStates: [idle, connecting, listening, thinking, speaking]
         )
-
-        if #available(iOS 26.4, *) {
-            idle.actionButtons = buttons(for: StateID.idle)
-            connecting.actionButtons = buttons(for: StateID.connecting)
-            listening.actionButtons = buttons(for: StateID.listening)
-            thinking.actionButtons = buttons(for: StateID.thinking)
-            speaking.actionButtons = buttons(for: StateID.speaking)
-        }
-
-        return template
-    }
-
-    // MARK: - Action Buttons
-
-    private func buttons(for stateID: String) -> [CPButton] {
-        guard #available(iOS 26.4, *) else { return [] }
-
-        switch stateID {
-        case StateID.idle:
-            return [startButton()]
-        case StateID.connecting:
-            return [endButton()]
-        case StateID.speaking:
-            return [interruptButton(), muteButton(), endButton()]
-        case StateID.listening, StateID.thinking:
-            return [muteButton(), endButton()]
-        default:
-            return []
-        }
-    }
-
-    private func startButton() -> CPButton {
-        let button = CPButton(
-            image: UIImage(systemName: "play.fill")!,
-            handler: { [weak self] _ in
-                guard let self else { return }
-                Task { @MainActor in
-                    await self.talkStore.startSessionDirectly()
-                    self.syncState()
-                }
-            }
-        )
-        button.title = "Start"
-        return button
-    }
-
-    private func muteButton() -> CPButton {
-        let isMuted = talkStore.isMuted
-        let button = CPButton(
-            image: UIImage(systemName: isMuted ? "mic.slash.fill" : "mic.fill")!,
-            handler: { [weak self] _ in
-                guard let self else { return }
-                Task { @MainActor in
-                    await self.talkStore.toggleMute()
-                    self.syncState()
-                }
-            }
-        )
-        button.title = isMuted ? "Unmute" : "Mute"
-        return button
-    }
-
-    private func endButton() -> CPButton {
-        let button = CPButton(
-            image: UIImage(systemName: "xmark.circle.fill")!,
-            handler: { [weak self] _ in
-                guard let self else { return }
-                Task { @MainActor in
-                    await self.talkStore.endSession()
-                    self.syncState()
-                }
-            }
-        )
-        button.title = "End"
-        return button
-    }
-
-    private func interruptButton() -> CPButton {
-        let button = CPButton(
-            image: UIImage(systemName: "hand.raised.fill")!,
-            handler: { [weak self] _ in
-                guard let self else { return }
-                self.talkStore.interruptAssistant()
-                self.syncState()
-            }
-        )
-        button.title = "Stop"
-        return button
     }
 
     // MARK: - State Sync
@@ -228,20 +137,14 @@ final class CarPlayVoiceManager {
         }
     }
 
-    private func actionSignature(for stateID: String) -> String {
-        "\(stateID)|\(talkStore.isSessionActive)|\(talkStore.isMuted)"
-    }
-
     private func syncState() {
         guard voiceTemplate != nil else { return }
 
         let stateID = currentStateIdentifier()
         let latestTitle = lastAssistantText()
-        let actionSignature = actionSignature(for: stateID)
 
-        if latestTitle != currentSpeakingTitle || actionSignature != lastActionSignature {
+        if latestTitle != currentSpeakingTitle {
             currentSpeakingTitle = latestTitle
-            lastActionSignature = actionSignature
             lastSyncedStateID = stateID
             setTemplate(speakingTitle: latestTitle, activeStateID: stateID)
             return

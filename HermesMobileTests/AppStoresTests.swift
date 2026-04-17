@@ -149,9 +149,13 @@ struct AppStoresTests {
     @MainActor
     private final class RecordingHermesHostService: HermesHostServiceProtocol {
         var currentHost: HermesHostStatus?
+        var fetchError: Error?
 
         func fetchCurrentHost(accessToken: String?) async throws -> HermesHostStatus? {
-            currentHost
+            if let fetchError {
+                throw fetchError
+            }
+            return currentHost
         }
 
         func createEnrollmentCode(accessToken: String?) async throws -> HostEnrollmentCode {
@@ -1276,6 +1280,76 @@ struct AppStoresTests {
     }
 
     @Test @MainActor
+    func liveVoiceSessionServiceKeepsUserTranscriptOrderedWhenTranscriptionFinishesLate() async throws {
+        let apiClient = RelayAPIClient(
+            baseURLProvider: { "https://relay.example.com/v1" }
+        )
+        let voiceService = LiveVoiceSessionService(
+            apiClient: apiClient,
+            accessTokenProvider: { "token" }
+        )
+
+        voiceService.connectionState = .connected
+        voiceService.handleDataChannelEvent([
+            "type": "input_audio_buffer.committed",
+            "item_id": "user_item_1",
+        ])
+        voiceService.handleDataChannelEvent([
+            "type": "response.created",
+            "response": ["id": "resp_late_user"],
+        ])
+        voiceService.handleDataChannelEvent([
+            "type": "conversation.item.created",
+            "item": [
+                "id": "assistant_item_1",
+                "role": "assistant",
+                "type": "message",
+            ],
+        ])
+        voiceService.handleDataChannelEvent([
+            "type": "response.output_text.delta",
+            "delta": "Let me check that.",
+        ])
+
+        voiceService.handleDataChannelEvent([
+            "type": "conversation.item.input_audio_transcription.completed",
+            "item_id": "user_item_1",
+            "transcript": "What should I focus on today?",
+        ])
+
+        #expect(voiceService.transcriptItems.count == 2)
+        #expect(voiceService.transcriptItems[0].speaker == .user)
+        #expect(voiceService.transcriptItems[0].text == "What should I focus on today?")
+        #expect(voiceService.transcriptItems[0].isPartial == false)
+        #expect(voiceService.transcriptItems[1].speaker == .hermes)
+        #expect(voiceService.transcriptItems[1].text == "Let me check that.")
+    }
+
+    @Test @MainActor
+    func liveVoiceSessionServiceIgnoresLateRealtimeErrorsAfterIntentionalEnd() async throws {
+        let apiClient = RelayAPIClient(
+            baseURLProvider: { "https://relay.example.com/v1" }
+        )
+        let voiceService = LiveVoiceSessionService(
+            apiClient: apiClient,
+            accessTokenProvider: { "token" }
+        )
+
+        voiceService.connectionState = .connected
+        voiceService.voiceState = .speaking
+
+        await voiceService.endSession()
+        voiceService.handleDataChannelEvent([
+            "type": "error",
+            "error": ["message": "Connection lost."],
+        ])
+
+        #expect(voiceService.connectionState == .idle)
+        #expect(voiceService.voiceState == .idle)
+        #expect(voiceService.statusMessage == nil)
+    }
+
+    @Test @MainActor
     func liveHermesClientRefreshesExpiredAccessTokenDuringConversationLoad() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubURLProtocol.self]
@@ -1580,6 +1654,54 @@ struct AppStoresTests {
     }
 
     @Test @MainActor
+    func hostStoreMarksReachabilityErrorsWithoutPretendingHostIsOffline() async throws {
+        let service = RecordingHermesHostService()
+        service.fetchError = RelayAPIClient.ClientError.requestFailed("Relay unreachable.")
+
+        let hostStore = HermesHostStore(
+            hostService: service,
+            accessTokenProvider: { "access-token" }
+        )
+
+        await hostStore.refresh()
+
+        #expect(hostStore.currentHost == nil)
+        #expect(hostStore.connectionState == .unreachable)
+        #expect(hostStore.lastErrorMessage == "Relay unreachable.")
+    }
+
+    @Test @MainActor
+    func hostStoreKeepsKnownOnlineHostDuringRefreshErrors() async throws {
+        let service = RecordingHermesHostService()
+        service.currentHost = HermesHostStatus(
+            id: UUID(),
+            displayName: "Home Mac mini",
+            hostname: "test-host",
+            platform: "macos",
+            connectorVersion: "0.1.0",
+            hermesCommand: "hermes",
+            hermesVersion: "hermes 1.2.3",
+            hermesModel: "gpt-5.4-mini",
+            lastSeenAt: .now,
+            lastConnectedAt: .now,
+            isOnline: true
+        )
+
+        let hostStore = HermesHostStore(
+            hostService: service,
+            accessTokenProvider: { "access-token" }
+        )
+
+        await hostStore.refresh()
+        service.fetchError = RelayAPIClient.ClientError.requestFailed("Relay unreachable.")
+        await hostStore.refresh()
+
+        #expect(hostStore.currentHost?.resolvedDisplayName == "Home Mac mini")
+        #expect(hostStore.connectionState == .online)
+        #expect(hostStore.lastErrorMessage == "Relay unreachable.")
+    }
+
+    @Test @MainActor
     func pairingStoreDisconnectClearsRelayConfigurationAndSession() async throws {
         let suiteName = "pairing-store-disconnect-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -1776,7 +1898,7 @@ struct AppStoresTests {
         #expect(chatStore.currentContextTokens == 3200)
     }
 
-    @Test
+    @Test @MainActor
     func chatStoreInfersHermesAlignedContextWindowFallback() {
         #expect(ChatStore.inferredContextWindow(for: "gpt-5.4-mini") == 128_000)
         #expect(ChatStore.inferredContextWindow(for: "claude-sonnet-4.6") == 1_000_000)

@@ -203,26 +203,52 @@ struct ConnectHermesHostScreen: View {
     // MARK: - Status Helpers
 
     private var statusColor: Color {
-        if hostStore.currentHost?.isOnline == true { return .green }
-        if hostStore.currentHost != nil { return .orange }
-        return Design.Colors.secondaryForeground
+        switch hostStore.connectionState {
+        case .online:
+            return .green
+        case .offline, .unreachable:
+            return .orange
+        case .notConnected:
+            return Design.Colors.secondaryForeground
+        }
     }
 
     private var statusIcon: String {
-        if hostStore.currentHost?.isOnline == true { return "checkmark.circle.fill" }
-        if hostStore.currentHost != nil { return "exclamationmark.circle.fill" }
-        return "desktopcomputer"
+        switch hostStore.connectionState {
+        case .online:
+            return "checkmark.circle.fill"
+        case .offline:
+            return "exclamationmark.circle.fill"
+        case .unreachable:
+            return "wifi.exclamationmark"
+        case .notConnected:
+            return "desktopcomputer"
+        }
     }
 
     private var statusTitle: String {
-        if hostStore.currentHost?.isOnline == true { return "Connected" }
-        if hostStore.currentHost != nil { return "Offline" }
-        return "No Host"
+        switch hostStore.connectionState {
+        case .online:
+            return "Connected"
+        case .offline:
+            return "Offline"
+        case .unreachable:
+            return "Status Unavailable"
+        case .notConnected:
+            return "No Host"
+        }
     }
 
     private var statusSubtitle: String {
-        if hostStore.currentHost?.isOnline == true { return "Your Hermes agent is ready" }
-        if hostStore.currentHost != nil { return "Waiting for the connector to come online" }
-        return "Set up from your Hermes machine"
+        switch hostStore.connectionState {
+        case .online:
+            return "Your Hermes agent is ready"
+        case .offline:
+            return "Waiting for the connector to come online"
+        case .unreachable:
+            return hostStore.lastErrorMessage ?? "We couldn't refresh host status from the relay."
+        case .notConnected:
+            return "Set up from your Hermes machine"
+        }
     }
 }
