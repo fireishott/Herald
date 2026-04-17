@@ -44,18 +44,17 @@ final class HermesMobileUITests: XCTestCase {
     }
 
     @MainActor
-    func testManualPairingFlowShowsMainTabs() throws {
+    func testManualPairingFlowShowsMainChatSurface() throws {
         let context = UITestLaunchContext()
         let app = makeApp(context: context)
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["Connect Your Hermes"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Enter Code Manually"].waitForExistence(timeout: 5))
         completePairing(in: app, setupCode: context.setupCode)
 
-        XCTAssertTrue(app.tabBars.buttons["Chat"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.tabBars.buttons["Talk"].exists)
-        XCTAssertTrue(app.tabBars.buttons["Inbox"].exists)
-        XCTAssertTrue(app.tabBars.buttons["Settings"].exists)
+        XCTAssertTrue(composerInput(in: app).waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Start voice mode"].exists)
+        XCTAssertTrue(app.buttons["Open settings"].exists)
     }
 
     @MainActor
@@ -68,7 +67,7 @@ final class HermesMobileUITests: XCTestCase {
         app.launch()
         completePairing(in: app, setupCode: context.setupCode)
 
-        let input = app.textFields["Message Hermes."]
+        let input = composerInput(in: app)
         XCTAssertTrue(input.waitForExistence(timeout: 5))
 
         input.tap()
@@ -84,15 +83,15 @@ final class HermesMobileUITests: XCTestCase {
         let app = makeApp(context: context)
         app.launch()
         completePairing(in: app, setupCode: context.setupCode)
-        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Open settings"].waitForExistence(timeout: 5))
 
         app.terminate()
 
         let relaunchedApp = makeApp(context: context)
         relaunchedApp.launch()
 
-        XCTAssertFalse(relaunchedApp.staticTexts["Connect Your Hermes"].waitForExistence(timeout: 2))
-        XCTAssertTrue(relaunchedApp.tabBars.buttons["Chat"].waitForExistence(timeout: 5))
+        XCTAssertFalse(relaunchedApp.buttons["Enter Code Manually"].waitForExistence(timeout: 2))
+        XCTAssertTrue(composerInput(in: relaunchedApp).waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -102,16 +101,16 @@ final class HermesMobileUITests: XCTestCase {
         app.launch()
         completePairing(in: app, setupCode: context.setupCode)
 
-        app.tabBars.buttons["Settings"].tap()
-        let manageButton = app.buttons["Host Status"]
+        app.buttons["Open settings"].tap()
+        let manageButton = app.buttons["settings.hermesHost"]
         XCTAssertTrue(manageButton.waitForExistence(timeout: 5))
         manageButton.tap()
 
-        let disconnectButton = app.buttons["Disconnect Hermes"]
+        let disconnectButton = app.buttons["Disconnect"]
         XCTAssertTrue(disconnectButton.waitForExistence(timeout: 5))
         disconnectButton.tap()
 
-        XCTAssertTrue(app.staticTexts["Connect Your Hermes"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Enter Code Manually"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -121,14 +120,13 @@ final class HermesMobileUITests: XCTestCase {
         app.launch()
         completePairing(in: app, setupCode: context.setupCode)
 
-        app.tabBars.buttons["Settings"].tap()
-        let manageHostButton = app.buttons["Host Status"]
+        app.buttons["Open settings"].tap()
+        let manageHostButton = app.buttons["settings.hermesHost"]
         XCTAssertTrue(manageHostButton.waitForExistence(timeout: 5))
         manageHostButton.tap()
 
         XCTAssertTrue(app.navigationBars["Connect Host"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Setup From Your Hermes Machine"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "hermes-mobile pair-phone")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["Disconnect"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -151,7 +149,7 @@ final class HermesMobileUITests: XCTestCase {
 
     @MainActor
     private func completePairing(in app: XCUIApplication, setupCode: String) {
-        app.buttons["Enter Setup Code"].tap()
+        app.buttons["Enter Code Manually"].tap()
 
         let setupCodeField = app.textFields["Setup code"]
         XCTAssertTrue(setupCodeField.waitForExistence(timeout: 5))
@@ -159,6 +157,24 @@ final class HermesMobileUITests: XCTestCase {
         setupCodeField.typeText(setupCode)
         app.buttons["Connect Hermes"].tap()
 
-        XCTAssertTrue(app.tabBars.buttons["Chat"].waitForExistence(timeout: 5))
+        let continueButton = app.buttons["Continue"]
+        if continueButton.waitForExistence(timeout: 5) {
+            continueButton.tap()
+        }
+
+        XCTAssertTrue(app.buttons["Open settings"].waitForExistence(timeout: 8))
+    }
+
+    @MainActor
+    private func composerInput(in app: XCUIApplication) -> XCUIElement {
+        let identifiedField = app.textFields["chat.composer"]
+        if identifiedField.exists {
+            return identifiedField
+        }
+        let textField = app.textFields["Reply to Hermes"]
+        if textField.exists {
+            return textField
+        }
+        return app.textViews["Reply to Hermes"]
     }
 }

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GlassCircleButton: View {
     let icon: String
+    var accessibilityLabel: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -15,5 +16,6 @@ struct GlassCircleButton: View {
                 )
         }
         .contentShape(Circle())
+        .accessibilityLabel(accessibilityLabel ?? icon)
     }
 }
