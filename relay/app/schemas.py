@@ -94,6 +94,49 @@ class PushRegisterRequest(BaseModel):
     bundleId: str
 
 
+class PushBrokerRelayIdentityRequest(BaseModel):
+    id: str = Field(min_length=1)
+    publicKey: str = Field(min_length=1)
+    relayBaseURL: str | None = None
+
+
+class PushBrokerAppAttestRequest(BaseModel):
+    keyId: str = Field(min_length=1)
+    attestationObject: str = Field(min_length=1)
+    assertion: str = Field(min_length=1)
+    signedPayload: str = Field(min_length=1)
+
+
+class PushBrokerRegisterRequest(BaseModel):
+    challengeId: str = Field(min_length=1)
+    challenge: str = Field(min_length=1)
+    relayIdentity: PushBrokerRelayIdentityRequest
+    installationId: str = Field(min_length=1)
+    bundleId: str = Field(min_length=1)
+    appVersion: str | None = None
+    apnsEnvironment: str = Field(pattern="^(development|production|sandbox)$")
+    apnsToken: str = Field(min_length=1)
+    appAttest: PushBrokerAppAttestRequest
+
+
+class PushBrokerSendRequest(BaseModel):
+    relayHandle: str = Field(min_length=1)
+    sendGrant: str = Field(min_length=1)
+    relayId: str = Field(min_length=1)
+    relayPublicKey: str = Field(min_length=1)
+    pushType: str = Field(pattern="^(alert|silent)$")
+    title: str | None = None
+    body: str | None = None
+    signature: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _require_alert_content(self) -> "PushBrokerSendRequest":
+        if self.pushType == "alert":
+            if not self.title or not self.body:
+                raise ValueError("Alert push requires title and body.")
+        return self
+
+
 class DeviceAppStateRequest(BaseModel):
     state: str = Field(pattern="^(foreground|background)$")
 
