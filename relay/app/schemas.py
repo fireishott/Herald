@@ -89,9 +89,26 @@ class RefreshRequest(BaseModel):
 
 class PushRegisterRequest(BaseModel):
     deviceId: UUID
-    apnsToken: str
+    transport: str = Field(default="direct", pattern="^(direct|relay)$")
+    apnsToken: str | None = None
     pushEnvironment: str
     bundleId: str
+    relayHandle: str | None = None
+    sendGrant: str | None = None
+    relayId: str | None = None
+    relayPublicKey: str | None = None
+    tokenDebugSuffix: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_transport_fields(self) -> "PushRegisterRequest":
+        if self.transport == "direct":
+            if not self.apnsToken:
+                raise ValueError("Direct push registration requires apnsToken.")
+        else:
+            required = [self.relayHandle, self.sendGrant, self.relayId, self.relayPublicKey]
+            if any(not value for value in required):
+                raise ValueError("Relay push registration requires relayHandle, sendGrant, relayId, and relayPublicKey.")
+        return self
 
 
 class PushBrokerRelayIdentityRequest(BaseModel):
