@@ -3,7 +3,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Iterator
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 
@@ -13,8 +13,11 @@ class Base(DeclarativeBase):
 
 class Database:
     def __init__(self, database_url: str) -> None:
-        connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
+        self.is_sqlite = database_url.startswith("sqlite")
+        connect_args = {"check_same_thread": False, "timeout": 10} if self.is_sqlite else {}
         self.engine = create_engine(database_url, future=True, connect_args=connect_args)
+        if self.is_sqlite:
+            event.listen(self.engine, "connect", self._configure_sqlite_connection)
         self.session_factory = sessionmaker(
             bind=self.engine,
             autoflush=False,
@@ -22,6 +25,17 @@ class Database:
             expire_on_commit=False,
             class_=Session,
         )
+
+    @staticmethod
+    def _configure_sqlite_connection(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute("PRAGMA busy_timeout=5000")
+        finally:
+            cursor.close()
 
     def create_all(self) -> None:
         from . import models  # noqa: F401

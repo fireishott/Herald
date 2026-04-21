@@ -19,12 +19,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .apns import PushResult, create_apns_client
+from .app_attest import AppAttestVerificationError, verify_app_attest_registration_proof
 from .config import Settings
 from .database import Database
 from .hermes_adapter import build_hermes_adapter
 from .models import Conversation, HermesHost, Message, PushRegistration
 from .pairing import HostSetupCodePayload, format_phone_pairing_code, build_host_setup_code
+from .push_broker import create_push_broker_challenge, serialize_push_broker_challenge
+from .push_broker import PushBrokerChallengeError, PushBrokerSendError, create_push_broker_registration, verify_push_broker_send_request
 from .rate_limit import PhonePairingRateLimiter
+from .relay_identity import _b64url_decode, ensure_relay_identity, serialize_relay_identity
 from .schemas import (
     ConnectorSetupRequest,
     DeviceRegisterRequest,
@@ -39,6 +43,8 @@ from .schemas import (
     SensorHealthRequest,
     SensorLocationRequest,
     PushRegisterRequest,
+    PushBrokerRegisterRequest,
+    PushBrokerSendRequest,
     RefreshRequest,
     VoiceTurnCreateRequest,
 )
@@ -132,6 +138,13 @@ def reply_state_for_job(job_status: str) -> str:
     if job_status == "failed":
         return "failed"
     return "pending"
+
+
+def decode_b64url_field(value: str, *, field_name: str) -> bytes:
+    try:
+        return _b64url_decode(value)
+    except Exception as error:  # noqa: BLE001 - any decode failure is a bad client payload
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid base64url field: {field_name}.") from error
 
 
 @dataclass
@@ -533,6 +546,147 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "environment": request_settings.environment,
             }
         )
+
+    @app.get("/v1/relay/identity")
+    def relay_identity(
+        db: Session = Depends(get_db),
+        request_settings: Settings = Depends(get_settings),
+    ) -> dict:
+        identity = ensure_relay_identity(db, settings=request_settings)
+        return success({"identity": serialize_relay_identity(identity, settings=request_settings)})
+
+    @app.post("/v1/push-broker/challenge")
+    def push_broker_challenge(
+        db: Session = Depends(get_db),
+        request_settings: Settings = Depends(get_settings),
+    ) -> dict:
+        challenge = create_push_broker_challenge(db, settings=request_settings)
+        return success(serialize_push_broker_challenge(challenge))
+
+    @app.post("/v1/push-broker/register")
+    def push_broker_register(
+        payload: PushBrokerRegisterRequest,
+        request: Request,
+        db: Session = Depends(get_db),
+        request_settings: Settings = Depends(get_settings),
+    ) -> dict:
+        team_id = request_settings.apns_team_id
+        if not team_id:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Push broker App Attest team ID is not configured.")
+        trusted_roots = getattr(request.app.state, "app_attest_trusted_roots", None)
+        if not trusted_roots:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Push broker App Attest roots are not configured.")
+
+        signed_payload = decode_b64url_field(payload.appAttest.signedPayload, field_name="appAttest.signedPayload")
+        try:
+            signed_payload_data = json.loads(signed_payload.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid push broker signed payload.") from error
+
+        expected_signed_payload = {
+            "challengeId": payload.challengeId,
+            "installationId": payload.installationId,
+            "bundleId": payload.bundleId,
+            "appVersion": payload.appVersion,
+            "apnsEnvironment": payload.apnsEnvironment,
+            "apnsToken": payload.apnsToken,
+            "relayIdentity": {
+                "id": payload.relayIdentity.id,
+                "publicKey": payload.relayIdentity.publicKey,
+                "relayBaseURL": payload.relayIdentity.relayBaseURL,
+            },
+        }
+        if signed_payload_data != expected_signed_payload:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Push broker signed payload does not match request.")
+
+        try:
+            app_attest = verify_app_attest_registration_proof(
+                attestation_object=decode_b64url_field(payload.appAttest.attestationObject, field_name="appAttest.attestationObject"),
+                assertion_object=decode_b64url_field(payload.appAttest.assertion, field_name="appAttest.assertion"),
+                signed_payload=signed_payload,
+                key_id=payload.appAttest.keyId,
+                challenge=payload.challenge,
+                team_id=team_id,
+                bundle_id=payload.bundleId,
+                environment="development" if payload.apnsEnvironment in {"development", "sandbox"} else "production",
+                trusted_root_certificates=trusted_roots,
+            )
+        except AppAttestVerificationError as error:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(error)) from error
+
+        try:
+            result = create_push_broker_registration(
+                db,
+                settings=request_settings,
+                challenge_id=payload.challengeId,
+                challenge=payload.challenge,
+                relay_id=payload.relayIdentity.id,
+                relay_public_key=payload.relayIdentity.publicKey,
+                installation_id=payload.installationId,
+                bundle_id=payload.bundleId,
+                app_version=payload.appVersion,
+                apns_environment=payload.apnsEnvironment,
+                apns_token=payload.apnsToken,
+                app_attest=app_attest,
+            )
+        except PushBrokerChallengeError as error:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error)) from error
+        return success(result.gateway_payload() | {"expiresAt": result.expires_at})
+
+    @app.post("/v1/push-broker/send")
+    async def push_broker_send(
+        payload: PushBrokerSendRequest,
+        request: Request,
+        db: Session = Depends(get_db),
+    ) -> dict:
+        signed_payload = {
+            "relayHandle": payload.relayHandle,
+            "sendGrant": payload.sendGrant,
+            "relayId": payload.relayId,
+            "relayPublicKey": payload.relayPublicKey,
+            "pushType": payload.pushType,
+            "title": payload.title,
+            "body": payload.body,
+        }
+        try:
+            registration = verify_push_broker_send_request(
+                db,
+                relay_handle=payload.relayHandle,
+                send_grant=payload.sendGrant,
+                relay_id=payload.relayId,
+                relay_public_key=payload.relayPublicKey,
+                payload=signed_payload,
+                signature=payload.signature,
+            )
+        except PushBrokerSendError as error:
+            detail = str(error)
+            status_code = status.HTTP_401_UNAUTHORIZED
+            if "expired" in detail or "revoked" in detail:
+                status_code = status.HTTP_409_CONFLICT
+            elif "invalid." in detail and "handle" in detail:
+                status_code = status.HTTP_404_NOT_FOUND
+            raise HTTPException(status_code=status_code, detail=detail) from error
+
+        apns_client = request.app.state.apns_client
+        if apns_client is None:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="APNs client is not configured.")
+
+        if payload.pushType == "silent":
+            result = await apns_client.send_silent_push(
+                registration.apns_token,
+                bundle_id=registration.bundle_id,
+                environment=registration.apns_environment,
+            )
+        else:
+            result = await apns_client.send_alert_push(
+                registration.apns_token,
+                title=payload.title or "Hermes",
+                body=payload.body or "",
+                bundle_id=registration.bundle_id,
+                environment=registration.apns_environment,
+            )
+        sent = getattr(result, "value", result) == "sent"
+        return success({"sent": sent, "relayHandle": registration.relay_handle})
 
     @app.post("/v1/connector/setup")
     def connector_setup(

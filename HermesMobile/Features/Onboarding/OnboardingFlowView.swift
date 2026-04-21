@@ -90,7 +90,7 @@ struct OnboardingFlowView: View {
                 relayConfiguration: relayConfiguration,
                 validationMessage: relayConfiguration.validationMessage,
                 errorMessage: localErrorMessage,
-                relayModeBinding: relayModeBinding,
+                connectionModeBinding: connectionModeBinding,
                 customRelayURLBinding: customRelayURLBinding,
                 isRelayURLFocused: $isRelayURLFocused,
                 onPaste: pasteRelayURL,
@@ -170,7 +170,7 @@ struct OnboardingFlowView: View {
     private func pasteRelayURL() {
         guard let pasted = UIPasteboard.general.string else { return }
         var config = settingsStore.settings.relayConfiguration
-        config.relayMode = .custom
+        config.updateConnectionMode(.selfHostedRelay)
         config.customRelayBaseURL = pasted.trimmingCharacters(in: .whitespacesAndNewlines)
         settingsStore.settings.relayConfiguration = config
     }
@@ -182,10 +182,7 @@ struct OnboardingFlowView: View {
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let code = json["code"] as? String {
             if let relay = json["relay"] as? String, !relay.isEmpty {
-                var config = settingsStore.settings.relayConfiguration
-                config.relayMode = .custom
-                config.customRelayBaseURL = relay
-                settingsStore.settings.relayConfiguration = config
+                applyRelayURL(relay)
             }
             setupCode = PhonePairingCode.format(code)
             Task { await completePairing(using: code) }
@@ -198,6 +195,18 @@ struct OnboardingFlowView: View {
         }
         setupCode = PhonePairingCode.format(value)
         Task { await completePairing(using: value) }
+    }
+
+    private func applyRelayURL(_ rawRelayURL: String) {
+        var config = settingsStore.settings.relayConfiguration
+        let normalizedRelayURL = RelayConfiguration.normalizeBaseURL(rawRelayURL)
+        if normalizedRelayURL == config.hostedRelayBaseURL, config.canUseHosted {
+            config.updateConnectionMode(.managedRelay)
+        } else {
+            config.updateConnectionMode(.selfHostedRelay)
+            config.customRelayBaseURL = rawRelayURL
+        }
+        settingsStore.settings.relayConfiguration = config
     }
 
     private func completePairing(using rawCode: String) async {
@@ -230,12 +239,12 @@ struct OnboardingFlowView: View {
         }
     }
 
-    private var relayModeBinding: Binding<RelayMode> {
+    private var connectionModeBinding: Binding<RelayConnectionMode> {
         Binding(
-            get: { settingsStore.settings.relayConfiguration.relayMode },
+            get: { settingsStore.settings.relayConfiguration.connectionMode },
             set: { newValue in
                 var config = settingsStore.settings.relayConfiguration
-                config.relayMode = newValue
+                config.updateConnectionMode(newValue)
                 settingsStore.settings.relayConfiguration = config
             }
         )
@@ -327,7 +336,7 @@ private struct RelayStepView: View {
     let relayConfiguration: RelayConfiguration
     let validationMessage: String?
     let errorMessage: String?
-    let relayModeBinding: Binding<RelayMode>
+    let connectionModeBinding: Binding<RelayConnectionMode>
     let customRelayURLBinding: Binding<String>
     var isRelayURLFocused: FocusState<Bool>.Binding
     let onPaste: () -> Void
@@ -354,18 +363,15 @@ private struct RelayStepView: View {
             // URL field + mode
             ScrollView {
                 VStack(alignment: .leading, spacing: Design.Spacing.md) {
-                    if relayConfiguration.canUseHosted {
-                        Picker("Relay Mode", selection: relayModeBinding) {
-                            Text(RelayMode.custom.displayLabel).tag(RelayMode.custom)
-                            Text(RelayMode.hosted.displayLabel).tag(RelayMode.hosted)
-                        }
-                        .pickerStyle(.segmented)
-                    }
+                    ConnectionModeSelector(
+                        modes: relayConfiguration.selectableConnectionModes,
+                        selection: connectionModeBinding
+                    )
 
                     VStack(alignment: .leading, spacing: Design.Spacing.xs) {
                         Text("RELAY URL").brandEyebrow()
 
-                        if relayConfiguration.relayMode == .custom {
+                        if relayConfiguration.connectionMode.usesCustomRelayURL {
                             TextField("https://relay.example.com/v1", text: customRelayURLBinding)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.URL)
@@ -421,6 +427,69 @@ private struct RelayStepView: View {
             }
             .padding(.horizontal, Design.Spacing.md)
             .padding(.bottom, Design.Spacing.xl)
+        }
+    }
+}
+
+private struct ConnectionModeSelector: View {
+    let modes: [RelayConnectionMode]
+    let selection: Binding<RelayConnectionMode>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Design.Spacing.xs) {
+            Text("CONNECTION MODE").brandEyebrow()
+
+            VStack(spacing: Design.Spacing.xs) {
+                ForEach(modes, id: \.self) { mode in
+                    Button {
+                        selection.wrappedValue = mode
+                    } label: {
+                        HStack(alignment: .top, spacing: Design.Spacing.sm) {
+                            Image(systemName: iconName(for: mode))
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(selection.wrappedValue == mode ? Design.Brand.accent : Design.Colors.secondaryForeground)
+                                .frame(width: 20)
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(mode.displayLabel)
+                                    .font(Design.Typography.callout)
+                                    .foregroundStyle(Design.Colors.foreground)
+                                Text(mode.shortDescription)
+                                    .font(Design.Typography.caption)
+                                    .foregroundStyle(Design.Colors.secondaryForeground)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Spacer(minLength: Design.Spacing.sm)
+
+                            if selection.wrappedValue == mode {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(Design.Brand.accent)
+                            }
+                        }
+                        .padding(Design.Spacing.md)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Design.Colors.surface, in: RoundedRectangle(cornerRadius: Design.CornerRadius.md))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Design.CornerRadius.md)
+                                .stroke(selection.wrappedValue == mode ? Design.Brand.accent.opacity(0.7) : Design.Colors.border, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private func iconName(for mode: RelayConnectionMode) -> String {
+        switch mode {
+        case .managedRelay:
+            return "cloud.fill"
+        case .tailscale:
+            return "point.3.connected.trianglepath.dotted"
+        case .selfHostedRelay:
+            return "server.rack"
         }
     }
 }
