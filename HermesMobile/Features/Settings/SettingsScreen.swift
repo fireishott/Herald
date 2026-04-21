@@ -82,7 +82,7 @@ struct SettingsScreen: View {
 
                 settingsToggle(
                     icon: "bolt.fill",
-                    iconColor: Design.Brand.accent,
+                    iconColor: Design.Colors.foreground,
                     title: "Auto-Connect",
                     isOn: autoConnectBinding
                 )
@@ -98,14 +98,14 @@ struct SettingsScreen: View {
                 if pairingStore.isPaired {
                     settingsRow(
                         icon: "point.3.connected.trianglepath.dotted",
-                        iconColor: Design.Brand.accent,
+                        iconColor: Design.Colors.foreground,
                         title: "Active Relay",
                         value: pairingStore.pairedRelayConfiguration?.hostDisplayName ?? relayConfiguration.relayOriginLabel
                     )
                     sectionDivider
                     settingsRow(
                         icon: "link",
-                        iconColor: .secondary,
+                        iconColor: Design.Colors.secondaryForeground,
                         title: "Base URL",
                         value: pairingStore.pairedRelayConfiguration?.baseURLString ?? relayConfiguration.activeBaseURLString ?? "Not configured"
                     )
@@ -130,10 +130,15 @@ struct SettingsScreen: View {
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.URL)
                                 .autocorrectionDisabled()
-                                .font(Design.Typography.callout.monospaced())
+                                .font(Design.Typography.callout)
                                 .foregroundStyle(Design.Colors.foreground)
                                 .padding(Design.Spacing.md)
-                                .background(Design.Colors.background, in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+                                .background(Design.Colors.background)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: Design.CornerRadius.lg)
+                                        .stroke(Design.Colors.border, lineWidth: 1)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
 
                             Text("Enter the relay API base URL your connector will use.")
                                 .font(Design.Typography.caption)
@@ -142,7 +147,7 @@ struct SettingsScreen: View {
                     } else if let hostedRelayBaseURL = relayConfiguration.hostedRelayBaseURL {
                         settingsRow(
                             icon: "cloud",
-                            iconColor: Design.Brand.accent,
+                            iconColor: Design.Colors.foreground,
                             title: "Hosted Relay",
                             value: hostedRelayBaseURL
                         )
@@ -151,7 +156,7 @@ struct SettingsScreen: View {
                     if let relayValidationMessage {
                         Text(relayValidationMessage)
                             .font(Design.Typography.caption)
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Design.Colors.warning)
                     }
                 }
             }
@@ -174,9 +179,9 @@ struct SettingsScreen: View {
     private var hostStatusRowColor: Color {
         switch hostStore.connectionState {
         case .online:
-            return .green
+            return Design.Colors.success
         case .offline, .unreachable:
-            return .orange
+            return Design.Colors.warning
         case .notConnected:
             return Design.Colors.secondaryForeground
         }
@@ -233,7 +238,7 @@ struct SettingsScreen: View {
             VStack(spacing: 0) {
                 settingsToggle(
                     icon: "bell.fill",
-                    iconColor: .orange,
+                    iconColor: Design.Colors.foreground,
                     title: "Notifications",
                     isOn: notificationsBinding
                 )
@@ -242,7 +247,7 @@ struct SettingsScreen: View {
 
                 settingsToggle(
                     icon: "hand.tap.fill",
-                    iconColor: .purple,
+                    iconColor: Design.Colors.foreground,
                     title: "Haptic Feedback",
                     isOn: hapticBinding
                 )
@@ -257,7 +262,7 @@ struct SettingsScreen: View {
             VStack(alignment: .leading, spacing: Design.Spacing.sm) {
                 settingsRow(
                     icon: "location.fill",
-                    iconColor: .blue,
+                    iconColor: Design.Brand.primary,
                     title: "Authorization",
                     value: permissionsStore.locationAuthorizationLevel.displayLabel
                 )
@@ -266,7 +271,7 @@ struct SettingsScreen: View {
 
                 settingsRow(
                     icon: "scope",
-                    iconColor: .blue,
+                    iconColor: Design.Brand.primary,
                     title: "Accuracy",
                     value: permissionsStore.locationAccuracyLevel.displayLabel
                 )
@@ -275,7 +280,7 @@ struct SettingsScreen: View {
 
                 settingsToggle(
                     icon: "location.circle.fill",
-                    iconColor: .blue,
+                    iconColor: Design.Brand.primary,
                     title: "Background Location",
                     isOn: backgroundLocationBinding
                 )
@@ -293,7 +298,7 @@ struct SettingsScreen: View {
         SettingsSectionView(title: "Privacy") {
             settingsNavRow(
                 icon: "lock.shield.fill",
-                iconColor: .green,
+                iconColor: Design.Colors.success,
                 title: "Permissions"
             ) {
                 dismiss()
@@ -312,7 +317,7 @@ struct SettingsScreen: View {
             VStack(spacing: 0) {
                 settingsRow(
                     icon: "info.circle",
-                    iconColor: .secondary,
+                    iconColor: Design.Colors.secondaryForeground,
                     title: "Version",
                     value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0") (\(Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "1"))"
                 )
@@ -321,7 +326,7 @@ struct SettingsScreen: View {
 
                 settingsNavRow(
                     icon: "doc.text",
-                    iconColor: .secondary,
+                    iconColor: Design.Colors.secondaryForeground,
                     title: "Terms of Service"
                 ) {
                     openConfiguredURL(settingsStore.buildConfiguration.termsOfServiceURL)
@@ -331,7 +336,7 @@ struct SettingsScreen: View {
 
                 settingsNavRow(
                     icon: "hand.raised",
-                    iconColor: .secondary,
+                    iconColor: Design.Colors.secondaryForeground,
                     title: "Privacy Policy"
                 ) {
                     openConfiguredURL(settingsStore.buildConfiguration.privacyPolicyURL)
@@ -342,7 +347,7 @@ struct SettingsScreen: View {
 
                     settingsNavRow(
                         icon: "questionmark.circle",
-                        iconColor: .secondary,
+                        iconColor: Design.Colors.secondaryForeground,
                         title: "Support"
                     ) {
                         openConfiguredURL(settingsStore.buildConfiguration.supportURL)
