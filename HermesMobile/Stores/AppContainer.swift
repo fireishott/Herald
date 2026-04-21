@@ -55,7 +55,7 @@ final class AppContainer {
     }
 
     /// Returns true once we know which top-level screen to render — either we're
-    /// unpaired (ConnectHermesScreen shows immediately) or we've finished the
+    /// unpaired (OnboardingFlowView shows immediately) or we've finished the
     /// paired-session bootstrap. The old launch splash has been removed; during
     /// the brief window before this flips true the app shows only the deep-ink
     /// background, continuous with the iOS launch image.

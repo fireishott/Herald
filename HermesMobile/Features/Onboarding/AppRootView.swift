@@ -11,9 +11,9 @@ struct AppRootView: View {
             if container.isLaunchReady {
                 Group {
                     if !container.pairingStore.isPaired {
-                        ConnectHermesScreen()
+                        OnboardingFlowView(initialStep: .welcome)
                     } else if container.pairingStore.needsPermissionsOnboarding {
-                        PermissionsOnboardingScreen()
+                        OnboardingFlowView(initialStep: .permissions)
                     } else {
                         MainTabView()
                     }
