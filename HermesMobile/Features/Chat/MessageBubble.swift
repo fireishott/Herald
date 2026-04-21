@@ -35,8 +35,7 @@ struct MessageBubble: View {
 
     private var systemMessage: some View {
         Text(message.content)
-            .font(Design.Typography.caption)
-            .foregroundStyle(Design.Colors.secondaryForeground)
+            .brandEyebrow()
             .multilineTextAlignment(.center)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, Design.Spacing.lg)
@@ -51,8 +50,8 @@ struct MessageBubble: View {
                 voiceTranscriptText(message.content)
                     .padding(.horizontal, Design.Spacing.md)
                     .padding(.vertical, Design.Spacing.sm)
-                    .background(Design.Colors.surface.opacity(0.5))
-                    .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+                    .background(Design.Colors.surface2)
+                    .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xxl))
 
                 voiceModeLabel
             } else {
@@ -70,15 +69,14 @@ struct MessageBubble: View {
                             .foregroundStyle(Design.Colors.foreground)
                             .padding(.horizontal, Design.Spacing.md)
                             .padding(.vertical, Design.Spacing.sm)
-                            .background(Design.Colors.surface)
-                            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+                            .background(Design.Colors.surface2)
+                            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xxl))
                     }
                 }
 
-                HStack(spacing: Design.Spacing.xxs) {
+                HStack(spacing: Design.Spacing.xs) {
                     Text(message.timestamp, style: .time)
-                        .font(Design.Typography.caption2)
-                        .foregroundStyle(Design.Colors.secondaryForeground)
+                        .brandEyebrow()
 
                     Image(systemName: message.status.displayIcon)
                         .font(.system(size: Design.Size.iconTiny))
@@ -90,8 +88,7 @@ struct MessageBubble: View {
             if message.status == .failed {
                 Button { onRetry?(message) } label: {
                     Label("Retry", systemImage: "arrow.clockwise")
-                        .font(Design.Typography.caption)
-                        .foregroundStyle(.red)
+                        .brandEyebrow(Design.Colors.danger)
                 }
             }
         }
@@ -133,15 +130,13 @@ struct MessageBubble: View {
 
                 if !message.isStreaming {
                     Text(message.timestamp, style: .time)
-                        .font(Design.Typography.caption2)
-                        .foregroundStyle(Design.Colors.secondaryForeground)
+                        .brandEyebrow()
                 }
 
                 if message.status == .failed {
                     Button { onRetry?(message) } label: {
                         Label("Regenerate", systemImage: "arrow.counterclockwise")
-                            .font(Design.Typography.caption)
-                            .foregroundStyle(Design.Brand.accent)
+                            .brandEyebrow(Design.Brand.accent)
                     }
                 }
             }
@@ -155,14 +150,13 @@ struct MessageBubble: View {
 
     private func voiceTranscriptText(_ content: String) -> some View {
         Text("\u{201C}\(content)\u{201D}")
-            .font(Design.Typography.body.italic())
-            .foregroundStyle(Design.Colors.foreground.opacity(0.85))
+            .font(Design.Typography.editorialItalicSmall)
+            .foregroundStyle(Design.Colors.foreground.opacity(0.88))
     }
 
     private var voiceModeLabel: some View {
         Text("Voice Mode")
-            .font(Design.Typography.caption2)
-            .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.6))
+            .brandEyebrow(Design.Colors.tertiaryForeground)
     }
 
     // MARK: - Streaming Components
@@ -189,11 +183,13 @@ struct MessageBubble: View {
 
     private func toolActivityPill(_ label: String) -> some View {
         Text(label)
-            .font(Design.Typography.caption)
-            .foregroundStyle(Design.Colors.secondaryForeground)
+            .brandEyebrow()
             .padding(.horizontal, Design.Spacing.sm)
             .padding(.vertical, Design.Spacing.xxs)
             .background(Design.Colors.surface)
+            .overlay(
+                Capsule().stroke(Design.Colors.border, lineWidth: 1)
+            )
             .clipShape(Capsule())
     }
 
@@ -257,16 +253,18 @@ struct MessageBubble: View {
     // MARK: - Context Compaction Banner
 
     private var compactionBanner: some View {
-        HStack(spacing: Design.Spacing.sm) {
-            Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                .font(.system(size: Design.Size.iconSmall))
-                .foregroundStyle(Design.Colors.secondaryForeground)
-
+        HStack(spacing: Design.Spacing.xs) {
+            Rectangle()
+                .fill(Design.Colors.border)
+                .frame(height: 1)
             Text("Context compacted")
-                .font(Design.Typography.caption)
-                .foregroundStyle(Design.Colors.secondaryForeground)
+                .brandEyebrow()
+                .fixedSize()
+            Rectangle()
+                .fill(Design.Colors.border)
+                .frame(height: 1)
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, Design.Spacing.lg)
         .padding(.vertical, Design.Spacing.sm)
     }
 

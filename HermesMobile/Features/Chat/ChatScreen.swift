@@ -137,7 +137,7 @@ struct ChatScreen: View {
         Button {
             showContextPopover.toggle()
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: Design.Spacing.xs) {
                 Circle()
                     .fill(connectionIndicatorColor)
                     .frame(width: 6, height: 6)
@@ -151,8 +151,14 @@ struct ChatScreen: View {
 
                 contextRing(progress: contextProgress)
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, Design.Spacing.sm)
             .padding(.vertical, 6)
+            .background(
+                Capsule().fill(Design.Colors.surface)
+            )
+            .overlay(
+                Capsule().stroke(Design.Colors.border, lineWidth: 1)
+            )
             .fixedSize(horizontal: true, vertical: false)
         }
         .buttonStyle(.plain)
@@ -211,9 +217,7 @@ struct ChatScreen: View {
 
                 VStack(alignment: .leading, spacing: Design.Spacing.xs) {
                     Text("Context Window")
-                        .font(.system(.caption2, weight: .semibold))
-                        .foregroundStyle(Design.Colors.secondaryForeground)
-                        .textCase(.uppercase)
+                        .brandEyebrow()
 
                     if let usedTokens = currentContextTokens {
                         let progress = min(Double(usedTokens) / Double(maxCtx), 1.0)
@@ -273,9 +277,9 @@ struct ChatScreen: View {
     }
 
     private func contextColor(_ progress: Double) -> Color {
-        if progress > 0.85 { return .red }
-        if progress > 0.65 { return .orange }
-        return Design.Brand.accent
+        if progress > 0.85 { return Design.Colors.danger }
+        if progress > 0.65 { return Design.Colors.warning }
+        return Design.Brand.primary
     }
 
     private func formatTokenCount(_ count: Int) -> String {
@@ -303,11 +307,11 @@ struct ChatScreen: View {
     private var connectionIndicatorColor: Color {
         switch hostStore.connectionState {
         case .online:
-            return .green
+            return Design.Colors.success
         case .offline, .unreachable:
-            return .orange
+            return Design.Colors.warning
         case .notConnected:
-            return .gray
+            return Design.Colors.tertiaryForeground
         }
     }
 

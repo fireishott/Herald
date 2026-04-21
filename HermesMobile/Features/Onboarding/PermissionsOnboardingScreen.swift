@@ -31,13 +31,17 @@ struct PermissionsOnboardingScreen: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: Design.Spacing.sm) {
-            Text("Permissions")
+            Text("002 · Access")
+                .brandEyebrow()
+
+            Text("PERMISSIONS")
                 .font(Design.Typography.heroTitle)
+                .tracking(-1.2)
                 .foregroundStyle(Design.Colors.foreground)
 
-            Text("Enable only what you need. You can change these anytime in Settings.")
-                .font(Design.Typography.body)
-                .foregroundStyle(Design.Colors.secondaryForeground)
+            Text("enable only what you need. change anytime in settings.")
+                .font(Design.Typography.editorialItalicSmall)
+                .foregroundStyle(Design.Colors.foreground.opacity(0.85))
         }
     }
 
@@ -61,9 +65,14 @@ struct PermissionsOnboardingScreen: View {
         HStack(spacing: Design.Spacing.md) {
             Image(systemName: capability.permissionType.displayIcon)
                 .font(.system(size: Design.Size.iconMedium))
-                .foregroundStyle(.white)
+                .foregroundStyle(Design.Colors.foreground)
                 .frame(width: Design.Size.avatarSmall, height: Design.Size.avatarSmall)
-                .background(capability.permissionType.displayColor, in: .rect(cornerRadius: Design.CornerRadius.md))
+                .background(Design.Colors.surface2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Design.CornerRadius.md)
+                        .stroke(Design.Colors.border, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.md))
 
             VStack(alignment: .leading, spacing: Design.Spacing.xxxs) {
                 Text(capability.permissionType.displayLabel)
@@ -77,8 +86,7 @@ struct PermissionsOnboardingScreen: View {
 
                 if capability.status.isGranted {
                     Text("Granted")
-                        .font(Design.Typography.caption)
-                        .foregroundStyle(.green)
+                        .brandEyebrow(Design.Colors.success)
                 }
             }
 
@@ -88,6 +96,10 @@ struct PermissionsOnboardingScreen: View {
         }
         .padding(Design.Spacing.md)
         .background(Design.Colors.surface)
+        .overlay(
+            RoundedRectangle(cornerRadius: Design.CornerRadius.lg)
+                .stroke(Design.Colors.border, lineWidth: 1)
+        )
         .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
     }
 
@@ -99,8 +111,7 @@ struct PermissionsOnboardingScreen: View {
                 Task { await permissionsStore.requestPermission(for: capability.permissionType) }
             } label: {
                 Text("Enable")
-                    .font(Design.Typography.footnote.weight(.semibold))
-                    .foregroundStyle(Design.Colors.foreground)
+                    .brandEyebrow(Design.Colors.background)
                     .padding(.horizontal, Design.Spacing.md)
                     .padding(.vertical, Design.Spacing.xs)
             }
@@ -110,7 +121,7 @@ struct PermissionsOnboardingScreen: View {
         case .authorized, .authorizedWhenInUse, .authorizedAlways:
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 22))
-                .foregroundStyle(.green)
+                .foregroundStyle(Design.Colors.success)
 
         case .denied:
             Button {
@@ -119,8 +130,7 @@ struct PermissionsOnboardingScreen: View {
                 }
             } label: {
                 Text("Settings")
-                    .font(Design.Typography.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
+                    .brandEyebrow(Design.Colors.warning)
             }
 
         case .limited, .restricted, .unsupported:
@@ -136,14 +146,13 @@ struct PermissionsOnboardingScreen: View {
         Button {
             pairingStore.completePermissionsOnboarding()
         } label: {
-            Text("Continue")
-                .font(Design.Typography.headline)
-                .foregroundStyle(.white)
+            Text("Continue →")
+                .brandEyebrow(Design.Colors.background)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, Design.Spacing.sm)
+                .padding(.vertical, Design.Spacing.md)
         }
         .background(Design.Brand.accent)
-        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+        .clipShape(Capsule())
         .padding(.horizontal, Design.Spacing.md)
         .padding(.bottom, Design.Spacing.xl)
     }

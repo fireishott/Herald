@@ -170,8 +170,10 @@ struct ImageViewerScreen: View {
                         savedToPhotos ? "Saved" : (saveError ?? "Save to Photos"),
                         systemImage: savedToPhotos ? "checkmark.circle.fill" : (saveError != nil ? "exclamationmark.triangle" : "arrow.down.to.line")
                     )
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(saveError != nil ? .red : .white)
+                    .font(Design.Typography.eyebrow)
+                    .textCase(.uppercase)
+                    .tracking(1.2)
+                    .foregroundStyle(saveError != nil ? Design.Colors.danger : .white)
                     .padding(.horizontal, Design.Spacing.md)
                     .padding(.vertical, Design.Spacing.sm)
                     .background(.ultraThinMaterial)

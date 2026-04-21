@@ -145,7 +145,7 @@ struct ChatInputBar: View {
                         } label: {
                             Image(systemName: "waveform")
                                 .font(.system(size: Design.Size.iconMedium, weight: .medium))
-                                .foregroundStyle(Design.Colors.foreground)
+                                .foregroundStyle(Design.Colors.background)
                                 .frame(width: 36, height: 36)
                                 .background(Design.Brand.accent)
                                 .clipShape(Circle())
@@ -161,6 +161,10 @@ struct ChatInputBar: View {
                 .padding(.bottom, Design.Spacing.sm)
             }
             .background(Design.Colors.surface)
+            .overlay(
+                RoundedRectangle(cornerRadius: Design.CornerRadius.xxl)
+                    .stroke(Design.Colors.border, lineWidth: 1)
+            )
             .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xxl))
             .padding(.horizontal, Design.Spacing.md)
             .padding(.bottom, Design.Spacing.md)

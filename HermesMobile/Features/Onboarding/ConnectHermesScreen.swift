@@ -63,41 +63,42 @@ struct ConnectHermesScreen: View {
     """
 
     private var heroSection: some View {
-        VStack(spacing: Design.Spacing.md) {
+        VStack(alignment: .leading, spacing: Design.Spacing.md) {
+            Text("001 · Setup")
+                .brandEyebrow()
+
             // Caduceus art
             Text(Self.caduceus)
                 .font(.system(size: 14, design: .monospaced))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 1.0, green: 0.84, blue: 0.0),     // #FFD700 gold
-                            Color(red: 0.80, green: 0.50, blue: 0.20),   // #CD7F32 bronze
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+                .foregroundStyle(Design.Colors.foreground.opacity(0.9))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
-            Text("Hermes iOS")
-                .font(Design.Typography.heroTitle)
-                .foregroundStyle(Design.Colors.foreground)
+            VStack(alignment: .leading, spacing: Design.Spacing.xs) {
+                Text("Hermes")
+                    .font(Design.Typography.heroTitle)
+                    .tracking(-1.6)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Design.Colors.foreground)
+
+                Text("point it at your runtime.")
+                    .font(Design.Typography.editorialItalicSmall)
+                    .foregroundStyle(Design.Colors.foreground.opacity(0.88))
+            }
 
             Text("Run `hermes-mobile pair-phone` on your Hermes host, then scan the QR code to connect.")
-                .font(Design.Typography.body)
+                .font(Design.Typography.footnote)
                 .foregroundStyle(Design.Colors.secondaryForeground)
-                .multilineTextAlignment(.center)
         }
-        .padding(.vertical, Design.Spacing.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, Design.Spacing.md)
         .padding(.horizontal, Design.Spacing.md)
     }
 
     private var relayConfigurationCard: some View {
-        VStack(alignment: .leading, spacing: Design.Spacing.md) {
-            Text("Relay")
-                .font(Design.Typography.sectionTitle)
-                .foregroundStyle(Design.Colors.foreground)
+        VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+            Text("Relay URL")
+                .brandEyebrow()
 
             if relayConfiguration.canUseHosted {
                 Picker("Relay Mode", selection: relayModeBinding) {
@@ -112,10 +113,14 @@ struct ConnectHermesScreen: View {
                     .textInputAutocapitalization(.never)
                     .keyboardType(.URL)
                     .autocorrectionDisabled()
-                    .font(Design.Typography.callout.monospaced())
+                    .font(Design.Typography.callout)
                     .foregroundStyle(Design.Colors.foreground)
                     .padding(Design.Spacing.md)
-                    .background(Design.Colors.surface, in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+                    .background(Design.Colors.surface, in: RoundedRectangle(cornerRadius: Design.CornerRadius.md))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Design.CornerRadius.md)
+                            .stroke(Design.Colors.border, lineWidth: 1)
+                    )
                     .accessibilityLabel("Relay URL")
 
                 Text("This should be your relay API base URL. The app will append pairing and chat endpoints to it.")
@@ -123,19 +128,24 @@ struct ConnectHermesScreen: View {
                     .foregroundStyle(Design.Colors.secondaryForeground)
             } else if let hostedRelayBaseURL = relayConfiguration.hostedRelayBaseURL {
                 Text(hostedRelayBaseURL)
-                    .font(Design.Typography.callout.monospaced())
+                    .font(Design.Typography.callout)
                     .foregroundStyle(Design.Colors.secondaryForeground)
             }
 
             if let relayValidationMessage {
                 Text(relayValidationMessage)
                     .font(Design.Typography.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Design.Colors.warning)
             }
         }
-        .padding(Design.Spacing.lg)
+        .padding(Design.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Design.Colors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+        .overlay(
+            RoundedRectangle(cornerRadius: Design.CornerRadius.lg)
+                .stroke(Design.Colors.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
     }
 
     private var entryOptions: some View {
@@ -146,12 +156,12 @@ struct ConnectHermesScreen: View {
             } label: {
                 Label("Scan QR Code", systemImage: "qrcode.viewfinder")
                     .font(Design.Typography.headline)
-                    .foregroundStyle(Design.Colors.foreground)
+                    .foregroundStyle(Design.Colors.background)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, Design.Spacing.sm)
+                    .padding(.vertical, Design.Spacing.sm + 2)
             }
             .background(Design.Brand.accent)
-            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+            .clipShape(Capsule())
             .accessibilityLabel("Scan QR Code")
 
             Button {
@@ -165,27 +175,37 @@ struct ConnectHermesScreen: View {
                     .font(Design.Typography.headline)
                     .foregroundStyle(Design.Colors.foreground)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, Design.Spacing.sm)
+                    .padding(.vertical, Design.Spacing.sm + 2)
             }
             .background(Design.Colors.surface)
-            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+            .overlay(
+                Capsule().stroke(Design.Colors.border, lineWidth: 1)
+            )
+            .clipShape(Capsule())
             .accessibilityLabel("Enter Code Manually")
         }
     }
 
     private var manualEntryCard: some View {
-        VStack(alignment: .leading, spacing: Design.Spacing.md) {
-            Text("Phone Pairing Code")
-                .font(Design.Typography.sectionTitle)
-                .foregroundStyle(Design.Colors.foreground)
+        VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+            Text("Pairing Code")
+                .brandEyebrow()
 
             TextField("ABCD-EFGH", text: $setupCode)
                 .textInputAutocapitalization(.characters)
                 .autocorrectionDisabled()
-                .font(Design.Typography.callout.monospaced())
+                .font(.system(size: 22, weight: .regular, design: .monospaced))
+                .tracking(2)
                 .foregroundStyle(Design.Colors.foreground)
                 .padding(Design.Spacing.md)
-                .background(Design.Colors.surface, in: RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+                .background(Design.Colors.surface2, in: RoundedRectangle(cornerRadius: Design.CornerRadius.md))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Design.CornerRadius.md)
+                        .strokeBorder(
+                            style: StrokeStyle(lineWidth: 1, dash: [4, 3])
+                        )
+                        .foregroundStyle(Design.Colors.borderStrong)
+                )
                 .focused($isSetupCodeFocused)
                 .accessibilityLabel("Setup code")
 
@@ -194,25 +214,32 @@ struct ConnectHermesScreen: View {
             } label: {
                 if pairingStore.isWorking {
                     ProgressView()
-                        .tint(Design.Colors.foreground)
+                        .tint(Design.Colors.background)
                         .frame(maxWidth: .infinity)
                 } else {
-                    Text("Connect Hermes")
+                    Text("Pair Phone →")
                         .font(Design.Typography.headline)
-                        .foregroundStyle(Design.Colors.foreground)
+                        .tracking(0.5)
+                        .foregroundStyle(Design.Colors.background)
                         .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.vertical, Design.Spacing.sm)
+            .padding(.vertical, Design.Spacing.sm + 2)
             .background(Design.Brand.accent)
-            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
+            .clipShape(Capsule())
             .disabled(pairingStore.isWorking || !PhonePairingCode.isComplete(setupCode) || !isRelayConfigurationValid)
             .opacity(pairingStore.isWorking || !PhonePairingCode.isComplete(setupCode) || !isRelayConfigurationValid ? 0.5 : 1)
-            .accessibilityLabel("Connect Hermes")
+            .padding(.top, Design.Spacing.xs)
+            .accessibilityLabel("Pair Phone")
         }
-        .padding(Design.Spacing.lg)
+        .padding(Design.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Design.Colors.surface)
-        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.xl))
+        .overlay(
+            RoundedRectangle(cornerRadius: Design.CornerRadius.lg)
+                .stroke(Design.Colors.border, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
     }
 
     private var scannerSheet: some View {
