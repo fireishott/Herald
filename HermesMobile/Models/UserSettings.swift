@@ -1,18 +1,40 @@
 import Foundation
 
+enum PushTransportMode: String, Codable, Hashable, Sendable {
+    case direct
+    case relay
+}
+
 struct AppBuildConfiguration: Equatable, Sendable {
     let hostedRelayBaseURL: String?
     let hostedRelayEnabled: Bool
+    let pushTransport: PushTransportMode
+    let pushBrokerBaseURL: URL?
     let supportURL: URL?
     let termsOfServiceURL: URL?
     let privacyPolicyURL: URL?
 
     static func current(bundle: Bundle = .main) -> AppBuildConfiguration {
-        let info = bundle.infoDictionary ?? [:]
+        AppBuildConfiguration(infoDictionary: bundle.infoDictionary ?? [:])
+    }
+
+    init(infoDictionary: [String: Any]) {
+        let info = infoDictionary
         let hostedRelayBaseURL = RelayConfiguration.normalizeBaseURL(
             info["APP_HOSTED_RELAY_URL"] as? String
         )
         let hostedRelayEnabled = (info["APP_HOSTED_RELAY_ENABLED"] as? Bool) ?? false
+        let pushTransport = PushTransportMode(
+            rawValue: ((info["APP_PUSH_TRANSPORT"] as? String) ?? "direct")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+        ) ?? .direct
+
+        let pushBrokerBaseURL: URL? = {
+            guard let raw = info["APP_PUSH_BROKER_URL"] as? String else { return nil }
+            guard let normalized = RelayConfiguration.normalizeBaseURL(raw) else { return nil }
+            return URL(string: normalized)
+        }()
 
         func urlValue(_ key: String) -> URL? {
             guard let raw = info[key] as? String, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -21,13 +43,17 @@ struct AppBuildConfiguration: Equatable, Sendable {
             return URL(string: raw)
         }
 
-        return AppBuildConfiguration(
-            hostedRelayBaseURL: hostedRelayBaseURL,
-            hostedRelayEnabled: hostedRelayEnabled && hostedRelayBaseURL != nil,
-            supportURL: urlValue("APP_SUPPORT_URL"),
-            termsOfServiceURL: urlValue("APP_TERMS_URL"),
-            privacyPolicyURL: urlValue("APP_PRIVACY_URL")
-        )
+        self.hostedRelayBaseURL = hostedRelayBaseURL
+        self.hostedRelayEnabled = hostedRelayEnabled && hostedRelayBaseURL != nil
+        self.pushTransport = pushTransport
+        self.pushBrokerBaseURL = pushBrokerBaseURL
+        self.supportURL = urlValue("APP_SUPPORT_URL")
+        self.termsOfServiceURL = urlValue("APP_TERMS_URL")
+        self.privacyPolicyURL = urlValue("APP_PRIVACY_URL")
+    }
+
+    var usesManagedPushBroker: Bool {
+        pushTransport == .relay && pushBrokerBaseURL != nil
     }
 }
 

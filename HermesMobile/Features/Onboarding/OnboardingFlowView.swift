@@ -88,6 +88,7 @@ struct OnboardingFlowView: View {
         case .relay:
             RelayStepView(
                 relayConfiguration: relayConfiguration,
+                usesManagedPushBroker: settingsStore.buildConfiguration.usesManagedPushBroker,
                 validationMessage: relayConfiguration.validationMessage,
                 errorMessage: localErrorMessage,
                 connectionModeBinding: connectionModeBinding,
@@ -334,6 +335,7 @@ private struct WelcomeStepView: View {
 
 private struct RelayStepView: View {
     let relayConfiguration: RelayConfiguration
+    let usesManagedPushBroker: Bool
     let validationMessage: String?
     let errorMessage: String?
     let connectionModeBinding: Binding<RelayConnectionMode>
@@ -399,6 +401,12 @@ private struct RelayStepView: View {
                             Text(validationMessage)
                                 .font(Design.Typography.caption)
                                 .foregroundStyle(Design.Colors.warning)
+                        }
+
+                        if relayConfiguration.connectionMode == .managedRelay {
+                            Text(usesManagedPushBroker ? "Official push delivery is enabled in this build." : "This build uses direct relay push only.")
+                                .font(Design.Typography.caption)
+                                .foregroundStyle(Design.Colors.secondaryForeground)
                         }
                     }
 

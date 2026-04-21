@@ -154,6 +154,10 @@ struct SettingsScreen: View {
                             title: "Hosted Relay",
                             value: hostedRelayBaseURL
                         )
+
+                        Text(settingsStore.buildConfiguration.usesManagedPushBroker ? "Official managed push is enabled in this build." : "This build uses direct relay push only.")
+                            .font(Design.Typography.caption)
+                            .foregroundStyle(Design.Colors.secondaryForeground)
                     }
 
                     if let relayValidationMessage {

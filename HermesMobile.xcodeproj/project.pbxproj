@@ -36,6 +36,7 @@
 		24ADF49D0A89908EA74858B1 /* HermesHostServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01A310FC7CE4D91514A32147 /* HermesHostServiceProtocol.swift */; };
 		28954832D2F8292FE2718C35 /* VoiceSessionServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56166EB9EE951AC73734CE7D /* VoiceSessionServiceProtocol.swift */; };
 		2ABF0F9EAD035ABE26514847 /* LiveSessionBootstrapService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A74A05574828199D600F3F75 /* LiveSessionBootstrapService.swift */; };
+		30A579270FB6710022638907 /* PushBrokerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAE869E3CDE290E1B1EC66E6 /* PushBrokerClient.swift */; };
 		311C32C38604948756B41932 /* CodeBlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F77FB3058B069312B9716844 /* CodeBlockView.swift */; };
 		3652BC8BBD34B2AB22476C7C /* SessionBootstrapServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73518DAA2B5C3318F623C266 /* SessionBootstrapServiceProtocol.swift */; };
 		39B3EB23E6D50A2DB15D7189 /* PairedRelayConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7FFDDBF96B625F71573F9D5 /* PairedRelayConfiguration.swift */; };
@@ -44,6 +45,7 @@
 		3FD762BB48352F4B7832682D /* HealthServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A365392D8FF6A1CA075D55F9 /* HealthServiceProtocol.swift */; };
 		407CFBF26B282A2960795CE6 /* PermissionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9ED29B54E6DCD5E9B71B4628 /* PermissionStatus.swift */; };
 		415B41D3E6722C9A145EEE21 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3C649C9B4BAD6717BFF735EB /* Assets.xcassets */; };
+		41B481857E718FA69E0A78CE /* PushRegistrationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C13B8475726520B44DE20E3 /* PushRegistrationCoordinator.swift */; };
 		41E17786AB77C5C81B56F376 /* HermesMobileWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CB1E16EC7AC1A55E87ED87EA /* HermesMobileWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		42A73FB8DF4A3E5BCBE7A38C /* AttachmentPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 563A8C074CFB49E60CF6686E /* AttachmentPickerSheet.swift */; };
 		458E4319DAC3C7EEDBDE7B2A /* InboxStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36500DDDD7B917A3A3C1A3FC /* InboxStore.swift */; };
@@ -61,6 +63,7 @@
 		53774770A0DA6C7475CFF2F9 /* ChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0579B075189F65103B6B277 /* ChatInputBar.swift */; };
 		54DA8267DE03CA306CF575B6 /* MarkdownContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6109316083425073F0703CE6 /* MarkdownContentView.swift */; };
 		56DB6FEB2CE77EDD26CFA5E0 /* Message.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F93EA9C1C026795AB668C6E /* Message.swift */; };
+		582BA1B3B7725B471CCD8AFE /* AppAttestService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 194D16634406A1D3F8B30CE7 /* AppAttestService.swift */; };
 		585427AAF0E7B38F1C57FC15 /* PermissionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACB3C95563F41E3B154C3DF3 /* PermissionsStore.swift */; };
 		5F823D253275EC39470DF3C9 /* ResilientSessionBootstrapService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A742298DC50F521403AA5AF7 /* ResilientSessionBootstrapService.swift */; };
 		61009C17CACB163B4CEB157F /* MockHealthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B914BAD0AFF93498E42755F /* MockHealthService.swift */; };
@@ -137,6 +140,7 @@
 		D4459E9B350994A6B0C4D284 /* MockLocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164FC29A86F0762768A9E444 /* MockLocationService.swift */; };
 		D5F972289540E4C859061FC1 /* SlashCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF6C9CA515F8316F3CC8DDF /* SlashCommand.swift */; };
 		D9255DD5A9B9F7DA427EC3D5 /* HermesHealthWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64A4197D843A907F1F4539E6 /* HermesHealthWidget.swift */; };
+		DAFE60F0AAF6A556722EE093 /* PushBrokerRegistrationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0DAA40C50E81147DFAE59A2 /* PushBrokerRegistrationStore.swift */; };
 		DB13D240C5F7B8919C8FF881 /* ChatStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0220D103178EF414928CFCA7 /* ChatStore.swift */; };
 		DEA375A9D664BF1F4E2E5F60 /* StreamingUpdate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D413F0B4D4CB0A7613A4A0E6 /* StreamingUpdate.swift */; };
 		E515B2B803409DD8B53A65A2 /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7745C09181860B8818753B91 /* SettingsScreen.swift */; };
@@ -212,6 +216,7 @@
 		10FCCF49653C4D623A96D6DA /* HostEnrollmentCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostEnrollmentCode.swift; sourceTree = "<group>"; };
 		164FC29A86F0762768A9E444 /* MockLocationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockLocationService.swift; sourceTree = "<group>"; };
 		18C2AFDCFC6C6C119984318D /* LiveHermesHostService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveHermesHostService.swift; sourceTree = "<group>"; };
+		194D16634406A1D3F8B30CE7 /* AppAttestService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAttestService.swift; sourceTree = "<group>"; };
 		1AB61078198CA1379D8F50ED /* ChatScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatScreen.swift; sourceTree = "<group>"; };
 		1ABD6B7D4D5606CBC4DF62B6 /* MockHermesHostService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockHermesHostService.swift; sourceTree = "<group>"; };
 		1C8D4D1AE1F87252EEB0C2FF /* MockInboxService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockInboxService.swift; sourceTree = "<group>"; };
@@ -231,6 +236,7 @@
 		3ACC623FAF147465BB777E42 /* HermesActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesActivityAttributes.swift; sourceTree = "<group>"; };
 		3B0D65894E05A8CB60246986 /* InboxServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxServiceProtocol.swift; sourceTree = "<group>"; };
 		3C0CE3739DE97A0EED8BF86C /* VoiceOrb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceOrb.swift; sourceTree = "<group>"; };
+		3C13B8475726520B44DE20E3 /* PushRegistrationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushRegistrationCoordinator.swift; sourceTree = "<group>"; };
 		3C649C9B4BAD6717BFF735EB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		41A7265DC07E05B68C845778 /* InboxActionDescriptor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxActionDescriptor.swift; sourceTree = "<group>"; };
 		41F982E7FF317AD2BDA8879C /* SettingsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStore.swift; sourceTree = "<group>"; };
@@ -299,6 +305,7 @@
 		9C0F5A52769E2B66E7288C6B /* KeychainSecureStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSecureStore.swift; sourceTree = "<group>"; };
 		9ED29B54E6DCD5E9B71B4628 /* PermissionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionStatus.swift; sourceTree = "<group>"; };
 		9FF6C9CA515F8316F3CC8DDF /* SlashCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlashCommand.swift; sourceTree = "<group>"; };
+		A0DAA40C50E81147DFAE59A2 /* PushBrokerRegistrationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushBrokerRegistrationStore.swift; sourceTree = "<group>"; };
 		A20870910260860BA2EF0F2D /* DeviceCapability.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceCapability.swift; sourceTree = "<group>"; };
 		A2B04B5A213133A77C0982DE /* HapticEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticEngine.swift; sourceTree = "<group>"; };
 		A3638A04F9C4EF799250E210 /* SyncCoordinatorProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCoordinatorProtocol.swift; sourceTree = "<group>"; };
@@ -347,6 +354,7 @@
 		E7FFDDBF96B625F71573F9D5 /* PairedRelayConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedRelayConfiguration.swift; sourceTree = "<group>"; };
 		E900FB004E762EAB2F356D20 /* PairingRedeemResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingRedeemResult.swift; sourceTree = "<group>"; };
 		E963F520419ACAC16EF3BB13 /* LocationServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationServiceProtocol.swift; sourceTree = "<group>"; };
+		EAE869E3CDE290E1B1EC66E6 /* PushBrokerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushBrokerClient.swift; sourceTree = "<group>"; };
 		EE23CAFCDB6E64ED3FFB78BB /* LiveInboxService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveInboxService.swift; sourceTree = "<group>"; };
 		EE6D891E4F6D043CE9C6CC15 /* HermesClientProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesClientProtocol.swift; sourceTree = "<group>"; };
 		EF9D9C3F3DC8A0B7DF53278B /* UserDefaultsAppPersistenceStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsAppPersistenceStore.swift; sourceTree = "<group>"; };
@@ -568,7 +576,11 @@
 		8B8E000DEAE7C4C24271ABEA /* Support */ = {
 			isa = PBXGroup;
 			children = (
+				194D16634406A1D3F8B30CE7 /* AppAttestService.swift */,
 				9C0F5A52769E2B66E7288C6B /* KeychainSecureStore.swift */,
+				EAE869E3CDE290E1B1EC66E6 /* PushBrokerClient.swift */,
+				A0DAA40C50E81147DFAE59A2 /* PushBrokerRegistrationStore.swift */,
+				3C13B8475726520B44DE20E3 /* PushRegistrationCoordinator.swift */,
 				77889D1F0949BA7D30FE3A76 /* RelayAPIClient.swift */,
 				539E2CFF8AC26909D0C7EFC0 /* ResilientHermesClient.swift */,
 				5DE4327F2AD595475224778C /* ResilientInboxService.swift */,
@@ -906,6 +918,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				582BA1B3B7725B471CCD8AFE /* AppAttestService.swift in Sources */,
 				78E916A7C30474717FE1F7DC /* AppContainer.swift in Sources */,
 				48EA1D2ECF55A452C1F6F592 /* AppEntry.swift in Sources */,
 				1EA612E6046B341EBC64339F /* AppPersistenceStoreProtocol.swift in Sources */,
@@ -1002,6 +1015,9 @@
 				0CD417A7D4F86CDEE8D563E8 /* PermissionType.swift in Sources */,
 				0BC371DA53649A79C69D09BA /* PermissionsScreen.swift in Sources */,
 				585427AAF0E7B38F1C57FC15 /* PermissionsStore.swift in Sources */,
+				30A579270FB6710022638907 /* PushBrokerClient.swift in Sources */,
+				DAFE60F0AAF6A556722EE093 /* PushBrokerRegistrationStore.swift in Sources */,
+				41B481857E718FA69E0A78CE /* PushRegistrationCoordinator.swift in Sources */,
 				1CB407EF5D79683130EF86DD /* RelayAPIClient.swift in Sources */,
 				B888DF20EF13BD44C49678F7 /* RelaySetupCodePayload.swift in Sources */,
 				BEB46DCA8E625E9631C185BC /* ResilientHermesClient.swift in Sources */,

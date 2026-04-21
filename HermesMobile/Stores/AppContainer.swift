@@ -18,6 +18,7 @@ final class AppContainer {
     let sensorUploadService: SensorUploadService?
     private let apiClient: RelayAPIClient?
     private let notificationService: (any NotificationServiceProtocol)?
+    private let pushRegistrationCoordinator: PushRegistrationCoordinator?
     private var isInitialized = false
     private var lastCommandCatalogRefreshAt: Date?
     private var lastKnownHostOnline = false
@@ -35,7 +36,8 @@ final class AppContainer {
         talkStore: TalkStore,
         sensorUploadService: SensorUploadService? = nil,
         apiClient: RelayAPIClient? = nil,
-        notificationService: (any NotificationServiceProtocol)? = nil
+        notificationService: (any NotificationServiceProtocol)? = nil,
+        pushRegistrationCoordinator: PushRegistrationCoordinator? = nil
     ) {
         self.sessionStore = sessionStore
         self.pairingStore = pairingStore
@@ -48,6 +50,7 @@ final class AppContainer {
         self.sensorUploadService = sensorUploadService
         self.apiClient = apiClient
         self.notificationService = notificationService
+        self.pushRegistrationCoordinator = pushRegistrationCoordinator
     }
 
     static func sharedDefault() -> AppContainer {
@@ -104,6 +107,14 @@ final class AppContainer {
                 ?? settingsStore.settings.relayConfiguration.activeBaseURLString
                 ?? ""
         }
+        let pushBrokerClient = buildConfiguration.pushBrokerBaseURL.map { PushBrokerClient(baseURL: $0) }
+        let pushRegistrationCoordinator = PushRegistrationCoordinator(
+            relayAPIClient: apiClient,
+            brokerClient: pushBrokerClient,
+            registrationStore: PushBrokerRegistrationStore(secureStore: secureStore),
+            appAttestService: LiveAppAttestService(secureStore: secureStore),
+            buildConfiguration: buildConfiguration
+        )
 
         let sessionBootstrapService = ResilientSessionBootstrapService(
             primary: LiveSessionBootstrapService(apiClient: apiClient),
@@ -219,7 +230,8 @@ final class AppContainer {
             talkStore: TalkStore(voiceService: voiceService),
             sensorUploadService: sensorUploadService,
             apiClient: apiClient,
-            notificationService: notificationService
+            notificationService: notificationService,
+            pushRegistrationCoordinator: pushRegistrationCoordinator
         )
 
         let refreshUnpairedRelayContext: @MainActor () async -> Void = { [weak sessionStore, weak container] in
@@ -395,33 +407,19 @@ final class AppContainer {
         let pushEnvironment = "production"
         #endif
 
-        struct PushRegisterBody: Encodable {
-            let deviceId: String
-            let apnsToken: String
-            let pushEnvironment: String
-            let bundleId: String
-        }
-
-        let body = PushRegisterBody(
-            deviceId: deviceID.uuidString.lowercased(),
-            apnsToken: normalizedToken,
-            pushEnvironment: pushEnvironment,
-            bundleId: Bundle.main.bundleIdentifier ?? "io.hermesmobile.HermesMobile"
-        )
-
-        struct PushRegisterResponse: Decodable {
-            let data: PushData?
-            struct PushData: Decodable { let registered: Bool }
-        }
-
         do {
-            let _: PushRegisterResponse = try await apiClient.post(
-                path: "push/register",
-                body: body,
-                accessToken: accessToken
+            let didRegister = try await pushRegistrationCoordinator?.registerPushToken(
+                normalizedToken,
+                relayConfiguration: settingsStore.settings.relayConfiguration,
+                accessToken: accessToken,
+                deviceID: deviceID,
+                installationID: sessionStore.state.installationID,
+                bundleID: Bundle.main.bundleIdentifier ?? "io.hermesmobile.HermesMobile",
+                appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0",
+                pushEnvironment: pushEnvironment
             )
-            await notificationService.markPushTokenRegistered(true)
-            sessionStore.state.pushTokenRegistered = true
+            await notificationService.markPushTokenRegistered(didRegister ?? false)
+            sessionStore.state.pushTokenRegistered = didRegister ?? false
         } catch {
             // Non-critical — token will be retried on next app launch
             await notificationService.markPushTokenRegistered(false)
@@ -431,17 +429,18 @@ final class AppContainer {
 
     /// Tells the relay to deactivate push registrations for this device.
     private func deactivatePushRegistration() async {
-        guard let apiClient,
-              let accessToken = await sessionStore.currentAccessToken() else { return }
+        guard let accessToken = await sessionStore.currentAccessToken() else { return }
+        if let pushRegistrationCoordinator {
+            try? await pushRegistrationCoordinator.deactivatePushRegistration(accessToken: accessToken)
+            return
+        }
+        guard let apiClient else { return }
 
         struct DeactivateResponse: Decodable {
             let deactivated: Bool?
         }
 
-        _ = try? await apiClient.post(
-            path: "push/deactivate",
-            accessToken: accessToken
-        ) as DeactivateResponse
+        _ = try? await apiClient.post(path: "push/deactivate", accessToken: accessToken) as DeactivateResponse
     }
 
     private func registerStoredPushTokenIfNeeded() async {

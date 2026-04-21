@@ -130,6 +130,7 @@ For public/self-hosted users, `connector` mode is the intended deployment model.
 - `POST /v1/push-broker/send`
   - relay-signed APNs send through a validated relay handle and send grant
 - `POST /v1/push/register`
+  - stores either direct APNs tokens or broker-backed relay handle/send grant metadata
 - `POST /v1/push/deactivate`
 - `POST /v1/push/send` *(internal)*
 - `POST /internal/inbox/create`
