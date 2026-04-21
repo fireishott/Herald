@@ -1,8 +1,16 @@
 import SwiftUI
 
-struct MessageBubble: View {
+struct MessageBubble: View, Equatable {
     let message: Message
     var onRetry: ((Message) -> Void)? = nil
+
+    /// Only the message itself affects the rendered bubble — the retry closure
+    /// is captured fresh per parent render but is functionally stable. Comparing
+    /// messages lets `.equatable()` in the list skip re-rendering unchanged
+    /// bubbles while the streaming tail appends.
+    nonisolated static func == (lhs: MessageBubble, rhs: MessageBubble) -> Bool {
+        lhs.message == rhs.message
+    }
 
     private var isUser: Bool { message.sender == .user || message.sender == .voiceUser }
     private var isHermes: Bool { message.sender == .hermes || message.sender == .voiceHermes }

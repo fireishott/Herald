@@ -1601,32 +1601,93 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     done_event_data["message"] = serialize_message(result_message, job=job)
 
         async def event_stream():
+            # Coalesce streaks of text_delta events into a single outgoing SSE
+            # frame. On noisy connections each frame carries TLS + HTTP/2 framing
+            # overhead, so batching 5–20 deltas cuts bytes-on-wire and wakeups on
+            # the iOS side by an order of magnitude for long model outputs.
+            delta_buffer: list[str] = []
+            delta_job_id: str | None = None
+            # ~40ms is below human perception of streaming lag but wide enough
+            # to absorb the tokens-per-second cadence of GPT-4 class models.
+            delta_flush_window = 0.04
+
+            def drain_delta(data: dict) -> None:
+                delta_buffer.append(str(data.get("delta") or ""))
+                nonlocal delta_job_id
+                delta_job_id = data.get("jobId") or delta_job_id
+
+            def flushed_delta_frame() -> str | None:
+                if not delta_buffer:
+                    return None
+                merged = "".join(delta_buffer)
+                delta_buffer.clear()
+                if not merged:
+                    return None
+                payload = {"jobId": delta_job_id or job_id, "kind": "text_delta", "delta": merged}
+                return f"event: text_delta\ndata: {json.dumps(jsonable_encoder(payload))}\n\n"
+
+            def emit_event(event: dict) -> str | None:
+                event_type = event.get("event", "progress")
+                if event_type == "text_delta":
+                    drain_delta(event.get("data", {}) or {})
+                    return None
+                data = json.dumps(jsonable_encoder(event.get("data", {})))
+                return f"event: {event_type}\ndata: {data}\n\n"
+
             try:
-                # First, replay any buffered events (text_delta, tool_activity, etc.)
+                # Replay any buffered events (text_delta, tool_activity, etc.)
+                # that landed before the SSE connection opened.
                 while not queue.empty():
                     event = queue.get_nowait()
-                    event_type = event.get("event", "progress")
-                    data = json.dumps(jsonable_encoder(event.get("data", {})))
-                    yield f"event: {event_type}\ndata: {data}\n\n"
-                    if event_type == "done":
-                        return
+                    frame = emit_event(event)
+                    if frame is not None:
+                        flushed = flushed_delta_frame()
+                        if flushed is not None:
+                            yield flushed
+                        yield frame
+                        if event.get("event") == "done":
+                            return
+
+                flushed = flushed_delta_frame()
+                if flushed is not None:
+                    yield flushed
 
                 # If job already completed, emit the done event after replaying buffer
                 if done_event_data is not None:
                     yield f"event: done\ndata: {json.dumps(jsonable_encoder(done_event_data))}\n\n"
                     return
 
-                # Otherwise, stream live events as they arrive
+                # Live phase — drain events with short-timeout coalescing for
+                # text_delta streaks, long-timeout keepalive otherwise.
                 while True:
+                    # If we're sitting on buffered deltas, use the short flush
+                    # window so we never hold a delta longer than ~40ms.
+                    timeout = delta_flush_window if delta_buffer else float(settings.sse_keepalive_seconds)
                     try:
-                        event = await asyncio.wait_for(queue.get(), timeout=float(settings.sse_keepalive_seconds))
-                        event_type = event.get("event", "progress")
-                        data = json.dumps(jsonable_encoder(event.get("data", {})))
-                        yield f"event: {event_type}\ndata: {data}\n\n"
-                        if event_type == "done":
-                            break
+                        event = await asyncio.wait_for(queue.get(), timeout=timeout)
                     except asyncio.TimeoutError:
-                        yield ": keepalive\n\n"
+                        if delta_buffer:
+                            flushed = flushed_delta_frame()
+                            if flushed is not None:
+                                yield flushed
+                        else:
+                            yield ": keepalive\n\n"
+                        continue
+
+                    frame = emit_event(event)
+                    if frame is None:
+                        # Buffered a delta. Continue draining without yielding —
+                        # the next iteration's short timeout will flush it.
+                        continue
+
+                    # Non-delta event: flush any pending delta first so order
+                    # is preserved, then emit this event.
+                    flushed = flushed_delta_frame()
+                    if flushed is not None:
+                        yield flushed
+                    yield frame
+                    if event.get("event") == "done":
+                        break
             finally:
                 unsubscribe_job_events(job_id, queue)
 
@@ -1744,6 +1805,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         connection_nonce = str(uuid.uuid4())
         host_id: str | None = None
         user_id: str | None = None
+        # Track the job currently being executed so the `finally` block can
+        # surface a `done`/failed event if the connector drops mid-response.
+        # Without this, iOS SSE clients hang until their own request timeout.
+        in_flight_job_id: str | None = None
 
         try:
             with database.session() as db:
@@ -1801,6 +1866,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     session = connector_session_for_user(user_id)
                     if session is not None and session.connection_nonce == connection_nonce:
                         session.busy = True
+
+                    in_flight_job_id = claimed_job.id
 
                     try:
                         await websocket.send_json(job_payload)
@@ -1894,6 +1961,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                     "event": "done",
                                     "data": done_event_data,
                                 })
+                                in_flight_job_id = None
                                 break
 
                             if message_type == "job.failed" and incoming.get("jobId") == claimed_job.id:
@@ -1923,6 +1991,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                             "message": result_message,
                                         },
                                     })
+                                in_flight_job_id = None
                                 break
 
                             await websocket.close(code=4400)
@@ -1984,6 +2053,41 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except WebSocketDisconnect:
             return
         finally:
+            if in_flight_job_id is not None:
+                # Connector dropped mid-response. Mark the job failed and emit a
+                # `done` event so the iOS SSE subscriber unblocks immediately —
+                # otherwise the client would wait for the request timeout.
+                try:
+                    with database.session() as db:
+                        failed_job = fail_message_job(
+                            db,
+                            job_id=in_flight_job_id,
+                            connection_nonce=connection_nonce,
+                            error_text="Hermes connector disconnected before completing the response.",
+                            retryable=False,
+                        )
+                        result_message = (
+                            serialize_message(db.get(Message, failed_job.result_message_id), job=failed_job)
+                            if failed_job is not None
+                            and failed_job.result_message_id
+                            and db.get(Message, failed_job.result_message_id) is not None
+                            else None
+                        )
+                    publish_job_event(in_flight_job_id, {
+                        "event": "done",
+                        "data": {
+                            "jobId": in_flight_job_id,
+                            "status": "failed",
+                            "error": "Hermes connector disconnected.",
+                            "message": result_message,
+                        },
+                    })
+                except Exception:  # noqa: BLE001 — last-ditch cleanup
+                    logger.exception(
+                        "Failed to fail in-flight job %s after connector disconnect",
+                        in_flight_job_id,
+                    )
+
             if host_id is not None:
                 clear_connector_session(user_id, connection_nonce)
                 with database.session() as db:
