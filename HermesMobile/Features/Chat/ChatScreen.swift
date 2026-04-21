@@ -339,6 +339,7 @@ struct ChatScreen: View {
                             MessageBubble(message: message) { failedMessage in
                                 Task { await chatStore.retryMessage(failedMessage) }
                             }
+                            .equatable()
                             .id(message.id)
                         }
                     }
