@@ -21,7 +21,7 @@ Tracked files should keep generic defaults. Real deployment values belong in loc
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `PUBLIC_BASE_URL` | Yes | Public API base URL ending in `/v1` |
-| `DATABASE_URL` | Yes | PostgreSQL in production; SQLite is fine for local dev |
+| `DATABASE_URL` | Yes | SQLite on a persistent volume is supported for the single-node managed beta path; PostgreSQL is recommended for multi-node production |
 | `INTERNAL_API_KEY` | Yes | Must be a strong random value outside development/test |
 | `RELAY_ENVIRONMENT` | Recommended | `development`, `test`, or `production` |
 

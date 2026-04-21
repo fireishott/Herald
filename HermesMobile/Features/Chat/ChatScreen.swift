@@ -434,11 +434,11 @@ struct ChatScreen: View {
         case .online:
             return "Your Hermes host is connected."
         case .offline:
-            return "Messages will queue until your Hermes host reconnects."
+            return settingsStore.settings.relayConfiguration.connectionMode.hostOfflineMessage
         case .unreachable:
-            return hostStore.lastErrorMessage ?? "Check your relay connection or refresh your session."
+            return hostStore.lastErrorMessage ?? settingsStore.settings.relayConfiguration.connectionMode.defaultOfflineMessage
         case .notConnected:
-            return "Pair a Hermes host from Settings to send messages through your Mac."
+            return settingsStore.settings.relayConfiguration.connectionMode.notConnectedMessage
         }
     }
 

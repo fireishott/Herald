@@ -1540,6 +1540,61 @@ struct AppStoresTests {
     }
 
     @Test
+    func relayConfigurationDefaultsCustomRelayToSelfHostedConnectionMode() throws {
+        let configuration = RelayConfiguration(
+            relayMode: .custom,
+            customRelayBaseURL: "https://relay.example.com/v1",
+            hostedRelayBaseURL: nil,
+            hostedRelayEnabled: false
+        )
+
+        #expect(configuration.connectionMode == .selfHostedRelay)
+        #expect(configuration.connectionMode.reliesOnOfficialPushRelay == false)
+        #expect(configuration.activeBaseURLString == "https://relay.example.com/v1")
+    }
+
+    @Test
+    func relayConfigurationMigratesLegacyHostedModeToManagedConnectionMode() throws {
+        let json = """
+        {
+          "relayMode": "hosted",
+          "customRelayBaseURL": "",
+          "hostedRelayBaseURL": "https://managed.example.com/v1",
+          "hostedRelayEnabled": true
+        }
+        """
+        let data = try #require(json.data(using: .utf8))
+
+        let configuration = try JSONDecoder().decode(RelayConfiguration.self, from: data)
+
+        #expect(configuration.connectionMode == .managedRelay)
+        #expect(configuration.connectionMode.reliesOnOfficialPushRelay == true)
+        #expect(configuration.activeBaseURLString == "https://managed.example.com/v1")
+    }
+
+    @Test
+    func relayConfigurationTailscaleModeUsesCustomRelayURLWithoutOfficialPushByDefault() throws {
+        let configuration = RelayConfiguration(
+            connectionMode: .tailscale,
+            customRelayBaseURL: "https://home-mac.tailnet.ts.net/v1",
+            hostedRelayBaseURL: "https://managed.example.com/v1",
+            hostedRelayEnabled: true
+        )
+
+        #expect(configuration.relayMode == .custom)
+        #expect(configuration.connectionMode == .tailscale)
+        #expect(configuration.connectionMode.reliesOnOfficialPushRelay == false)
+        #expect(configuration.activeBaseURLString == "https://home-mac.tailnet.ts.net/v1")
+    }
+
+    @Test
+    func relayConnectionModesExposeModeAwareChatRecoveryCopy() throws {
+        #expect(RelayConnectionMode.managedRelay.hostOfflineMessage == "Messages can queue while your Hermes host reconnects.")
+        #expect(RelayConnectionMode.tailscale.defaultOfflineMessage == "Open Tailscale or reconnect to your tailnet to reach Hermes.")
+        #expect(RelayConnectionMode.selfHostedRelay.notConnectedMessage == "Pair a Hermes host with this self-hosted relay before sending messages.")
+    }
+
+    @Test
     func relayDecoderParsesFractionalSecondsWithoutTimezone() throws {
         let data = #"{"timestamp":"2026-03-31T18:58:36.197800"}"#.data(using: .utf8)!
         let payload = try RelayCoders.makeDecoder().decode(TimestampPayload.self, from: data)

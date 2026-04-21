@@ -114,17 +114,20 @@ struct SettingsScreen: View {
                         .foregroundStyle(Design.Colors.secondaryForeground)
                         .padding(.top, Design.Spacing.xs)
                 } else {
-                    if relayConfiguration.canUseHosted {
-                        Picker("Relay Mode", selection: relayModeBinding) {
-                            Text(RelayMode.custom.displayLabel).tag(RelayMode.custom)
-                            Text(RelayMode.hosted.displayLabel).tag(RelayMode.hosted)
+                    VStack(alignment: .leading, spacing: Design.Spacing.xs) {
+                        Text("CONNECTION MODE").brandEyebrow()
+
+                        Picker("Connection Mode", selection: connectionModeBinding) {
+                            ForEach(relayConfiguration.selectableConnectionModes, id: \.self) { mode in
+                                Text(mode.compactLabel).tag(mode)
+                            }
                         }
                         .pickerStyle(.segmented)
-
-                        sectionDivider
                     }
 
-                    if relayConfiguration.relayMode == .custom {
+                    sectionDivider
+
+                    if relayConfiguration.connectionMode.usesCustomRelayURL {
                         VStack(alignment: .leading, spacing: Design.Spacing.xs) {
                             TextField("https://your-relay.example.com/v1", text: customRelayURLBinding)
                                 .textInputAutocapitalization(.never)
@@ -140,7 +143,7 @@ struct SettingsScreen: View {
                                 )
                                 .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
 
-                            Text("Enter the relay API base URL your connector will use.")
+                            Text(relayConfiguration.connectionMode.shortDescription)
                                 .font(Design.Typography.caption)
                                 .foregroundStyle(Design.Colors.secondaryForeground)
                         }
@@ -440,12 +443,12 @@ struct SettingsScreen: View {
         return "Foreground-only keeps location updates limited to active app use."
     }
 
-    private var relayModeBinding: Binding<RelayMode> {
+    private var connectionModeBinding: Binding<RelayConnectionMode> {
         Binding(
-            get: { settingsStore.settings.relayConfiguration.relayMode },
+            get: { settingsStore.settings.relayConfiguration.connectionMode },
             set: { newValue in
                 var relayConfiguration = settingsStore.settings.relayConfiguration
-                relayConfiguration.relayMode = newValue
+                relayConfiguration.updateConnectionMode(newValue)
                 settingsStore.settings.relayConfiguration = relayConfiguration
             }
         )

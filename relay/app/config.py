@@ -58,6 +58,8 @@ class Settings:
     apns_bundle_id: str = "io.hermesmobile.HermesMobile"
     apns_environment: str = "development"
     app_presence_stale_seconds: int = 120
+    push_broker_challenge_ttl_seconds: int = 300
+    push_broker_grant_ttl_seconds: int = 60 * 60 * 24 * 30
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -98,4 +100,6 @@ class Settings:
             apns_bundle_id=os.getenv("APNS_BUNDLE_ID", "io.hermesmobile.HermesMobile"),
             apns_environment=os.getenv("APNS_ENVIRONMENT", "development"),
             app_presence_stale_seconds=int(os.getenv("APP_PRESENCE_STALE_SECONDS", "120")),
+            push_broker_challenge_ttl_seconds=int(os.getenv("PUSH_BROKER_CHALLENGE_TTL_SECONDS", "300")),
+            push_broker_grant_ttl_seconds=int(os.getenv("PUSH_BROKER_GRANT_TTL_SECONDS", str(60 * 60 * 24 * 30))),
         )
