@@ -4,6 +4,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import httpx
 import inspect
 import logging
 import uuid
@@ -26,9 +27,14 @@ from .hermes_adapter import build_hermes_adapter
 from .models import Conversation, HermesHost, Message, PushRegistration
 from .pairing import HostSetupCodePayload, format_phone_pairing_code, build_host_setup_code
 from .push_broker import create_push_broker_challenge, serialize_push_broker_challenge
-from .push_broker import PushBrokerChallengeError, PushBrokerSendError, create_push_broker_registration, verify_push_broker_send_request
+from .push_broker import (
+    PushBrokerChallengeError,
+    PushBrokerSendError,
+    create_push_broker_registration,
+    verify_push_broker_send_request,
+)
 from .rate_limit import PhonePairingRateLimiter
-from .relay_identity import _b64url_decode, ensure_relay_identity, serialize_relay_identity
+from .relay_identity import _b64url_decode, ensure_relay_identity, serialize_relay_identity, sign_relay_payload
 from .schemas import (
     ConnectorSetupRequest,
     DeviceRegisterRequest,
@@ -140,6 +146,14 @@ def reply_state_for_job(job_status: str) -> str:
     return "pending"
 
 
+def broker_http2_supported() -> bool:
+    try:
+        import h2  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 def decode_b64url_field(value: str, *, field_name: str) -> bytes:
     try:
         return _b64url_decode(value)
@@ -176,6 +190,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         database.create_all()
         app.state.apns_client = create_apns_client(settings)
+        app.state.push_broker_http_client = httpx.AsyncClient(http2=broker_http2_supported(), timeout=30.0)
 
         async def _cleanup_stale_job_queues():
             """Periodically remove event queues for completed/failed jobs."""
@@ -201,6 +216,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             yield
         finally:
             cleanup_task.cancel()
+            await app.state.push_broker_http_client.aclose()
             if app.state.apns_client:
                 close_method = getattr(app.state.apns_client, "close", None)
                 if callable(close_method):
@@ -296,6 +312,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return
         app.state.connector_sessions.pop(user_id, None)
 
+    async def default_push_broker_sender(*, registration: PushRegistration, title: str, body: str) -> bool:
+        with database.session() as db:
+            identity = ensure_relay_identity(db, settings=settings)
+        broker_base_url = (settings.push_broker_base_url or settings.public_base_url).rstrip("/")
+        payload = {
+            "relayHandle": registration.relay_handle,
+            "sendGrant": registration.send_grant,
+            "relayId": registration.relay_id or identity.id,
+            "relayPublicKey": registration.relay_public_key or identity.public_key,
+            "pushType": "alert",
+            "title": title,
+            "body": body,
+        }
+        signature = sign_relay_payload(identity, payload)
+        response = await app.state.push_broker_http_client.post(
+            f"{broker_base_url}/push-broker/send",
+            json=payload | {"signature": signature},
+        )
+        return response.status_code == 200 and bool(response.json().get("data", {}).get("sent"))
+
+    app.state.push_broker_sender = default_push_broker_sender
+
     async def maybe_send_message_push(
         *,
         db: Session,
@@ -315,6 +353,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         for device, registration in active_push_registrations_for_user(db, user_id=user_id):
             if device_is_foreground(device, stale_seconds=settings.app_presence_stale_seconds):
+                continue
+            if registration.transport == "relay":
+                sender = app.state.push_broker_sender
+                try:
+                    sent = await sender(registration=registration, title="Hermes", body=preview)
+                except Exception:
+                    logger.warning("Push broker delivery failed for device %s", device.id, exc_info=True)
+                    continue
+                if not sent:
+                    logger.warning("Push broker delivery not accepted for device %s", device.id)
                 continue
 
             result = await apns_client.send_alert_push(
@@ -1417,9 +1465,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         registration = upsert_push_registration(
             db,
             device=auth.device,
+            transport=payload.transport,
             apns_token=payload.apnsToken,
             push_environment=payload.pushEnvironment,
             bundle_id=payload.bundleId,
+            relay_handle=payload.relayHandle,
+            send_grant=payload.sendGrant,
+            relay_id=payload.relayId,
+            relay_public_key=payload.relayPublicKey,
+            token_debug_suffix=payload.tokenDebugSuffix,
         )
         record_audit(
             db,

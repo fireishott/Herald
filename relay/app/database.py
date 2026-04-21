@@ -60,6 +60,20 @@ class Database:
             if "hermes_model" not in host_columns:
                 connection.execute(text("ALTER TABLE hermes_hosts ADD COLUMN hermes_model TEXT"))
 
+            push_columns = {column["name"] for column in inspector.get_columns("push_registrations")}
+            if "transport" not in push_columns:
+                connection.execute(text("ALTER TABLE push_registrations ADD COLUMN transport TEXT DEFAULT 'direct'"))
+            if "relay_handle" not in push_columns:
+                connection.execute(text("ALTER TABLE push_registrations ADD COLUMN relay_handle TEXT"))
+            if "send_grant" not in push_columns:
+                connection.execute(text("ALTER TABLE push_registrations ADD COLUMN send_grant TEXT"))
+            if "relay_id" not in push_columns:
+                connection.execute(text("ALTER TABLE push_registrations ADD COLUMN relay_id TEXT"))
+            if "relay_public_key" not in push_columns:
+                connection.execute(text("ALTER TABLE push_registrations ADD COLUMN relay_public_key TEXT"))
+            if "token_debug_suffix" not in push_columns:
+                connection.execute(text("ALTER TABLE push_registrations ADD COLUMN token_debug_suffix TEXT"))
+
             conversation_columns = {column["name"] for column in inspector.get_columns("conversations")}
             if "hermes_session_id" not in conversation_columns:
                 connection.execute(text("ALTER TABLE conversations ADD COLUMN hermes_session_id TEXT"))
