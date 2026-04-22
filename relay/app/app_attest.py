@@ -249,18 +249,35 @@ def _extract_app_attest_nonce(leaf: x509.Certificate) -> bytes:
         raise AppAttestVerificationError("App Attest nonce extension is missing.") from error
     if not isinstance(extension, x509.UnrecognizedExtension):
         raise AppAttestVerificationError("App Attest nonce extension has unexpected type.")
-    return _parse_der_sequence_octet_string(extension.value)
+    return _parse_app_attest_nonce_extension(extension.value)
 
 
-def _parse_der_sequence_octet_string(raw: bytes) -> bytes:
+# Apple's App Attest nonce extension (OID 1.2.840.113635.100.8.2) is DER-encoded
+# as `SEQUENCE { [1] EXPLICIT OCTET STRING }` — the 32-byte nonce is wrapped in
+# a context-specific `[1]` explicit tag (0xA1) inside an outer SEQUENCE. We also
+# tolerate the legacy `SEQUENCE { OCTET STRING }` form because earlier fixtures
+# used it; real Apple-produced certs always carry the explicit tag.
+def _parse_app_attest_nonce_extension(raw: bytes) -> bytes:
     pos = 0
     if pos >= len(raw) or raw[pos] != 0x30:
         raise AppAttestVerificationError("App Attest nonce extension is not a DER sequence.")
     pos += 1
     _, pos = _read_der_length(raw, pos)
-    if pos >= len(raw) or raw[pos] != 0x04:
-        raise AppAttestVerificationError("App Attest nonce extension is not an octet string.")
-    pos += 1
+    if pos >= len(raw):
+        raise AppAttestVerificationError("App Attest nonce extension is truncated.")
+
+    tag = raw[pos]
+    if tag == 0xA1:
+        pos += 1
+        _, pos = _read_der_length(raw, pos)
+        if pos >= len(raw) or raw[pos] != 0x04:
+            raise AppAttestVerificationError("App Attest nonce extension inner tag is not an octet string.")
+        pos += 1
+    elif tag == 0x04:
+        pos += 1
+    else:
+        raise AppAttestVerificationError("App Attest nonce extension has unexpected inner tag.")
+
     length, pos = _read_der_length(raw, pos)
     value = raw[pos:pos + length]
     if len(value) != length:

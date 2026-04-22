@@ -374,7 +374,7 @@ private struct RelayStepView: View {
                         Text("RELAY URL").brandEyebrow()
 
                         if relayConfiguration.connectionMode.usesCustomRelayURL {
-                            TextField("https://relay.example.com/v1", text: customRelayURLBinding)
+                            TextField(urlPlaceholder(for: relayConfiguration.connectionMode), text: customRelayURLBinding)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.URL)
                                 .autocorrectionDisabled()
@@ -388,6 +388,13 @@ private struct RelayStepView: View {
                                 )
                                 .focused(isRelayURLFocused)
                                 .accessibilityLabel("Relay URL")
+
+                            if let hint = relayConfiguration.connectionMode.relayURLHint {
+                                Text(hint)
+                                    .font(Design.Typography.caption)
+                                    .foregroundStyle(Design.Colors.secondaryForeground)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         } else if let hostedRelayBaseURL = relayConfiguration.hostedRelayBaseURL {
                             Text(hostedRelayBaseURL)
                                 .font(Design.Typography.callout)
@@ -403,11 +410,10 @@ private struct RelayStepView: View {
                                 .foregroundStyle(Design.Colors.warning)
                         }
 
-                        if relayConfiguration.connectionMode == .managedRelay {
-                            Text(usesManagedPushBroker ? "Official push delivery is enabled in this build." : "This build uses direct relay push only.")
-                                .font(Design.Typography.caption)
-                                .foregroundStyle(Design.Colors.secondaryForeground)
-                        }
+                        Text(backgroundDeliveryNote(for: relayConfiguration.connectionMode, usesManagedPushBroker: usesManagedPushBroker))
+                            .font(Design.Typography.caption)
+                            .foregroundStyle(Design.Colors.secondaryForeground)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     if let errorMessage {
@@ -437,6 +443,27 @@ private struct RelayStepView: View {
             .padding(.bottom, Design.Spacing.xl)
         }
     }
+}
+
+private func urlPlaceholder(for mode: RelayConnectionMode) -> String {
+    switch mode {
+    case .managedRelay:
+        return "https://relay.example.com/v1"
+    case .tailscale:
+        return "https://my-mac.tail-scale.ts.net/v1"
+    case .selfHostedRelay:
+        return "https://relay.example.com/v1"
+    }
+}
+
+private func backgroundDeliveryNote(
+    for mode: RelayConnectionMode,
+    usesManagedPushBroker: Bool
+) -> String {
+    if mode == .managedRelay && !usesManagedPushBroker {
+        return "Managed mode selected, but this build uses direct relay push only."
+    }
+    return mode.backgroundDeliveryNote
 }
 
 private struct ConnectionModeSelector: View {

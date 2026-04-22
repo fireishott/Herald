@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from .apns import PushResult, create_apns_client
 from .app_attest import AppAttestVerificationError, verify_app_attest_registration_proof
+from .app_attest_trust import AppAttestTrustAnchorError, load_bundled_app_attest_roots
 from .config import Settings
 from .database import Database
 from .hermes_adapter import build_hermes_adapter
@@ -30,6 +31,7 @@ from .push_broker import create_push_broker_challenge, serialize_push_broker_cha
 from .push_broker import (
     PushBrokerChallengeError,
     PushBrokerSendError,
+    canonical_push_broker_signed_payload,
     create_push_broker_registration,
     verify_push_broker_send_request,
 )
@@ -228,6 +230,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.database = database
     app.state.hermes_adapter = build_hermes_adapter(settings)
+    # Load the bundled + pinned Apple App Attest root CA. If the fingerprint
+    # doesn't match or the file is missing, loudly surface the misconfiguration
+    # rather than silently falling back to accepting any chain. The push-broker
+    # register endpoint still returns 503 when trusted_roots is empty, so
+    # logging here is enough — we don't want a boot failure to take down all
+    # other endpoints (pairing, SSE, etc.) on an older image that lacks the PEM.
+    try:
+        app.state.app_attest_trusted_roots = load_bundled_app_attest_roots()
+    except AppAttestTrustAnchorError as error:
+        logger.error("App Attest trust anchor unavailable: %s", error)
+        app.state.app_attest_trusted_roots = []
     app.state.phone_pairing_rate_limiter = PhonePairingRateLimiter(
         max_attempts=settings.phone_pairing_max_attempts_per_ip,
         window_seconds=settings.phone_pairing_rate_limit_window_seconds,
@@ -313,6 +326,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.connector_sessions.pop(user_id, None)
 
     async def default_push_broker_sender(*, registration: PushRegistration, title: str, body: str) -> bool:
+        import secrets as _secrets
+        import time as _time
+
         with database.session() as db:
             identity = ensure_relay_identity(db, settings=settings)
         broker_base_url = (settings.push_broker_base_url or settings.public_base_url).rstrip("/")
@@ -324,6 +340,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "pushType": "alert",
             "title": title,
             "body": body,
+            "nonce": _secrets.token_urlsafe(24),
+            "iat": int(_time.time()),
         }
         signature = sign_relay_payload(identity, payload)
         response = await app.state.push_broker_http_client.post(
@@ -625,27 +643,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not trusted_roots:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Push broker App Attest roots are not configured.")
 
-        signed_payload = decode_b64url_field(payload.appAttest.signedPayload, field_name="appAttest.signedPayload")
-        try:
-            signed_payload_data = json.loads(signed_payload.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid push broker signed payload.") from error
-
-        expected_signed_payload = {
-            "challengeId": payload.challengeId,
-            "installationId": payload.installationId,
-            "bundleId": payload.bundleId,
-            "appVersion": payload.appVersion,
-            "apnsEnvironment": payload.apnsEnvironment,
-            "apnsToken": payload.apnsToken,
-            "relayIdentity": {
-                "id": payload.relayIdentity.id,
-                "publicKey": payload.relayIdentity.publicKey,
-                "relayBaseURL": payload.relayIdentity.relayBaseURL,
-            },
-        }
-        if signed_payload_data != expected_signed_payload:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Push broker signed payload does not match request.")
+        # Build the signed-payload bytes server-side so the client never gets
+        # to dictate the exact byte sequence verified by App Attest. The client
+        # must produce the same canonical bytes before signing.
+        signed_payload = canonical_push_broker_signed_payload(
+            challenge_id=payload.challengeId,
+            installation_id=payload.installationId,
+            bundle_id=payload.bundleId,
+            app_version=payload.appVersion,
+            apns_environment=payload.apnsEnvironment,
+            apns_token=payload.apnsToken,
+            relay_id=payload.relayIdentity.id,
+            relay_public_key=payload.relayIdentity.publicKey,
+            relay_base_url=payload.relayIdentity.relayBaseURL,
+        )
 
         try:
             app_attest = verify_app_attest_registration_proof(
@@ -695,6 +706,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "pushType": payload.pushType,
             "title": payload.title,
             "body": payload.body,
+            "nonce": payload.nonce,
+            "iat": payload.iat,
         }
         try:
             registration = verify_push_broker_send_request(
@@ -705,6 +718,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 relay_public_key=payload.relayPublicKey,
                 payload=signed_payload,
                 signature=payload.signature,
+                nonce=payload.nonce,
+                iat=payload.iat,
             )
         except PushBrokerSendError as error:
             detail = str(error)

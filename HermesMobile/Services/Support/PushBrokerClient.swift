@@ -37,7 +37,6 @@ final class PushBrokerClient {
         let keyId: String
         let attestationObject: String
         let assertion: String
-        let signedPayload: String
     }
 
     private struct RegisterBody: Encodable {
@@ -97,8 +96,7 @@ final class PushBrokerClient {
             appAttest: AppAttestBody(
                 keyId: proof.keyId,
                 attestationObject: proof.attestationObject,
-                assertion: proof.assertion,
-                signedPayload: proof.signedPayload
+                assertion: proof.assertion
             )
         )
         let request = try makeRequest(path: "push-broker/register", method: "POST", body: try encoder.encode(body))

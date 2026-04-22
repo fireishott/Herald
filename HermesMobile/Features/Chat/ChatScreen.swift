@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ChatScreen: View {
     @Environment(ChatStore.self) private var chatStore
@@ -423,7 +424,14 @@ struct ChatScreen: View {
         case .offline:
             return "Hermes host offline"
         case .unreachable:
-            return "Could not refresh host status"
+            switch settingsStore.settings.relayConfiguration.connectionMode {
+            case .managedRelay:
+                return "Managed relay unreachable"
+            case .tailscale:
+                return "Tailnet relay unreachable"
+            case .selfHostedRelay:
+                return "Relay URL unreachable"
+            }
         case .notConnected:
             return "No Hermes host connected"
         }
@@ -447,14 +455,20 @@ struct ChatScreen: View {
         case .online, .offline, .notConnected:
             return "Settings"
         case .unreachable:
-            return "Retry"
+            return settingsStore.settings.relayConfiguration.connectionMode.unreachableActionLabel
         }
     }
 
     private func connectionBannerAction() {
         switch hostStore.connectionState {
         case .unreachable:
-            Task { await hostStore.refresh() }
+            let mode = settingsStore.settings.relayConfiguration.connectionMode
+            if let deepLink = mode.unreachableActionDeepLink,
+               UIApplication.shared.canOpenURL(deepLink) {
+                UIApplication.shared.open(deepLink)
+            } else {
+                Task { await hostStore.refresh() }
+            }
         case .online, .offline, .notConnected:
             router.presentSheet(.settings)
         }
@@ -466,6 +480,15 @@ struct ChatScreen: View {
         let content = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
         let attachments = pendingAttachments
         guard !content.isEmpty || !attachments.isEmpty else { return }
+
+        // Mode-aware pre-flight: when the relay is confirmed unreachable the
+        // request would just fail. Each connection mode needs different guidance
+        // (retry managed vs. reopen Tailscale vs. check a self-hosted URL), so
+        // short-circuit the send and surface the right next step.
+        if refuseSendIfUnreachable() {
+            return
+        }
+
         messageText = ""
         pendingAttachments = []
 
@@ -481,6 +504,14 @@ struct ChatScreen: View {
             }
             scrollToBottom()
         }
+    }
+
+    @discardableResult
+    private func refuseSendIfUnreachable() -> Bool {
+        guard hostStore.connectionState == .unreachable else { return false }
+        let mode = settingsStore.settings.relayConfiguration.connectionMode
+        appendSystemMessage(mode.unreachableSendBlockedMessage)
+        return true
     }
 
     func handleAttachmentResult(_ result: AttachmentResult) {
@@ -501,17 +532,20 @@ struct ChatScreen: View {
         // Agent pass-through: send the raw slash command text as a chat message.
         // The Hermes agent processes it natively — same as Discord/Telegram.
         guard command.isLocal else {
-            let messageText: String
+            let outgoing: String
             if let arg = argument?.trimmingCharacters(in: .whitespacesAndNewlines), !arg.isEmpty {
-                messageText = "/\(command.name) \(arg)"
+                outgoing = "/\(command.name) \(arg)"
             } else {
-                messageText = "/\(command.name)"
+                outgoing = "/\(command.name)"
             }
-            Task { await sendSlashAsMessage(messageText) }
+            Task { await sendSlashAsMessage(outgoing) }
             return
         }
 
-        // Local commands handled by the iOS app directly.
+        // Local commands dispatch synchronously in-app, so the composer is
+        // consumed on tap.
+        messageText = ""
+
         switch command.name {
         case "new", "reset", "clear":
             showClearConfirmation = true
@@ -545,7 +579,11 @@ struct ChatScreen: View {
     }
 
     /// Sends a slash command as a regular chat message to the Hermes agent.
+    /// Clears the composer only after the send is accepted, so a draft refused
+    /// for unreachability stays editable for retry.
     private func sendSlashAsMessage(_ text: String) async {
+        if refuseSendIfUnreachable() { return }
+        messageText = ""
         await chatStore.sendMessage(text, attachments: [])
         scrollToBottom()
     }
@@ -583,6 +621,7 @@ struct ChatScreen: View {
     }
 
     private func performRetry() async {
+        if refuseSendIfUnreachable() { return }
         guard let messages = chatStore.conversation?.messages, !messages.isEmpty else {
             appendSystemMessage("No messages to retry.")
             return

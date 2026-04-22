@@ -315,7 +315,6 @@ struct AppStoresTests {
         let keyId: String
         let attestationObject: String
         let assertion: String
-        let signedPayload: String
     }
 
     @MainActor
@@ -326,8 +325,7 @@ struct AppStoresTests {
         var proof = FakeAppAttestProof(
             keyId: "attest-key",
             attestationObject: "attestation-proof",
-            assertion: "assertion-proof",
-            signedPayload: "signed-payload-proof"
+            assertion: "assertion-proof"
         )
 
         func createProof(challenge: String, signedPayload: Data) async throws -> AppAttestProof {
@@ -337,8 +335,7 @@ struct AppStoresTests {
             return AppAttestProof(
                 keyId: proof.keyId,
                 attestationObject: proof.attestationObject,
-                assertion: proof.assertion,
-                signedPayload: proof.signedPayload
+                assertion: proof.assertion
             )
         }
     }
@@ -1888,6 +1885,115 @@ struct AppStoresTests {
         #expect(RelayConnectionMode.managedRelay.hostOfflineMessage == "Messages can queue while your Hermes host reconnects.")
         #expect(RelayConnectionMode.tailscale.defaultOfflineMessage == "Open Tailscale or reconnect to your tailnet to reach Hermes.")
         #expect(RelayConnectionMode.selfHostedRelay.notConnectedMessage == "Pair a Hermes host with this self-hosted relay before sending messages.")
+    }
+
+    @Test
+    func relayConnectionModesExposeModeAwareUnreachableSendGuidance() throws {
+        #expect(
+            RelayConnectionMode.managedRelay.unreachableSendBlockedMessage ==
+            "Hermes relay is unreachable. Check your connection and try again."
+        )
+        #expect(
+            RelayConnectionMode.tailscale.unreachableSendBlockedMessage ==
+            "Can't reach your tailnet relay. Open Tailscale to reconnect, then send again."
+        )
+        #expect(
+            RelayConnectionMode.selfHostedRelay.unreachableSendBlockedMessage ==
+            "Your self-hosted relay URL is not reachable. Check the URL in Settings and try again."
+        )
+    }
+
+    @Test
+    func relayConnectionModesExposeUnreachableActionLabels() throws {
+        #expect(RelayConnectionMode.managedRelay.unreachableActionLabel == "Retry")
+        #expect(RelayConnectionMode.tailscale.unreachableActionLabel == "Open Tailscale")
+        #expect(RelayConnectionMode.selfHostedRelay.unreachableActionLabel == "Retry")
+    }
+
+    @Test
+    func tailscaleModeProvidesDeepLinkOtherModesFallBackToRetry() throws {
+        #expect(RelayConnectionMode.managedRelay.unreachableActionDeepLink == nil)
+        #expect(RelayConnectionMode.selfHostedRelay.unreachableActionDeepLink == nil)
+        let tailscaleDeepLink = RelayConnectionMode.tailscale.unreachableActionDeepLink
+        #expect(tailscaleDeepLink == URL(string: "tailscale://"))
+        #expect(tailscaleDeepLink?.scheme == "tailscale")
+    }
+
+    @Test
+    func relayURLHintOnlyShownForModesThatNeedIt() throws {
+        // Managed has no URL field, so it shouldn't advertise a hint.
+        #expect(RelayConnectionMode.managedRelay.relayURLHint == nil)
+        // Tailscale points users at tailnet URLs or `tailscale serve`.
+        let tailscaleHint = try #require(RelayConnectionMode.tailscale.relayURLHint)
+        #expect(tailscaleHint.contains("tail-scale.ts.net"))
+        #expect(tailscaleHint.contains("tailscale serve"))
+        // Self-hosted nudges users toward a public URL example.
+        let selfHostedHint = try #require(RelayConnectionMode.selfHostedRelay.relayURLHint)
+        #expect(selfHostedHint.contains("public Hermes relay"))
+    }
+
+    @Test
+    func backgroundDeliveryNotesStayHonestAboutPushCapability() throws {
+        // Managed is the only mode that can honestly promise background wake.
+        #expect(
+            RelayConnectionMode.managedRelay.backgroundDeliveryNote.contains("official push")
+        )
+        // Tailscale's note must warn about foreground-only delivery.
+        let tailscaleNote = RelayConnectionMode.tailscale.backgroundDeliveryNote
+        #expect(tailscaleNote.contains("No official background push"))
+        #expect(tailscaleNote.contains("foreground"))
+        // Self-hosted defers to the user's own channel.
+        let selfHostedNote = RelayConnectionMode.selfHostedRelay.backgroundDeliveryNote
+        #expect(selfHostedNote.contains("don't receive official push credentials"))
+    }
+
+    @Test
+    func relayConnectionModePreservesLegacyMappingForBackwardsCompatibility() throws {
+        #expect(RelayConnectionMode(legacyRelayMode: .hosted) == .managedRelay)
+        #expect(RelayConnectionMode(legacyRelayMode: .custom) == .selfHostedRelay)
+        #expect(RelayConnectionMode.managedRelay.legacyRelayMode == .hosted)
+        #expect(RelayConnectionMode.tailscale.legacyRelayMode == .custom)
+        #expect(RelayConnectionMode.selfHostedRelay.legacyRelayMode == .custom)
+    }
+
+    @Test
+    func onlyManagedModeReliesOnOfficialPushRelay() throws {
+        #expect(RelayConnectionMode.managedRelay.reliesOnOfficialPushRelay == true)
+        #expect(RelayConnectionMode.tailscale.reliesOnOfficialPushRelay == false)
+        #expect(RelayConnectionMode.selfHostedRelay.reliesOnOfficialPushRelay == false)
+    }
+
+    @Test
+    func selectableConnectionModesIncludeManagedOnlyWhenBuildSupportsIt() throws {
+        let withoutManaged = RelayConfiguration(
+            connectionMode: .selfHostedRelay,
+            customRelayBaseURL: "https://relay.example.com/v1",
+            hostedRelayBaseURL: nil,
+            hostedRelayEnabled: false
+        )
+        #expect(withoutManaged.selectableConnectionModes == [.tailscale, .selfHostedRelay])
+
+        let withManaged = RelayConfiguration(
+            connectionMode: .managedRelay,
+            customRelayBaseURL: "",
+            hostedRelayBaseURL: "https://managed.example.com/v1",
+            hostedRelayEnabled: true
+        )
+        #expect(withManaged.selectableConnectionModes == [.managedRelay, .tailscale, .selfHostedRelay])
+    }
+
+    @Test
+    func relayConfigurationFallsBackOffManagedWhenHostedIsUnavailable() throws {
+        // Simulating a build that claims managed but never wired up the hosted URL.
+        let config = RelayConfiguration(
+            connectionMode: .managedRelay,
+            customRelayBaseURL: "https://relay.example.com/v1",
+            hostedRelayBaseURL: nil,
+            hostedRelayEnabled: false
+        )
+        // Init-time fallback prevents shipping with managed selected but no URL to hit.
+        #expect(config.connectionMode == .selfHostedRelay)
+        #expect(config.relayMode == .custom)
     }
 
     @Test

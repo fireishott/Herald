@@ -135,7 +135,12 @@ final class PushRegistrationCoordinator {
             throw RelayAPIClient.ClientError.requestFailed("Managed push broker is not configured in this build.")
         }
         let challenge = try await brokerClient.fetchChallenge()
-        let signedPayload = PushBrokerSignedPayload(
+        // Build the canonical signed-payload bytes with sorted keys + compact
+        // separators so the relay can independently reconstruct the same byte
+        // sequence from the register request fields. `relayBaseURL` falls back
+        // to an empty string (never omitted) so Swift's nil-omission behaviour
+        // doesn't diverge from Python's dict serialization server-side.
+        let signedPayloadData = try canonicalSignedPayloadData(
             challengeId: challenge.challengeId,
             installationId: installationID,
             bundleId: bundleID,
@@ -144,7 +149,6 @@ final class PushRegistrationCoordinator {
             apnsToken: token,
             relayIdentity: relayIdentity
         )
-        let signedPayloadData = try RelayCoders.makeEncoder().encode(signedPayload)
         let proof = try await appAttestService.createProof(challenge: challenge.challenge, signedPayload: signedPayloadData)
         let response = try await brokerClient.register(
             challenge: challenge,
@@ -179,14 +183,68 @@ final class PushRegistrationCoordinator {
         )
         await registrationStore.clearRegistrationState()
     }
+
+    /// Drops the cached broker registration locally without contacting the
+    /// relay. Used on unpair — the session is gone, so there's no access token
+    /// to call `/push/deactivate`, but we still need to forget the cached
+    /// `sendGrant`/`relayHandle` so a future re-pair mints a fresh one rather
+    /// than reusing state tied to the now-revoked device session.
+    func clearLocalBrokerRegistration() async {
+        await registrationStore.clearRegistrationState()
+    }
 }
 
-private struct PushBrokerSignedPayload: Encodable {
-    let challengeId: String
-    let installationId: String
-    let bundleId: String
-    let appVersion: String
+// Encodes the push-broker register inputs into a byte sequence that matches
+// `canonical_push_broker_signed_payload` in relay/app/push_broker.py. The
+// shared format is:
+//
+//   - JSON with alphabetical top-level and nested keys
+//   - Compact separators (`,`/`:`, no whitespace)
+//   - UTF-8 bytes
+//   - Nullable fields (`appVersion`, `relayBaseURL`) emitted as ``""``
+//
+// Any drift between the two sides will cause App Attest verification to fail
+// because the relay hashes a different byte sequence than the device signed.
+private func canonicalSignedPayloadData(
+    challengeId: String,
+    installationId: String,
+    bundleId: String,
+    appVersion: String,
+    apnsEnvironment: String,
+    apnsToken: String,
+    relayIdentity: PushBrokerRelayIdentity
+) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return try encoder.encode(
+        CanonicalPushBrokerSignedPayload(
+            apnsEnvironment: apnsEnvironment,
+            apnsToken: apnsToken,
+            appVersion: appVersion,
+            bundleId: bundleId,
+            challengeId: challengeId,
+            installationId: installationId,
+            relayIdentity: CanonicalRelayIdentity(
+                id: relayIdentity.id,
+                publicKey: relayIdentity.publicKey,
+                relayBaseURL: relayIdentity.relayBaseURL ?? ""
+            )
+        )
+    )
+}
+
+private struct CanonicalPushBrokerSignedPayload: Encodable {
     let apnsEnvironment: String
     let apnsToken: String
-    let relayIdentity: PushBrokerRelayIdentity
+    let appVersion: String
+    let bundleId: String
+    let challengeId: String
+    let installationId: String
+    let relayIdentity: CanonicalRelayIdentity
+}
+
+private struct CanonicalRelayIdentity: Encodable {
+    let id: String
+    let publicKey: String
+    let relayBaseURL: String
 }

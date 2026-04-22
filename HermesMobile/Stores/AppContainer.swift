@@ -3,7 +3,11 @@ import Foundation
 @MainActor
 @Observable
 final class AppContainer {
-    private static let apnsTokenDefaultsKey = "hermes.apns.deviceToken"
+    // Pre-1.1.1 releases stored the raw APNs token in UserDefaults.standard under
+    // this key. We now keep the token in Keychain (ThisDeviceOnly). The legacy
+    // key is read once on first launch after upgrade to migrate + delete.
+    private static let legacyAPNsTokenDefaultsKey = "hermes.apns.deviceToken"
+    static let apnsTokenKeychainKey = "hermes.apns.deviceToken"
     private static let sharedDefaultContainer = AppContainer.makeDefault()
 
     let router = TabRouter()
@@ -19,6 +23,8 @@ final class AppContainer {
     private let apiClient: RelayAPIClient?
     private let notificationService: (any NotificationServiceProtocol)?
     private let pushRegistrationCoordinator: PushRegistrationCoordinator?
+    private let secureStore: (any SecureStoreProtocol)?
+    private var didMigrateLegacyAPNsToken = false
     private var isInitialized = false
     private var lastCommandCatalogRefreshAt: Date?
     private var lastKnownHostOnline = false
@@ -37,7 +43,8 @@ final class AppContainer {
         sensorUploadService: SensorUploadService? = nil,
         apiClient: RelayAPIClient? = nil,
         notificationService: (any NotificationServiceProtocol)? = nil,
-        pushRegistrationCoordinator: PushRegistrationCoordinator? = nil
+        pushRegistrationCoordinator: PushRegistrationCoordinator? = nil,
+        secureStore: (any SecureStoreProtocol)? = nil
     ) {
         self.sessionStore = sessionStore
         self.pairingStore = pairingStore
@@ -51,6 +58,7 @@ final class AppContainer {
         self.apiClient = apiClient
         self.notificationService = notificationService
         self.pushRegistrationCoordinator = pushRegistrationCoordinator
+        self.secureStore = secureStore
     }
 
     static func sharedDefault() -> AppContainer {
@@ -231,7 +239,8 @@ final class AppContainer {
             sensorUploadService: sensorUploadService,
             apiClient: apiClient,
             notificationService: notificationService,
-            pushRegistrationCoordinator: pushRegistrationCoordinator
+            pushRegistrationCoordinator: pushRegistrationCoordinator,
+            secureStore: secureStore
         )
 
         let refreshUnpairedRelayContext: @MainActor () async -> Void = { [weak sessionStore, weak container] in
@@ -443,11 +452,60 @@ final class AppContainer {
         _ = try? await apiClient.post(path: "push/deactivate", accessToken: accessToken) as DeactivateResponse
     }
 
-    private func registerStoredPushTokenIfNeeded() async {
-        guard let storedToken = UserDefaults.standard.string(forKey: Self.apnsTokenDefaultsKey) else {
-            return
+    /// Persists a freshly delivered APNs device token into Keychain (ThisDeviceOnly,
+    /// AfterFirstUnlock) and attempts registration with the relay. Called from
+    /// `UIApplicationDelegate.didRegisterForRemoteNotificationsWithDeviceToken`.
+    func persistAndRegisterAPNsToken(_ token: String) async {
+        let normalized = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return }
+        if let secureStore {
+            await secureStore.store(key: Self.apnsTokenKeychainKey, value: normalized)
         }
+        // Clear the legacy UserDefaults copy if still present — the token now
+        // lives in Keychain, which is excluded from iCloud backups.
+        UserDefaults.standard.removeObject(forKey: Self.legacyAPNsTokenDefaultsKey)
+        didMigrateLegacyAPNsToken = true
+        await registerPushTokenIfNeeded(normalized)
+    }
+
+    /// Re-registers the currently stored APNs token with the relay. Used when
+    /// settings that affect push registration change (e.g. the notifications
+    /// toggle) so the user immediately sees the effect.
+    func reregisterStoredPushToken() async {
+        guard let token = await currentStoredAPNsToken() else { return }
+        await registerPushTokenIfNeeded(token)
+    }
+
+    private func registerStoredPushTokenIfNeeded() async {
+        guard let storedToken = await currentStoredAPNsToken() else { return }
         await registerPushTokenIfNeeded(storedToken)
+    }
+
+    /// Reads the APNs token from Keychain. On first launch after upgrading from
+    /// a pre-1.1.1 build, migrates any legacy UserDefaults-stored token into
+    /// Keychain and removes the UserDefaults entry.
+    private func currentStoredAPNsToken() async -> String? {
+        if let secureStore,
+           let token = await secureStore.retrieve(key: Self.apnsTokenKeychainKey) {
+            if !didMigrateLegacyAPNsToken {
+                UserDefaults.standard.removeObject(forKey: Self.legacyAPNsTokenDefaultsKey)
+                didMigrateLegacyAPNsToken = true
+            }
+            return token
+        }
+
+        // Legacy migration path: copy any token that a prior build wrote to
+        // UserDefaults into Keychain, then remove it from UserDefaults.
+        guard !didMigrateLegacyAPNsToken else { return nil }
+        didMigrateLegacyAPNsToken = true
+        guard let legacyToken = UserDefaults.standard.string(forKey: Self.legacyAPNsTokenDefaultsKey) else {
+            return nil
+        }
+        if let secureStore {
+            await secureStore.store(key: Self.apnsTokenKeychainKey, value: legacyToken)
+        }
+        UserDefaults.standard.removeObject(forKey: Self.legacyAPNsTokenDefaultsKey)
+        return legacyToken
     }
 
     /// Fetches the dynamic slash command catalog from the connected Hermes host.
@@ -620,6 +678,9 @@ final class AppContainer {
         lastCommandCatalogRefreshAt = nil
         LiveActivityService.endAllActivities()
         SharedWidgetDataStore.write(.empty)
+        // Forget the cached push-broker grant so a future re-pair mints a fresh
+        // one instead of replaying a send-grant tied to the revoked session.
+        await pushRegistrationCoordinator?.clearLocalBrokerRegistration()
     }
 
     private func reconcileLiveActivities() {
