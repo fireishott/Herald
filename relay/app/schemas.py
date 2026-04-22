@@ -121,7 +121,6 @@ class PushBrokerAppAttestRequest(BaseModel):
     keyId: str = Field(min_length=1)
     attestationObject: str = Field(min_length=1)
     assertion: str = Field(min_length=1)
-    signedPayload: str = Field(min_length=1)
 
 
 class PushBrokerRegisterRequest(BaseModel):
@@ -144,6 +143,12 @@ class PushBrokerSendRequest(BaseModel):
     pushType: str = Field(pattern="^(alert|silent)$")
     title: str | None = None
     body: str | None = None
+    # Replay defense: `nonce` is a random token unique per request, and `iat`
+    # is the Unix epoch seconds at which the signer produced the request. The
+    # broker rejects requests whose `iat` falls outside a small skew window
+    # and refuses to accept a (relayHandle, nonce) pair twice.
+    nonce: str = Field(min_length=16, max_length=128)
+    iat: int = Field(ge=0)
     signature: str = Field(min_length=1)
 
     @model_validator(mode="after")

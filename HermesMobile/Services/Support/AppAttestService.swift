@@ -6,7 +6,6 @@ struct AppAttestProof: Sendable {
     let keyId: String
     let attestationObject: String
     let assertion: String
-    let signedPayload: String
 }
 
 @MainActor
@@ -45,8 +44,7 @@ final class LiveAppAttestService: AppAttestServiceProtocol {
         return AppAttestProof(
             keyId: keyID,
             attestationObject: b64url(attestationObject),
-            assertion: b64url(assertion),
-            signedPayload: b64url(signedPayload)
+            assertion: b64url(assertion)
         )
     }
 

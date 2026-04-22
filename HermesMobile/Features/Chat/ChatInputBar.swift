@@ -73,7 +73,9 @@ struct ChatInputBar: View {
             if isSlashMode && !filteredCommands.isEmpty {
                 SlashCommandMenu(commands: filteredCommands) { command in
                     let arg = command.suggestedArgument ?? (command.acceptsArgument ? parsedSlashInput.argument : nil)
-                    text = ""
+                    // The handler clears the composer only after the command is
+                    // actually accepted (e.g. not refused for unreachability), so
+                    // drafts survive refusals and can be retried.
                     onSlashCommand(command, arg)
                 }
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
