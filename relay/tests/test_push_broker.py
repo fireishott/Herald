@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import secrets
+import time
+
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -16,6 +19,10 @@ from app.push_broker import (
 from app.relay_identity import _b64url_encode, ensure_relay_identity, sign_relay_payload
 from app.security import hash_token, normalize_datetime, utcnow
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+
+def make_fresh_nonce_and_iat() -> tuple[str, int]:
+    return secrets.token_urlsafe(24), int(time.time())
 
 
 def build_client(tmp_path):
@@ -289,6 +296,7 @@ def test_push_broker_send_endpoint_accepts_valid_signed_grant(tmp_path):
                 ),
             )
 
+        nonce, iat = make_fresh_nonce_and_iat()
         signed_payload = {
             "relayHandle": registration.relay_handle,
             "sendGrant": registration.send_grant,
@@ -297,6 +305,8 @@ def test_push_broker_send_endpoint_accepts_valid_signed_grant(tmp_path):
             "pushType": "alert",
             "title": "Hermes",
             "body": "Ready.",
+            "nonce": nonce,
+            "iat": iat,
         }
         signature = sign_relay_payload(relay_identity, signed_payload)
         response = client.post(
@@ -349,6 +359,7 @@ def test_push_broker_send_endpoint_rejects_invalid_signature(tmp_path):
                 ),
             )
 
+        nonce, iat = make_fresh_nonce_and_iat()
         response = client.post(
             "/v1/push-broker/send",
             json={
@@ -359,6 +370,8 @@ def test_push_broker_send_endpoint_rejects_invalid_signature(tmp_path):
                 "pushType": "alert",
                 "title": "Hermes",
                 "body": "Ready.",
+                "nonce": nonce,
+                "iat": iat,
                 "signature": "invalid-signature",
             },
         )
@@ -401,6 +414,7 @@ def test_push_broker_send_endpoint_rejects_expired_registration(tmp_path):
             registration.registration.expires_at = utcnow()
             db.commit()
 
+        nonce, iat = make_fresh_nonce_and_iat()
         signed_payload = {
             "relayHandle": registration.relay_handle,
             "sendGrant": registration.send_grant,
@@ -409,6 +423,8 @@ def test_push_broker_send_endpoint_rejects_expired_registration(tmp_path):
             "pushType": "alert",
             "title": "Hermes",
             "body": "Ready.",
+            "nonce": nonce,
+            "iat": iat,
         }
         signature = sign_relay_payload(relay_identity, signed_payload)
         response = client.post(

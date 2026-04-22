@@ -15,9 +15,11 @@ from cryptography.x509.oid import NameOID, ObjectIdentifier
 
 from app.app_attest import (
     AppAttestVerificationError,
+    _parse_app_attest_nonce_extension,
     verify_app_attest_assertion,
     verify_app_attest_attestation,
 )
+from app.push_broker import canonical_push_broker_signed_payload
 from app.relay_identity import _b64url_encode
 
 
@@ -105,8 +107,11 @@ def make_certificate(subject_name: str, issuer_cert, issuer_key, subject_key, *,
         .add_extension(x509.BasicConstraints(ca=is_ca, path_length=None), critical=True)
     )
     if nonce is not None:
+        # Apple's real App Attest nonce extension is
+        # SEQUENCE { [1] EXPLICIT OCTET STRING(32) }, i.e. 30 24 A1 22 04 20 <32>.
+        # See developer.apple.com forum threads 663118 and 738923.
         builder = builder.add_extension(
-            x509.UnrecognizedExtension(NONCE_OID, b"\x30\x22\x04\x20" + nonce),
+            x509.UnrecognizedExtension(NONCE_OID, b"\x30\x24\xa1\x22\x04\x20" + nonce),
             critical=False,
         )
     return builder.sign(private_key=issuer_key, algorithm=hashes.SHA256())
@@ -159,6 +164,44 @@ def make_attestation_fixture(*, challenge: str = "server-challenge", environment
         "root_der": root.public_bytes(serialization.Encoding.DER),
         "credential_key": credential_key,
     }
+
+
+def test_parse_app_attest_nonce_extension_accepts_apple_real_format():
+    # Real Apple attestations wrap the 32-byte nonce in a [1] EXPLICIT OCTET STRING
+    # inside an outer SEQUENCE: 30 24 A1 22 04 20 <32 bytes>.
+    nonce = bytes(range(32))
+    raw = b"\x30\x24\xa1\x22\x04\x20" + nonce
+    assert _parse_app_attest_nonce_extension(raw) == nonce
+
+
+def test_parse_app_attest_nonce_extension_accepts_bare_octet_string():
+    # Tolerant-but-correct fallback: some legacy fixtures emit SEQUENCE { OCTET STRING }
+    # without the [1] EXPLICIT wrapper. The parser must still accept it.
+    nonce = bytes(range(32))
+    raw = b"\x30\x22\x04\x20" + nonce
+    assert _parse_app_attest_nonce_extension(raw) == nonce
+
+
+def test_parse_app_attest_nonce_extension_rejects_unexpected_inner_tag():
+    nonce = bytes(range(32))
+    # Inner tag 0x05 is neither [1] EXPLICIT (0xA1) nor OCTET STRING (0x04).
+    raw = b"\x30\x22\x05\x20" + nonce
+    try:
+        _parse_app_attest_nonce_extension(raw)
+    except AppAttestVerificationError as error:
+        assert "inner tag" in str(error) or "octet string" in str(error)
+    else:
+        raise AssertionError("Expected nonce parser to reject an unknown inner tag.")
+
+
+def test_parse_app_attest_nonce_extension_rejects_truncated_payload():
+    truncated = b"\x30\x24\xa1\x22\x04\x20" + bytes(16)
+    try:
+        _parse_app_attest_nonce_extension(truncated)
+    except AppAttestVerificationError as error:
+        assert "truncated" in str(error)
+    else:
+        raise AssertionError("Expected nonce parser to reject a truncated payload.")
 
 
 def test_verify_app_attest_attestation_accepts_valid_synthetic_fixture():
@@ -266,20 +309,17 @@ def test_push_broker_register_endpoint_verifies_app_attest_proof(tmp_path):
         fixture = make_attestation_fixture(challenge=challenge_data["challenge"])
         client.app.state.app_attest_trusted_roots = [fixture["root_der"]]
         relay_identity = client.get("/v1/relay/identity").json()["data"]["identity"]
-        signed_payload = {
-            "challengeId": challenge_data["challengeId"],
-            "installationId": "install-123",
-            "bundleId": BUNDLE_ID,
-            "appVersion": "1.1.0",
-            "apnsEnvironment": "development",
-            "apnsToken": "abcd1234efef5678",
-            "relayIdentity": {
-                "id": relay_identity["id"],
-                "publicKey": relay_identity["publicKey"],
-                "relayBaseURL": relay_identity["relayBaseURL"],
-            },
-        }
-        signed_payload_bytes = json.dumps(signed_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        signed_payload_bytes = canonical_push_broker_signed_payload(
+            challenge_id=challenge_data["challengeId"],
+            installation_id="install-123",
+            bundle_id=BUNDLE_ID,
+            app_version="1.1.0",
+            apns_environment="development",
+            apns_token="abcd1234efef5678",
+            relay_id=relay_identity["id"],
+            relay_public_key=relay_identity["publicKey"],
+            relay_base_url=relay_identity["relayBaseURL"],
+        )
         auth_data, _ = make_authenticator_data(
             credential_key=fixture["credential_key"],
             counter=1,
@@ -298,17 +338,20 @@ def test_push_broker_register_endpoint_verifies_app_attest_proof(tmp_path):
             json={
                 "challengeId": challenge_data["challengeId"],
                 "challenge": challenge_data["challenge"],
-                "relayIdentity": signed_payload["relayIdentity"],
-                "installationId": signed_payload["installationId"],
-                "bundleId": signed_payload["bundleId"],
-                "appVersion": signed_payload["appVersion"],
-                "apnsEnvironment": signed_payload["apnsEnvironment"],
-                "apnsToken": signed_payload["apnsToken"],
+                "relayIdentity": {
+                    "id": relay_identity["id"],
+                    "publicKey": relay_identity["publicKey"],
+                    "relayBaseURL": relay_identity["relayBaseURL"],
+                },
+                "installationId": "install-123",
+                "bundleId": BUNDLE_ID,
+                "appVersion": "1.1.0",
+                "apnsEnvironment": "development",
+                "apnsToken": "abcd1234efef5678",
                 "appAttest": {
                     "keyId": fixture["key_id"],
                     "attestationObject": _b64url_encode(fixture["attestation"]),
                     "assertion": _b64url_encode(assertion),
-                    "signedPayload": _b64url_encode(signed_payload_bytes),
                 },
             },
         )
@@ -341,36 +384,42 @@ def test_push_broker_register_endpoint_rejects_tampered_signed_payload(tmp_path)
         fixture = make_attestation_fixture(challenge=challenge_data["challenge"])
         client.app.state.app_attest_trusted_roots = [fixture["root_der"]]
         relay_identity = client.get("/v1/relay/identity").json()["data"]["identity"]
-        signed_payload = {
-            "challengeId": challenge_data["challengeId"],
-            "installationId": "install-123",
-            "bundleId": BUNDLE_ID,
-            "appVersion": "1.1.0",
-            "apnsEnvironment": "development",
-            "apnsToken": "abcd1234efef5678",
-            "relayIdentity": {
-                "id": relay_identity["id"],
-                "publicKey": relay_identity["publicKey"],
-                "relayBaseURL": relay_identity["relayBaseURL"],
-            },
-        }
-        signed_payload_bytes = json.dumps(signed_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        # Sign the canonical bytes for the legitimate token.
+        legit_signed_payload_bytes = canonical_push_broker_signed_payload(
+            challenge_id=challenge_data["challengeId"],
+            installation_id="install-123",
+            bundle_id=BUNDLE_ID,
+            app_version="1.1.0",
+            apns_environment="development",
+            apns_token="abcd1234efef5678",
+            relay_id=relay_identity["id"],
+            relay_public_key=relay_identity["publicKey"],
+            relay_base_url=relay_identity["relayBaseURL"],
+        )
         auth_data, _ = make_authenticator_data(
             credential_key=fixture["credential_key"],
             counter=1,
             environment="development",
             include_credential=False,
         )
-        nonce = hashlib.sha256(auth_data + hashlib.sha256(signed_payload_bytes).digest()).digest()
+        nonce = hashlib.sha256(auth_data + hashlib.sha256(legit_signed_payload_bytes).digest()).digest()
         signature = fixture["credential_key"].sign(nonce, ec.ECDSA(hashes.SHA256()))
         assertion = cbor_dumps({"authenticatorData": auth_data, "signature": signature})
 
+        # Send the request with a tampered apnsToken. The server canonicalizes
+        # the signed bytes from request fields, so the bytes it hashes include
+        # `"tampered-token"` — which the App Attest assertion was not signed
+        # over. Verification fails with a signature error.
         response = client.post(
             "/v1/push-broker/register",
             json={
                 "challengeId": challenge_data["challengeId"],
                 "challenge": challenge_data["challenge"],
-                "relayIdentity": signed_payload["relayIdentity"],
+                "relayIdentity": {
+                    "id": relay_identity["id"],
+                    "publicKey": relay_identity["publicKey"],
+                    "relayBaseURL": relay_identity["relayBaseURL"],
+                },
                 "installationId": "install-123",
                 "bundleId": BUNDLE_ID,
                 "appVersion": "1.1.0",
@@ -380,10 +429,9 @@ def test_push_broker_register_endpoint_rejects_tampered_signed_payload(tmp_path)
                     "keyId": fixture["key_id"],
                     "attestationObject": _b64url_encode(fixture["attestation"]),
                     "assertion": _b64url_encode(assertion),
-                    "signedPayload": _b64url_encode(signed_payload_bytes),
                 },
             },
         )
 
-        assert response.status_code == 400
-        assert response.json()["detail"] == "Push broker signed payload does not match request."
+        assert response.status_code == 401
+        assert "signature" in response.json()["detail"].lower()

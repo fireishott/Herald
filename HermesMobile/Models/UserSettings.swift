@@ -175,6 +175,71 @@ enum RelayConnectionMode: String, Codable, CaseIterable, Hashable, Sendable {
             return "Pair a Hermes host with this self-hosted relay before sending messages."
         }
     }
+
+    /// Shown inline in chat when the user attempts to send while the relay is
+    /// confirmed unreachable. Each mode's guidance is honest about what can
+    /// recover delivery: managed retries once the network returns, Tailscale
+    /// needs the tailnet back, self-hosted needs the URL reachable again.
+    var unreachableSendBlockedMessage: String {
+        switch self {
+        case .managedRelay:
+            return "Hermes relay is unreachable. Check your connection and try again."
+        case .tailscale:
+            return "Can't reach your tailnet relay. Open Tailscale to reconnect, then send again."
+        case .selfHostedRelay:
+            return "Your self-hosted relay URL is not reachable. Check the URL in Settings and try again."
+        }
+    }
+
+    /// Action label shown on the chat connection banner's retry/settings button.
+    /// Tailscale gets an "Open Tailscale" shortcut since that's the most common
+    /// recovery step; the others fall back to the generic retry/settings actions.
+    var unreachableActionLabel: String {
+        switch self {
+        case .managedRelay, .selfHostedRelay:
+            return "Retry"
+        case .tailscale:
+            return "Open Tailscale"
+        }
+    }
+
+    /// Deep-link URL scheme used by the Tailscale iOS app. Other modes return
+    /// nil and fall back to a local retry action.
+    var unreachableActionDeepLink: URL? {
+        switch self {
+        case .tailscale:
+            return URL(string: "tailscale://")
+        case .managedRelay, .selfHostedRelay:
+            return nil
+        }
+    }
+
+    /// Inline hint shown under the relay URL field during onboarding/settings
+    /// to help users pick a sensible URL for their mode.
+    var relayURLHint: String? {
+        switch self {
+        case .managedRelay:
+            return nil
+        case .tailscale:
+            return "Use your tailnet URL — e.g. https://my-mac.tail-scale.ts.net/v1 — or run `tailscale serve` to proxy a local relay."
+        case .selfHostedRelay:
+            return "Point this at your public Hermes relay — e.g. https://relay.example.com/v1."
+        }
+    }
+
+    /// Honest summary of what background delivery to expect in each mode.
+    /// Shown near the relay configuration so users aren't surprised when
+    /// Tailscale/self-hosted builds don't wake the app.
+    var backgroundDeliveryNote: String {
+        switch self {
+        case .managedRelay:
+            return "Managed relay can wake Hermes via official push while the app is backgrounded."
+        case .tailscale:
+            return "Tailscale mode stays honest: messages arrive while the app is in the foreground or reconnected on your tailnet. No official background push."
+        case .selfHostedRelay:
+            return "Self-hosted relays don't receive official push credentials. Background delivery depends on your relay's own notification channel."
+        }
+    }
 }
 
 struct RelayConfiguration: Codable, Hashable, Sendable {
@@ -347,7 +412,7 @@ struct RelayConfiguration: Codable, Hashable, Sendable {
             let trimmed = customRelayBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return "Enter your relay URL." }
             guard RelayConfiguration.normalizeBaseURL(trimmed) != nil else {
-                return "Relay URL must be an absolute http(s) URL ending with /v1."
+                return "Relay URL must be an absolute https:// URL ending with /v1 (plain http:// is only allowed for localhost)."
             }
             return nil
         case .managedRelay:
@@ -375,6 +440,15 @@ struct RelayConfiguration: Codable, Hashable, Sendable {
             return nil
         }
 
+        // Plaintext HTTP is only accepted for loopback hosts. Allowing http://
+        // over the public internet would expose bearer tokens, pairing codes,
+        // and all user chat content to any on-path observer. Tailscale and
+        // managed relays are always HTTPS; users wanting to test a local relay
+        // can reach it via 127.0.0.1 / localhost.
+        if scheme == "http", !RelayConfiguration.isLoopbackHost(components.host) {
+            return nil
+        }
+
         let normalizedPath: String
         switch components.path {
         case "", "/":
@@ -387,6 +461,13 @@ struct RelayConfiguration: Codable, Hashable, Sendable {
         }
         components.path = normalizedPath
         return components.string
+    }
+
+    private static func isLoopbackHost(_ host: String?) -> Bool {
+        guard let host = host?.lowercased() else { return false }
+        return host == "localhost"
+            || host == "127.0.0.1"
+            || host == "::1"
     }
 }
 

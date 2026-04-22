@@ -129,7 +129,7 @@ struct SettingsScreen: View {
 
                     if relayConfiguration.connectionMode.usesCustomRelayURL {
                         VStack(alignment: .leading, spacing: Design.Spacing.xs) {
-                            TextField("https://your-relay.example.com/v1", text: customRelayURLBinding)
+                            TextField(customRelayURLPlaceholder, text: customRelayURLBinding)
                                 .textInputAutocapitalization(.never)
                                 .keyboardType(.URL)
                                 .autocorrectionDisabled()
@@ -143,6 +143,13 @@ struct SettingsScreen: View {
                                 )
                                 .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.lg))
 
+                            if let hint = relayConfiguration.connectionMode.relayURLHint {
+                                Text(hint)
+                                    .font(Design.Typography.caption)
+                                    .foregroundStyle(Design.Colors.secondaryForeground)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
                             Text(relayConfiguration.connectionMode.shortDescription)
                                 .font(Design.Typography.caption)
                                 .foregroundStyle(Design.Colors.secondaryForeground)
@@ -154,11 +161,12 @@ struct SettingsScreen: View {
                             title: "Hosted Relay",
                             value: hostedRelayBaseURL
                         )
-
-                        Text(settingsStore.buildConfiguration.usesManagedPushBroker ? "Official managed push is enabled in this build." : "This build uses direct relay push only.")
-                            .font(Design.Typography.caption)
-                            .foregroundStyle(Design.Colors.secondaryForeground)
                     }
+
+                    Text(backgroundDeliveryNote)
+                        .font(Design.Typography.caption)
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     if let relayValidationMessage {
                         Text(relayValidationMessage)
@@ -380,10 +388,7 @@ struct SettingsScreen: View {
                 settingsStore.settings.notificationsEnabled = newValue
                 // Immediately register or deactivate push token on the relay
                 Task {
-                    let container = AppContainer.sharedDefault()
-                    if let token = UserDefaults.standard.string(forKey: "hermes.apns.deviceToken") {
-                        await container.registerPushTokenIfNeeded(token)
-                    }
+                    await AppContainer.sharedDefault().reregisterStoredPushToken()
                 }
             }
         )
@@ -428,6 +433,25 @@ struct SettingsScreen: View {
 
     private var relayValidationMessage: String? {
         relayConfiguration.validationMessage
+    }
+
+    private var customRelayURLPlaceholder: String {
+        switch relayConfiguration.connectionMode {
+        case .managedRelay:
+            return "https://your-relay.example.com/v1"
+        case .tailscale:
+            return "https://my-mac.tail-scale.ts.net/v1"
+        case .selfHostedRelay:
+            return "https://your-relay.example.com/v1"
+        }
+    }
+
+    private var backgroundDeliveryNote: String {
+        let mode = relayConfiguration.connectionMode
+        if mode == .managedRelay && !settingsStore.buildConfiguration.usesManagedPushBroker {
+            return "Managed mode selected, but this build uses direct relay push only."
+        }
+        return mode.backgroundDeliveryNote
     }
 
     private var backgroundLocationDescription: String {

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -205,6 +205,26 @@ class PushBrokerRegistration(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class PushBrokerSendNonce(Base):
+    """Tracks recently-seen send-request nonces to reject signature replays.
+
+    Rows older than the iat skew window can be pruned after each insert —
+    the server rejects any iat outside that window anyway, so entries are
+    no longer load-bearing once they age out.
+    """
+    __tablename__ = "push_broker_send_nonces"
+    __table_args__ = (
+        UniqueConstraint("relay_handle", "nonce", name="uq_push_broker_send_nonces_handle_nonce"),
+        Index("ix_push_broker_send_nonces_iat", "iat"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    relay_handle: Mapped[str] = mapped_column(Text, nullable=False)
+    nonce: Mapped[str] = mapped_column(Text, nullable=False)
+    iat: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class Conversation(Base):
