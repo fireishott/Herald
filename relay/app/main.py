@@ -29,6 +29,8 @@ from .pairing import HostSetupCodePayload, format_phone_pairing_code, build_host
 from .rate_limit import PhonePairingRateLimiter
 from .schemas import (
     ConnectorSetupRequest,
+    CronCreateRequest,
+    CronUpdateRequest,
     DeviceRegisterRequest,
     DeviceAppStateRequest,
     HostEnrollmentCodeCreateRequest,
@@ -949,6 +951,131 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception as exc:
             logger.warning("models.list RPC failed: %s", exc)
             return success({"models": [], "activeModel": None})
+
+    @app.get("/v1/profiles")
+    async def profile_catalog(
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        try:
+            result = await send_connector_rpc(
+                auth.user.id, method="profiles.list", timeout_seconds=10.0,
+            )
+            return success(result)
+        except HTTPException:
+            return success({"profiles": [], "activeProfile": None})
+        except Exception:
+            return success({"profiles": [], "activeProfile": None})
+
+    @app.get("/v1/skills")
+    async def skill_catalog(
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        try:
+            result = await send_connector_rpc(
+                auth.user.id, method="skills.list", timeout_seconds=10.0,
+            )
+            return success(result)
+        except HTTPException:
+            return success({"skills": []})
+        except Exception:
+            return success({"skills": []})
+
+    @app.get("/v1/cron")
+    async def cron_list(
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        try:
+            result = await send_connector_rpc(
+                auth.user.id, method="cron.list", timeout_seconds=10.0,
+            )
+            return success(result)
+        except HTTPException:
+            return success({"jobs": []})
+        except Exception:
+            return success({"jobs": []})
+
+    @app.post("/v1/cron")
+    async def cron_create(
+        body: CronCreateRequest,
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        try:
+            result = await send_connector_rpc(
+                auth.user.id,
+                method="cron.create",
+                params=body.model_dump(),
+                timeout_seconds=10.0,
+            )
+            return success(result)
+        except HTTPException as exc:
+            raise exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.patch("/v1/cron/{job_id}")
+    async def cron_update(
+        job_id: str,
+        body: CronUpdateRequest,
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        try:
+            result = await send_connector_rpc(
+                auth.user.id,
+                method="cron.update",
+                params={"id": job_id, **body.model_dump()},
+                timeout_seconds=10.0,
+            )
+            return success(result)
+        except HTTPException as exc:
+            raise exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.delete("/v1/cron/{job_id}")
+    async def cron_delete(
+        job_id: str,
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        try:
+            result = await send_connector_rpc(
+                auth.user.id,
+                method="cron.delete",
+                params={"id": job_id},
+                timeout_seconds=10.0,
+            )
+            return success(result)
+        except HTTPException as exc:
+            raise exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/v1/memories")
+    async def memory_list(
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        try:
+            result = await send_connector_rpc(
+                auth.user.id, method="memories.list", timeout_seconds=10.0,
+            )
+            return success(result)
+        except HTTPException:
+            return success({"memories": []})
+        except Exception:
+            return success({"memories": []})
+
+    @app.get("/v1/tools")
+    async def tool_list(
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        try:
+            result = await send_connector_rpc(
+                auth.user.id, method="tools.list", timeout_seconds=10.0,
+            )
+            return success(result)
+        except HTTPException:
+            return success({"tools": []})
+        except Exception:
+            return success({"tools": []})
 
     @app.post("/v1/hosts/current/revoke")
     def revoke_current_host(
