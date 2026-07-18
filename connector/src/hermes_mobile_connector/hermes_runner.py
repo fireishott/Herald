@@ -97,8 +97,12 @@ class HermesCLIExecutor:
         if completed.returncode != 0:
             return None
 
+        # The relay rejects multi-line version strings (WebSocket 4401), and
+        # some hermes builds print banner text before the version — keep only
+        # the first line.
         output = completed.stdout.strip() or completed.stderr.strip()
-        return output or None
+        first_line = output.splitlines()[0].strip() if output else ""
+        return first_line or None
 
     def send_message(
         self,
