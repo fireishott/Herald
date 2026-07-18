@@ -31,8 +31,8 @@ struct iPhoneSessionDrawer: View {
                 .background(Design.Colors.background)
                 .clipShape(
                     UnevenRoundedRectangle(
-                        topTrailingRadius: Design.CornerRadius.lg,
-                        bottomTrailingRadius: Design.CornerRadius.lg
+                        bottomTrailingRadius: Design.CornerRadius.lg,
+                        topTrailingRadius: Design.CornerRadius.lg
                     )
                 )
 

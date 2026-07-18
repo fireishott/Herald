@@ -107,7 +107,9 @@ struct iPadRightPanelView: View {
         }
         .padding(.horizontal, Design.Spacing.sm)
         .padding(.vertical, Design.Spacing.xs)
-        Divider().background(Design.Colors.divider)
+        .overlay(alignment: .bottom) {
+            Divider().background(Design.Colors.divider)
+        }
     }
 
     private func logEntryRow(_ entry: LogEntry) -> some View {
@@ -197,7 +199,7 @@ struct iPadRightPanelView: View {
             Text(label).font(.system(size: 11, design: .monospaced)).foregroundStyle(Design.Colors.secondaryForeground)
             Spacer()
             Text(value.map { "\($0)" } ?? "--")
-                .font(.system(size: 11, design: .monospaced, weight: .medium))
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
                 .foregroundStyle(Design.Colors.foreground)
         }
     }
