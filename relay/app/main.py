@@ -15,6 +15,7 @@ import json
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -47,12 +48,14 @@ from .services import (
     activate_hermes_host_connection,
     append_message,
     archive_current_conversation,
+    archive_session,
     authenticate_hermes_host,
     build_connector_websocket_url,
     claim_next_message_job,
     complete_message_job,
     conversation_history_before_message,
     create_phone_pairing_code,
+    create_session,
     create_voice_session,
     create_host_enrollment_invite,
     create_inbox_item,
@@ -60,10 +63,12 @@ from .services import (
     current_hermes_host_for_user,
     active_push_registrations_for_user,
     deactivate_hermes_host_connection,
+    delete_session,
     device_is_foreground,
     end_voice_session,
     ensure_default_user,
     fail_message_job,
+    get_session,
     get_inbox_item_for_user,
     get_message_job,
     get_message_job_for_user_message,
@@ -76,22 +81,27 @@ from .services import (
     list_inbox_actions,
     list_inbox_items,
     list_message_jobs_for_conversation,
+    list_sessions,
     record_audit,
     record_inbox_action,
     redeem_phone_pairing_code,
     redeem_host_enrollment_invite,
     redeem_pairing_invite,
     refresh_auth_session,
+    rename_session,
     revoke_auth_session,
     revoke_current_hermes_host,
     rotate_auth_session,
+    search_sessions,
     serialize_conversation,
     serialize_hermes_host,
     serialize_inbox_item,
     serialize_message,
+    serialize_session_summary,
     serialize_voice_session,
     serialize_voice_turn,
     setup_connector_account,
+    toggle_pin_session,
     touch_hermes_host_connection,
     update_device_app_state,
     upsert_device,
@@ -1461,7 +1471,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/v1/conversations/current")
     def current_conversation(auth: AuthContext = Depends(get_auth_context), db: Session = Depends(get_db)) -> dict:
-        conversation = get_or_create_current_conversation(db, user_id=auth.user.id)
+        conversation = get_or_create_current_conversation(db, user_id=auth.user.id, device_id=auth.device.id)
         messages = list_conversation_messages(db, conversation_id=conversation.id)
         jobs = list_message_jobs_for_conversation(db, conversation_id=conversation.id)
         return success({"conversation": serialize_conversation(conversation, messages, jobs=jobs)})
@@ -1471,8 +1481,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         auth: AuthContext = Depends(get_auth_context),
         db: Session = Depends(get_db),
     ) -> dict:
-        archive_current_conversation(db, user_id=auth.user.id)
-        conversation = get_or_create_current_conversation(db, user_id=auth.user.id)
+        archive_current_conversation(db, user_id=auth.user.id, device_id=auth.device.id)
+        conversation = get_or_create_current_conversation(db, user_id=auth.user.id, device_id=auth.device.id)
         messages = list_conversation_messages(db, conversation_id=conversation.id)
         record_audit(
             db,
@@ -1485,7 +1495,142 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db.commit()
         return success({"conversation": serialize_conversation(conversation, messages)})
 
-    @app.post("/v1/messages")
+    # ── Session Management ──────────────────────────────────────────
+
+    class CreateSessionBody(BaseModel):
+        title: str = "New Chat"
+
+    class RenameSessionBody(BaseModel):
+        title: str
+
+    @app.get("/v1/sessions")
+    def list_user_sessions(
+        limit: int = 50,
+        offset: int = 0,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        sessions, total = list_sessions(
+            db,
+            user_id=auth.user.id,
+            device_id=auth.device.id,
+            limit=limit,
+            offset=offset,
+        )
+        return success({
+            "sessions": [serialize_session_summary(s) for s in sessions],
+            "total": total,
+        })
+
+    @app.get("/v1/sessions/search")
+    def search_user_sessions(
+        q: str,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        sessions = search_sessions(db, user_id=auth.user.id, query=q, device_id=auth.device.id)
+        return success({
+            "sessions": [serialize_session_summary(s) for s in sessions],
+            "total": len(sessions),
+        })
+
+    @app.post("/v1/sessions", status_code=status.HTTP_201_CREATED)
+    def create_user_session(
+        body: CreateSessionBody,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        session = create_session(
+            db,
+            user_id=auth.user.id,
+            device_id=auth.device.id,
+            title=body.title,
+        )
+        return success({"session": serialize_session_summary(session)})
+
+    @app.get("/v1/sessions/{session_id}")
+    def get_user_session(
+        session_id: str,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        session = get_session(db, session_id=session_id)
+        if session is None or session.user_id != auth.user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+        return success({"session": serialize_session_summary(session)})
+
+    @app.get("/v1/sessions/{session_id}/conversation")
+    def get_session_conversation(
+        session_id: str,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        conversation = get_session(db, session_id=session_id)
+        if conversation is None or conversation.user_id != auth.user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+        messages = list_conversation_messages(db, conversation_id=conversation.id)
+        jobs = list_message_jobs_for_conversation(db, conversation_id=conversation.id)
+        return success({"conversation": serialize_conversation(conversation, messages, jobs=jobs)})
+
+    @app.delete("/v1/sessions/{session_id}")
+    def delete_user_session(
+        session_id: str,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        session = get_session(db, session_id=session_id)
+        if session is None or session.user_id != auth.user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+        delete_session(db, session_id=session_id)
+        record_audit(
+            db,
+            actor_type="user",
+            actor_id=auth.user.id,
+            action="session.delete",
+            entity_type="session",
+            entity_id=session_id,
+        )
+        db.commit()
+        return success({"deleted": True})
+
+    @app.post("/v1/sessions/{session_id}/archive")
+    def archive_user_session(
+        session_id: str,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        session = get_session(db, session_id=session_id)
+        if session is None or session.user_id != auth.user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+        updated = archive_session(db, session_id=session_id)
+        return success({"session": serialize_session_summary(updated) if updated else None})
+
+    @app.post("/v1/sessions/{session_id}/pin")
+    def toggle_pin_user_session(
+        session_id: str,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        session = get_session(db, session_id=session_id)
+        if session is None or session.user_id != auth.user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+        updated = toggle_pin_session(db, session_id=session_id)
+        return success({"session": serialize_session_summary(updated) if updated else None})
+
+    @app.patch("/v1/sessions/{session_id}")
+    def rename_user_session(
+        session_id: str,
+        body: RenameSessionBody,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ) -> dict:
+        session = get_session(db, session_id=session_id)
+        if session is None or session.user_id != auth.user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
+        updated = rename_session(db, session_id=session_id, title=body.title)
+        return success({"session": serialize_session_summary(updated) if updated else None})
+
+    # ── Messages ────────────────────────────────────────────────────
     async def create_message(
         payload: MessageCreateRequest,
         auth: AuthContext = Depends(get_auth_context),
@@ -1524,7 +1669,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     db.commit()
                     return success_response(payload_data, status_code=status_code)
 
-        conversation = get_or_create_current_conversation(db, user_id=auth.user.id)
+        conversation = get_or_create_current_conversation(db, user_id=auth.user.id, device_id=auth.device.id)
         initial_delivery_status = "pending" if request_settings.hermes_adapter == "connector" else "sent"
         attachments_raw = (
             [att.model_dump() for att in payload.attachments]

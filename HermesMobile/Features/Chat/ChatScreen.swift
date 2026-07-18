@@ -7,6 +7,7 @@ struct ChatScreen: View {
     @Environment(AppSessionStore.self) private var sessionStore
     @Environment(SettingsStore.self) private var settingsStore
     @Environment(TabRouter.self) private var router
+    @Binding var isSessionDrawerOpen: Bool
 
     @State private var messageText = ""
     @State private var pendingAttachments: [PendingAttachment] = []
@@ -100,7 +101,22 @@ struct ChatScreen: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            modelStatusChip
+            HStack(spacing: Design.Spacing.sm) {
+                // Hamburger — only on iPhone (iPad has dedicated sidebar)
+                if DeviceClass.isPhone {
+                    Button {
+                        withAnimation(Design.Motion.standard) {
+                            isSessionDrawerOpen.toggle()
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundStyle(Design.Colors.foreground)
+                    }
+                    .buttonStyle(.plain)
+                }
+                modelStatusChip
+            }
         }
         ToolbarItem(placement: .topBarTrailing) {
             GlassCircleButton(icon: "gearshape", accessibilityLabel: "Open settings") {
