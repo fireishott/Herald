@@ -139,7 +139,7 @@ def test_chat_reply_triggers_push_when_device_is_backgrounded(tmp_path):
         def __init__(self) -> None:
             self.alerts = []
 
-        async def send_alert_push(self, token: str, *, title: str, body: str, category: str | None = None, bundle_id: str | None = None, environment: str | None = None):
+        async def send_alert_push(self, token: str, *, title: str, body: str, category: str | None = None, bundle_id: str | None = None, environment: str | None = None, user_info: dict | None = None):
             from app.apns import PushResult
             self.alerts.append({
                 "token": token,
