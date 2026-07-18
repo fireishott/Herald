@@ -220,6 +220,16 @@ struct iPadRightPanelView: View {
         }
     }
 
+        private func usageRow(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label).font(.system(size: 11, design: .monospaced)).foregroundStyle(Design.Colors.secondaryForeground)
+            Spacer()
+            Text(value)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(Design.Colors.foreground)
+        }
+    }
+
     private func usageRow(_ label: String, value: Int?) -> some View {
         HStack {
             Text(label).font(.system(size: 11, design: .monospaced)).foregroundStyle(Design.Colors.secondaryForeground)
