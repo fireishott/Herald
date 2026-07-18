@@ -1273,7 +1273,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.freemancurtis.HermesMobileApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.freemancurtis.HermesMobile;
 				PRODUCT_NAME = HermesMobile;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -1352,7 +1352,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.freemancurtis.HermesMobileApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.freemancurtis.HermesMobile;
 				PRODUCT_NAME = HermesMobile;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
