@@ -29,6 +29,7 @@ struct ChatScreen: View {
                     connectionBanner
                 }
                 messageList
+                SessionStatusBar()
                 ChatInputBar(
                     text: $messageText,
                     pendingAttachments: $pendingAttachments,

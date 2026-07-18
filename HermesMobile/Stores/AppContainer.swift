@@ -285,8 +285,11 @@ final class AppContainer {
         await sessionListStore.loadSessions()
         // Auto-create first session if none exist yet
         if sessionListStore.recentSessions.isEmpty && sessionListStore.pinnedSessions.isEmpty {
-            try? await Task.sleep(for: .milliseconds(500))
+            try? await Task.sleep(for: .milliseconds(800))
             await sessionListStore.createNewSession(title: "New Chat")
+            // Reload after creation
+            try? await Task.sleep(for: .milliseconds(300))
+            await sessionListStore.loadSessions()
         }
         await inboxStore.loadInbox()
         await refreshCommandCatalog(force: true)

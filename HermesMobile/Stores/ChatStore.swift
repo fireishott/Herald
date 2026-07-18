@@ -122,10 +122,12 @@ final class ChatStore {
 
         streamingTask = Task { [weak self] in
             guard let self else { return }
+            appendLog(level: "INFO", "Streaming started")
             for await update in stream {
                 if Task.isCancelled { break }
                 switch update {
                 case .messageSent(let jobID):
+                    appendLog(level: "INFO", "Message accepted — job \(jobID.uuidString.prefix(8))")
                     acceptedJobID = jobID
 
                 case .textDelta(let delta):
