@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import getpass
+import logging
 import os
 import secrets
 import shutil
@@ -759,6 +760,10 @@ def _run_foreground(connector: HermesMobileConnector) -> int:
 # ── Entry point ──────────────────────────────────────────────────
 
 def main(argv: list[str] | None = None) -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+    )
     parser = build_parser()
     args = parser.parse_args(argv)
     connector = HermesMobileConnector()

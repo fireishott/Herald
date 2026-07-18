@@ -943,8 +943,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 timeout_seconds=10.0,
             )
             return success(result)
-        except HTTPException:
-            # Host offline — empty list, iOS shows an offline state
+        except HTTPException as exc:
+            logger.warning("models.list RPC failed: %s", exc.detail)
+            return success({"models": [], "activeModel": None})
+        except Exception as exc:
+            logger.warning("models.list RPC failed: %s", exc)
             return success({"models": [], "activeModel": None})
 
     @app.post("/v1/hosts/current/revoke")
