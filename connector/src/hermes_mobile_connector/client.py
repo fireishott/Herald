@@ -993,6 +993,8 @@ class HermesMobileConnector:
                 result = self._rpc_commands_catalog()
             elif method == "models.list":
                 result = self._rpc_models_list()
+            elif method == "profiles.list":
+                result = await self._rpc_profiles_list()
             else:
                 raise RuntimeError(f"Unsupported RPC method: {method}")
             return {
@@ -1182,6 +1184,66 @@ class HermesMobileConnector:
 
         models.sort(key=lambda model: (model["providerName"].lower(), model["name"].lower()))
         return models
+
+    async def _rpc_profiles_list(self) -> dict:
+        hermes_home = self._resolve_hermes_home()
+        profiles_dir = hermes_home / "profiles"
+        if not profiles_dir.is_dir():
+            return {"activeProfile": None, "profiles": []}
+
+        # Read active profile from config
+        active_name = None
+        config_path = hermes_home / "config.yaml"
+        if config_path.is_file():
+            try:
+                import yaml
+                with open(config_path, encoding="utf-8") as f:
+                    config = yaml.safe_load(f) or {}
+                active_name = (config.get("profile") or {}).get("default")
+            except Exception:  # noqa: BLE001
+                pass
+
+        profiles = []
+        for entry in sorted(profiles_dir.iterdir()):
+            if not entry.is_dir():
+                continue
+            soul_path = entry / "SOUL.md"
+            description = ""
+            if soul_path.is_file():
+                try:
+                    with open(soul_path, encoding="utf-8") as f:
+                        lines = f.readlines()
+                    # First non-empty, non-frontmatter line = description
+                    in_frontmatter = False
+                    for line in lines:
+                        stripped = line.strip()
+                        if stripped == "---":
+                            in_frontmatter = not in_frontmatter
+                            continue
+                        if not in_frontmatter and stripped and not stripped.startswith("#"):
+                            description = stripped
+                            break
+                except Exception:  # noqa: BLE001
+                    pass
+
+            # Count skills
+            skills_dir = entry / "skills"
+            skill_count = len(list(skills_dir.iterdir())) if skills_dir.is_dir() else 0
+
+            profiles.append({
+                "name": entry.name,
+                "description": description,
+                "skillCount": skill_count,
+            })
+
+        active_profile = None
+        if active_name:
+            for p in profiles:
+                if p["name"] == active_name:
+                    active_profile = dict(p)
+                    break
+
+        return {"activeProfile": active_profile, "profiles": profiles}
 
     @staticmethod
     def _read_active_model(hermes_home: Path) -> dict | None:
