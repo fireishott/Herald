@@ -12,7 +12,7 @@ Hermes iOS is a self-hosted-first iPhone companion for a user-owned Hermes runti
 ## Why use it
 
 - **Self-hosted first**: the relay is yours, the connector runs next to your Hermes install, and the iPhone app can point to any compatible relay.
-- **Native iPhone experience**: chat, voice mode, camera attachments, widgets, Live Activities, and sensor-aware context.
+- **Native iPhone + iPad experience**: chat, voice mode, camera attachments, widgets, Live Activities, sensor-aware context. iPad gets a native sidebar layout with NavigationSplitView.
 - **Hermes-aware**: slash commands, installed skills, personalities, quick commands, MCP-backed context, and agent-side coding workflows.
 - **Optional platform extras**: APNs and CarPlay are supported, but not required to get a working setup.
 
@@ -180,6 +180,31 @@ Or start a fresh Hermes chat/session if you prefer.
 
 - **APNs**: lets the relay deliver Hermes replies while the app is backgrounded. Setup lives in [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 - **CarPlay**: requires Apple approval for the voice-based conversational entitlement. It is optional and inert when not configured.
+
+
+## iPad Support
+
+Hermes iOS adapts to iPad with a native sidebar layout:
+
+- **NavigationSplitView** with a persistent sidebar on the left
+- Sections: Chat, Inbox, Talk, Settings
+- Offline indicator (orange dot) next to Chat when Hermes is disconnected
+- Sidebar selection drives the detail pane
+- iPhone keeps the existing tab bar layout unchanged
+
+The root view auto-detects the device class and renders the appropriate layout. No configuration needed.
+
+### Building for iPad
+
+The branch `feat/ipad-layout` contains the iPad layout work:
+
+1. Clone the repo and check out `feat/ipad-layout`
+2. Open `HermesMobile.xcodeproj` in Xcode
+3. Build and run on an iPad simulator or device
+4. For sideloading: build for device, package as .ipa, install via SideStore
+
+No API keys or signing certificates required for development builds.
+
 
 ## Documentation map
 
