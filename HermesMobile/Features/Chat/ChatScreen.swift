@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ChatScreen: View {
     @Environment(ChatStore.self) private var chatStore
+    @Environment(ModelStore.self) private var modelStore
     @Environment(HermesHostStore.self) private var hostStore
     @Environment(PairingStore.self) private var pairingStore
     @Environment(AppSessionStore.self) private var sessionStore
@@ -94,6 +95,25 @@ struct ChatScreen: View {
             .presentationDetents([.height(220)])
             .presentationDragIndicator(.hidden)
         }
+        .sheet(isPresented: $showModelSelector) {
+            ModelSelectorSheet { model, setAsDefault in
+                switchModel(model, setAsDefault: setAsDefault)
+            }
+            .presentationDetents([.medium, .large])
+        }
+    }
+
+    // MARK: - Model switching
+
+    /// Dispatches `/model <name>` through the normal chat path. The gateway
+    /// confirms in the transcript and ChatStore parses the confirmation to
+    /// update the model chip.
+    private func switchModel(_ model: ModelStore.HermesModel, setAsDefault: Bool) {
+        var command = "/model \(model.name)"
+        if setAsDefault {
+            command += " --global"
+        }
+        Task { await chatStore.sendMessage(command) }
     }
 
     // MARK: - Toolbar
@@ -126,6 +146,7 @@ struct ChatScreen: View {
     }
 
     @State private var showContextPopover = false
+    @State private var showModelSelector = false
 
     private var displayedModelName: String? {
         chatStore.activeModelName ?? hostStore.currentHost?.hermesModel
@@ -282,6 +303,31 @@ struct ChatScreen: View {
                     .font(Design.Typography.caption)
                     .foregroundStyle(Design.Colors.secondaryForeground)
             }
+
+            Divider()
+
+            Button {
+                showContextPopover = false
+                // Let the popover finish dismissing before presenting the sheet
+                Task {
+                    try? await Task.sleep(for: .milliseconds(350))
+                    showModelSelector = true
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Switch Model")
+                        .font(Design.Typography.callout)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                }
+                .foregroundStyle(Design.Brand.accent)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
         .frame(width: 230, alignment: .leading)
         .padding(.horizontal, Design.Spacing.lg)

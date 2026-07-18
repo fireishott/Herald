@@ -1049,3 +1049,73 @@ def test_handle_sensor_message_returns_none_for_unknown_type(tmp_path):
 
     result = connector._handle_sensor_message({"type": "something.else"})  # noqa: SLF001
     assert result is None
+
+
+def test_rpc_models_list_reads_provider_models(monkeypatch, tmp_path):
+    hermes_home = tmp_path / ".hermes"
+    hermes_home.mkdir(parents=True)
+    (hermes_home / "config.yaml").write_text(
+        """
+model:
+  default: claude-sonnet-4-6
+  provider: anthropic
+providers:
+  anthropic:
+    name: Anthropic
+    default_model: claude-sonnet-4-6
+    models:
+      claude-sonnet-4-6:
+        context_length: 200000
+      claude-haiku-4-5-20251001:
+        context_length: 200000
+  local-ollama:
+    default_model: qwen3:8b
+    models:
+      qwen3:8b:
+        context_length: 40960
+      broken-entry: null
+""",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    connector = HermesMobileConnector(
+        state_store=ConnectorStateStore(state_dir=tmp_path / "connector-state"),
+        executor=make_executor(),
+    )
+
+    result = connector._rpc_models_list()
+
+    assert result["activeModel"]["name"] == "claude-sonnet-4-6"
+    assert result["activeModel"]["provider"] == "anthropic"
+
+    models = result["models"]
+    names = [model["name"] for model in models]
+    assert "claude-sonnet-4-6" in names
+    assert "claude-haiku-4-5-20251001" in names
+    assert "qwen3:8b" in names
+    assert "broken-entry" in names  # null config still lists the model
+
+    sonnet = next(model for model in models if model["name"] == "claude-sonnet-4-6")
+    assert sonnet["provider"] == "anthropic"
+    assert sonnet["providerName"] == "Anthropic"
+    assert sonnet["contextWindow"] == 200000
+    assert sonnet["isProviderDefault"] is True
+
+    qwen = next(model for model in models if model["name"] == "qwen3:8b")
+    assert qwen["providerName"] == "local-ollama"  # falls back to provider key
+    assert qwen["contextWindow"] == 40960
+
+
+def test_rpc_models_list_handles_missing_config(monkeypatch, tmp_path):
+    hermes_home = tmp_path / ".hermes-empty"
+    hermes_home.mkdir(parents=True)
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    connector = HermesMobileConnector(
+        state_store=ConnectorStateStore(state_dir=tmp_path / "connector-state"),
+        executor=make_executor(),
+    )
+
+    result = connector._rpc_models_list()
+
+    assert result == {"activeModel": None, "models": []}
