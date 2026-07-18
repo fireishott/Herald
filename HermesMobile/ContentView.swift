@@ -9,12 +9,42 @@ struct MainTabView: View {
     var body: some View {
         @Bindable var router = router
         ZStack {
-            NavigationStack(path: router.pathBinding()) {
-                ChatScreen(isSessionDrawerOpen: $isSessionDrawerOpen)
-                    .navigationDestination(for: Route.self) { route in
-                        routeDestination(route)
-                    }
+            TabView(selection: $router.selectedTab) {
+                // ── Chat Tab ──
+                NavigationStack(path: router.binding(for: .chat)) {
+                    ChatScreen(isSessionDrawerOpen: $isSessionDrawerOpen)
+                        .navigationDestination(for: Route.self) { route in
+                            routeDestination(route)
+                        }
+                }
+                .tabItem { Label(AppTab.chat.title, systemImage: AppTab.chat.icon) }
+                .tag(AppTab.chat)
+
+                // ── Inbox Tab ──
+                NavigationStack {
+                    InboxScreen()
+                }
+                .tabItem { Label(AppTab.inbox.title, systemImage: AppTab.inbox.icon) }
+                .tag(AppTab.inbox)
+
+                // ── Talk Tab ──
+                NavigationStack {
+                    TalkModeScreen()
+                }
+                .tabItem { Label(AppTab.talk.title, systemImage: AppTab.talk.icon) }
+                .tag(AppTab.talk)
+
+                // ── Settings Tab ──
+                NavigationStack {
+                    SettingsScreen()
+                        .navigationDestination(for: Route.self) { route in
+                            routeDestination(route)
+                        }
+                }
+                .tabItem { Label(AppTab.settings.title, systemImage: AppTab.settings.icon) }
+                .tag(AppTab.settings)
             }
+            .tint(Design.Brand.accent)
             .sheet(item: $router.activeSheet) { destination in
                 sheetDestination(destination)
             }
@@ -33,7 +63,7 @@ struct MainTabView: View {
                 }
             }
 
-            // Session drawer overlay
+            // Session drawer overlay (swipe from left edge)
             iPhoneSessionDrawer(isOpen: $isSessionDrawerOpen)
         }
     }

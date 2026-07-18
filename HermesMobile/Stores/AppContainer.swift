@@ -283,6 +283,7 @@ final class AppContainer {
         lastKnownHostOnline = hostStore.isHostOnline
         await chatStore.loadConversationIfNeeded()
         await inboxStore.loadInbox()
+        await sessionListStore.loadSessions()
         await refreshCommandCatalog(force: true)
         await registerStoredPushTokenIfNeeded()
         sensorUploadService?.start()

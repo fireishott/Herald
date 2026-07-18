@@ -28,18 +28,27 @@ enum SheetDestination: Identifiable {
 
 enum AppTab: String, CaseIterable, Identifiable {
     case chat
+    case inbox
+    case talk
+    case settings
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .chat: "Chat"
+        case .inbox: "Inbox"
+        case .talk: "Talk"
+        case .settings: "Settings"
         }
     }
 
     var icon: String {
         switch self {
         case .chat: "bubble.left.and.bubble.right"
+        case .inbox: "tray"
+        case .talk: "waveform"
+        case .settings: "gearshape"
         }
     }
 }
