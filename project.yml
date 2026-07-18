@@ -56,7 +56,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: io.hermesmobile.HermesMobile
         PRODUCT_NAME: HermesMobile
         MARKETING_VERSION: "1.3.0"
-        CURRENT_PROJECT_VERSION: "4"
+        CURRENT_PROJECT_VERSION: "5"
         DEVELOPMENT_TEAM: ""
         CODE_SIGN_STYLE: Automatic
         INFOPLIST_KEY_CFBundleDisplayName: HermesMobile
@@ -108,7 +108,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: io.hermesmobile.HermesMobile.Widgets
         PRODUCT_NAME: HermesMobileWidgets
         MARKETING_VERSION: "1.3.0"
-        CURRENT_PROJECT_VERSION: "4"
+        CURRENT_PROJECT_VERSION: "5"
         SWIFT_VERSION: "6.2"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
