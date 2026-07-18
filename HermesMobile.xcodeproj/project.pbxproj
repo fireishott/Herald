@@ -1203,7 +1203,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = HermesMobileWidgets/HermesMobileWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = HermesMobileWidgets/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1316,7 +1316,7 @@
 				CODE_SIGN_ENTITLEMENTS = HermesMobile/HermesMobile.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = HermesMobile/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = HermesMobile;
@@ -1354,7 +1354,7 @@
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = HermesMobileWidgets/HermesMobileWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = HermesMobileWidgets/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1395,7 +1395,7 @@
 				CODE_SIGN_ENTITLEMENTS = HermesMobile/HermesMobile.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				INFOPLIST_FILE = HermesMobile/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = HermesMobile;
