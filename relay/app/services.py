@@ -1444,9 +1444,7 @@ def list_sessions(
         Conversation.is_archived.is_(False),
     )
     if device_id is not None:
-        base = base.where(
-            (Conversation.device_id == device_id) | (Conversation.device_id.is_(None))
-        )
+        base = base.where(Conversation.device_id == device_id)
 
     # Count total matching sessions
     count_stmt = select(sqlfunc.count()).select_from(base.subquery())
@@ -1473,9 +1471,7 @@ def search_sessions(db: Session, *, user_id: str, query: str, device_id: str | N
         Conversation.title.ilike(f"%{query}%"),
     )
     if device_id is not None:
-        base = base.where(
-            (Conversation.device_id == device_id) | (Conversation.device_id.is_(None))
-        )
+        base = base.where(Conversation.device_id == device_id)
     return list(
         db.scalars(
             base.order_by(Conversation.last_message_at.desc().nullslast()).limit(20)

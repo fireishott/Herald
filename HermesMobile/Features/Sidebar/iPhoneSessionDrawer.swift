@@ -8,7 +8,7 @@ struct iPhoneSessionDrawer: View {
     @Binding var isOpen: Bool
     @State private var dragOffset: CGFloat = 0
 
-    private let drawerWidth: CGFloat = min(UIScreen.main.bounds.width * 0.82, 340)
+    private let drawerWidth: CGFloat = 340
 
     var body: some View {
         ZStack(alignment: .leading) {

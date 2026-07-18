@@ -10,6 +10,7 @@ struct ChatInputBar: View {
     let onStop: () -> Void
     let onAttach: () -> Void
     let onSlashCommand: (SlashCommand, String?) -> Void
+    let enterToSend: Bool
 
     @Environment(TalkStore.self) private var talkStore
     @Environment(ChatStore.self) private var chatStore
@@ -98,9 +99,9 @@ struct ChatInputBar: View {
                     .foregroundStyle(Design.Colors.foreground)
                     .lineLimit(1...5)
                     .focused(isFocused)
-                    .submitLabel(.send)
+                    .submitLabel(enterToSend ? .send : .return)
                     .onSubmit {
-                        if canSend {
+                        if enterToSend && canSend {
                             handlePrimaryAction()
                         }
                     }

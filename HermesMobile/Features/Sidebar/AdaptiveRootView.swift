@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Root view that adapts to device class:
-/// - iPad: NavigationSplitView with sidebar + detail + optional right panel
+/// - iPad: NavigationSplitView with sidebar + detail, right panel as overlay
 /// - iPhone: NavigationStack with slide-out session drawer
 struct AdaptiveRootView: View {
     @State private var selectedSection: SidebarSection = .chat
@@ -19,7 +19,7 @@ struct AdaptiveRootView: View {
     // MARK: - iPad Layout
 
     private var iPadLayout: some View {
-        HStack(spacing: 0) {
+        ZStack(alignment: .trailing) {
             NavigationSplitView {
                 iPadSidebarView(
                     selectedSection: $selectedSection,
@@ -29,14 +29,19 @@ struct AdaptiveRootView: View {
                 detailContent
             }
 
-            // Right-side inspector panel
+            // Right-side inspector panel as overlay
+            // This avoids wrapping NavigationSplitView in HStack,
+            // which breaks sidebar auto-dismiss on compact iPad widths.
             if isRightPanelOpen {
                 iPadRightPanelView(
                     isOpen: $isRightPanelOpen,
                     selectedTab: $rightPanelTab
                 )
+                .transition(.move(edge: .trailing))
+                .zIndex(1)
             }
         }
+        .animation(Design.Motion.standard, value: isRightPanelOpen)
     }
 
     @ViewBuilder

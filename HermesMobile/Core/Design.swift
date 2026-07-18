@@ -8,28 +8,27 @@ enum Design {
     // MARK: - Brand
 
     enum Brand {
-        /// Hermes warm terracotta accent.
-        static let accent = Color(hex: 0xFFBF00)
-        static let accentGradient = LinearGradient(
-            colors: [accent, accent.opacity(0.8)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        /// Theme-aware accent color.
+        static var accent: Color { AppTheme.shared.accent }
+        /// Theme-aware accent gradient.
+        static var accentGradient: LinearGradient { AppTheme.shared.accentGradient }
     }
 
     // MARK: - Colors
 
     enum Colors {
-        /// Deep charcoal background.
-        static let background = Color(hex: 0x2D2D2B)
-        /// Warm off-white foreground text.
-        static let foreground = Color(hex: 0xF9F9F7)
-        /// Muted foreground at 80% contrast.
-        static let secondaryForeground = foreground.opacity(0.6)
+        /// Theme-aware background.
+        static var background: Color { AppTheme.shared.background }
+        /// Theme-aware foreground text.
+        static var foreground: Color { AppTheme.shared.foreground }
+        /// Muted foreground at reduced contrast.
+        static var secondaryForeground: Color { AppTheme.shared.secondaryForeground }
         /// Subtle surface for cards and elevated elements.
-        static let surface = Color.white.opacity(0.08)
+        static var surface: Color { AppTheme.shared.surface }
         /// Border/divider at low opacity.
-        static let divider = Color.white.opacity(0.1)
+        static var divider: Color { AppTheme.shared.divider }
+        /// Theme-aware sidebar color.
+        static var sidebar: Color { AppTheme.shared.sidebar }
     }
 
     // MARK: - Spacing (4pt base grid)

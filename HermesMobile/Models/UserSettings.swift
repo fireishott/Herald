@@ -233,6 +233,8 @@ struct UserSettings: Codable, Hashable, Sendable {
     var relayConfiguration: RelayConfiguration
     var autoConnectOnLaunch: Bool
     var locationSyncPreference: LocationSyncPreference
+    var enterToSend: Bool
+    var theme: AppTheme
 
     init(
         userName: String = "User",
@@ -242,7 +244,9 @@ struct UserSettings: Codable, Hashable, Sendable {
         environment: AppEnvironment = AppEnvironmentPolicy.currentBuild.defaultEnvironment,
         relayConfiguration: RelayConfiguration = RelayConfiguration.defaultValue(),
         autoConnectOnLaunch: Bool = true,
-        locationSyncPreference: LocationSyncPreference = .foregroundOnly
+        locationSyncPreference: LocationSyncPreference = .foregroundOnly,
+        enterToSend: Bool = true,
+        theme: AppTheme = .default
     ) {
         self.userName = userName
         self.avatarInitials = avatarInitials
@@ -252,6 +256,8 @@ struct UserSettings: Codable, Hashable, Sendable {
         self.relayConfiguration = relayConfiguration
         self.autoConnectOnLaunch = autoConnectOnLaunch
         self.locationSyncPreference = locationSyncPreference
+        self.enterToSend = enterToSend
+        self.theme = theme
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -263,6 +269,8 @@ struct UserSettings: Codable, Hashable, Sendable {
         case relayConfiguration
         case autoConnectOnLaunch
         case locationSyncPreference
+        case enterToSend
+        case theme
     }
 
     init(from decoder: Decoder) throws {
@@ -276,6 +284,8 @@ struct UserSettings: Codable, Hashable, Sendable {
             ?? RelayConfiguration.migratedLegacyValue(environment: environment)
         autoConnectOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .autoConnectOnLaunch) ?? true
         locationSyncPreference = try container.decodeIfPresent(LocationSyncPreference.self, forKey: .locationSyncPreference) ?? .foregroundOnly
+        enterToSend = try container.decodeIfPresent(Bool.self, forKey: .enterToSend) ?? true
+        theme = try container.decodeIfPresent(AppTheme.self, forKey: .theme) ?? .default
     }
 
     func encode(to encoder: Encoder) throws {
@@ -288,6 +298,8 @@ struct UserSettings: Codable, Hashable, Sendable {
         try container.encode(relayConfiguration, forKey: .relayConfiguration)
         try container.encode(autoConnectOnLaunch, forKey: .autoConnectOnLaunch)
         try container.encode(locationSyncPreference, forKey: .locationSyncPreference)
+        try container.encode(enterToSend, forKey: .enterToSend)
+        try container.encode(theme, forKey: .theme)
     }
 
     func applyingEnvironmentPolicy(

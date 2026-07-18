@@ -29,17 +29,8 @@ struct ChatScreen: View {
                     connectionBanner
                 }
                 messageList
+                chatInputBar
                 SessionStatusBar()
-                ChatInputBar(
-                    text: $messageText,
-                    pendingAttachments: $pendingAttachments,
-                    isStreaming: chatStore.isStreaming,
-                    isFocused: $isComposerFocused,
-                    onSend: sendMessage,
-                    onStop: { chatStore.cancelStreaming() },
-                    onAttach: { showAttachmentPicker = true },
-                    onSlashCommand: handleSlashCommand
-                )
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -69,12 +60,7 @@ struct ChatScreen: View {
             scrollToBottom()
         }
         .onChange(of: chatStore.streamingMessageID) { old, new in
-            if let new, old == nil {
-                scrollToResponseTop(new)
-            }
-            if old != nil && new == nil && settingsStore.settings.hapticFeedbackEnabled {
-                HapticEngine.responseReceived()
-            }
+            handleStreamingChange(old: old, new: new)
         }
         .confirmationDialog(
             "Clear Conversation",
@@ -508,6 +494,34 @@ struct ChatScreen: View {
             }
         }
     }
+
+    private func handleStreamingChange(old: UUID?, new: UUID?) {
+        if let new, old == nil {
+            scrollToResponseTop(new)
+        }
+        if old != nil && new == nil && settingsStore.settings.hapticFeedbackEnabled {
+            HapticEngine.responseReceived()
+        }
+    }
+
+    @ViewBuilder
+    private var chatInputBar: some View {
+        ChatInputBar(
+            text: $messageText,
+            pendingAttachments: $pendingAttachments,
+            isStreaming: chatStore.isStreaming,
+            isFocused: $isComposerFocused,
+            onSend: sendMessage,
+            onStop: { chatStore.cancelStreaming() },
+            onAttach: { showAttachmentPicker = true },
+            onSlashCommand: handleSlashCommand,
+            enterToSend: settingsStore.settings.enterToSend
+        )
+    }
+
+    private func onStopStreaming() { chatStore.cancelStreaming() }
+
+    private func onShowAttachments() { showAttachmentPicker = true }
 
     private func handleSlashCommand(_ command: SlashCommand, _ argument: String?) {
         // Agent pass-through: send the raw slash command text as a chat message.

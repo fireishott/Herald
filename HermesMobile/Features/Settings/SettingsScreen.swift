@@ -246,6 +246,15 @@ struct SettingsScreen: View {
                     title: "Haptic Feedback",
                     isOn: hapticBinding
                 )
+
+                sectionDivider
+
+                settingsToggle(
+                    icon: "return",
+                    iconColor: Design.Brand.accent,
+                    title: "Enter to Send",
+                    isOn: enterToSendBinding
+                )
             }
         }
     }
@@ -381,6 +390,13 @@ struct SettingsScreen: View {
         Binding(
             get: { settingsStore.settings.hapticFeedbackEnabled },
             set: { settingsStore.settings.hapticFeedbackEnabled = $0 }
+        )
+    }
+
+    private var enterToSendBinding: Binding<Bool> {
+        Binding(
+            get: { settingsStore.settings.enterToSend },
+            set: { settingsStore.settings.enterToSend = $0 }
         )
     }
 
