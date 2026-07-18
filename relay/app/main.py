@@ -926,6 +926,26 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # Host offline — return empty catalog, iOS falls back to built-in list
             return success({"commands": [], "skills": []})
 
+    @app.get("/v1/models")
+    async def model_catalog(
+        auth: AuthContext = Depends(get_auth_context),
+    ) -> dict:
+        """Return the models configured on the connected Hermes host.
+
+        The iOS model selector shows this list grouped by provider; switching
+        is dispatched through the chat path as a `/model <name>` command.
+        """
+        try:
+            result = await send_connector_rpc(
+                auth.user.id,
+                method="models.list",
+                timeout_seconds=10.0,
+            )
+            return success(result)
+        except HTTPException:
+            # Host offline — empty list, iOS shows an offline state
+            return success({"models": [], "activeModel": None})
+
     @app.post("/v1/hosts/current/revoke")
     def revoke_current_host(
         auth: AuthContext = Depends(get_auth_context),

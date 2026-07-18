@@ -1,0 +1,113 @@
+import Foundation
+
+/// Loads the model catalog from the connected Hermes host via the relay.
+///
+/// Listing comes from `GET /v1/models` (config.yaml providers on the host).
+/// Switching is dispatched through the normal chat path as a `/model <name>`
+/// command, so this store is read-only apart from an optimistic active-model
+/// update while the gateway confirmation streams back.
+@MainActor
+@Observable
+final class ModelStore {
+    struct HermesModel: Decodable, Identifiable, Hashable {
+        let name: String
+        let provider: String
+        let providerName: String?
+        let contextWindow: Int?
+        let isProviderDefault: Bool?
+
+        var id: String { "\(provider)/\(name)" }
+        var displayProviderName: String { providerName ?? provider }
+    }
+
+    struct ActiveModel: Decodable, Hashable {
+        let name: String
+        let provider: String?
+        let contextWindow: Int?
+    }
+
+    private struct ModelCatalogResponse: Decodable {
+        let models: [HermesModel]?
+        let activeModel: ActiveModel?
+    }
+
+    private(set) var models: [HermesModel] = []
+    private(set) var activeModel: ActiveModel?
+    private(set) var isLoading = false
+    private(set) var errorMessage: String?
+    private var lastLoadedAt: Date?
+
+    private static let refreshInterval: TimeInterval = 60
+
+    private let apiClient: RelayAPIClient?
+    private let accessTokenProvider: () async -> String?
+
+    init(apiClient: RelayAPIClient?, accessTokenProvider: @escaping () async -> String?) {
+        self.apiClient = apiClient
+        self.accessTokenProvider = accessTokenProvider
+    }
+
+    /// Models grouped by provider display name, providers sorted alphabetically
+    /// with the active model's provider first.
+    var modelsByProvider: [(provider: String, models: [HermesModel])] {
+        let grouped = Dictionary(grouping: models, by: \.displayProviderName)
+        return grouped
+            .map { (provider: $0.key, models: $0.value) }
+            .sorted { lhs, rhs in
+                let activeProvider = models.first { $0.name == activeModel?.name }?.displayProviderName
+                if lhs.provider == activeProvider { return true }
+                if rhs.provider == activeProvider { return false }
+                return lhs.provider.localizedCaseInsensitiveCompare(rhs.provider) == .orderedAscending
+            }
+    }
+
+    func isActive(_ model: HermesModel) -> Bool {
+        model.name == activeModel?.name
+    }
+
+    func loadModels(force: Bool = false) async {
+        if !force,
+           let lastLoadedAt,
+           Date().timeIntervalSince(lastLoadedAt) < Self.refreshInterval,
+           !models.isEmpty {
+            return
+        }
+        guard let apiClient, let token = await accessTokenProvider() else {
+            errorMessage = "Not connected to a relay."
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let response: ModelCatalogResponse = try await apiClient.get(
+                path: "models",
+                accessToken: token
+            )
+            models = response.models ?? []
+            activeModel = response.activeModel
+            lastLoadedAt = .now
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Optimistically marks a model active while the `/model` command's
+    /// confirmation streams back through the chat path.
+    func markActive(_ model: HermesModel) {
+        activeModel = ActiveModel(
+            name: model.name,
+            provider: model.provider,
+            contextWindow: model.contextWindow
+        )
+    }
+
+    func reset() {
+        models = []
+        activeModel = nil
+        errorMessage = nil
+        lastLoadedAt = nil
+    }
+}

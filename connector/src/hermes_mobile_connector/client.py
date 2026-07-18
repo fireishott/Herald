@@ -920,6 +920,8 @@ class HermesMobileConnector:
                 result = await self._rpc_talk_delegate(params)
             elif method == "commands.catalog":
                 result = self._rpc_commands_catalog()
+            elif method == "models.list":
+                result = self._rpc_models_list()
             else:
                 raise RuntimeError(f"Unsupported RPC method: {method}")
             return {
@@ -1026,6 +1028,69 @@ class HermesMobileConnector:
             "quickCommands": quick_commands,
             "activeModel": model_info,
         }
+
+    def _rpc_models_list(self) -> dict:
+        """Return the available models configured in ~/.hermes/config.yaml.
+
+        The iOS model selector uses this to render a grouped picker. Switching
+        happens through the normal chat path via the `/model <name>` gateway
+        command, so this RPC is read-only.
+        """
+        hermes_home = self._resolve_hermes_home()
+        return {
+            "activeModel": self._read_active_model(hermes_home),
+            "models": self._read_available_models(hermes_home),
+        }
+
+    @staticmethod
+    def _read_available_models(hermes_home: Path) -> list[dict]:
+        """Read every provider's configured models from ~/.hermes/config.yaml."""
+        config_path = hermes_home / "config.yaml"
+        if not config_path.is_file():
+            return []
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                try:
+                    import yaml
+
+                    config = yaml.safe_load(f) or {}
+                except ImportError:
+                    from ruamel.yaml import YAML
+
+                    config = YAML(typ="safe").load(f) or {}
+        except Exception:
+            return []
+        providers = config.get("providers")
+        if not isinstance(providers, dict):
+            return []
+        models: list[dict] = []
+        for provider_key, provider in providers.items():
+            if not isinstance(provider, dict):
+                continue
+            provider_models = provider.get("models")
+            if not isinstance(provider_models, dict):
+                continue
+            provider_name = provider.get("name") or str(provider_key)
+            default_model = provider.get("default_model")
+            for model_name, model_config in provider_models.items():
+                context_length = None
+                if isinstance(model_config, dict):
+                    try:
+                        raw_length = model_config.get("context_length")
+                        context_length = int(raw_length) if raw_length is not None else None
+                    except (TypeError, ValueError):
+                        context_length = None
+                models.append(
+                    {
+                        "name": str(model_name),
+                        "provider": str(provider_key),
+                        "providerName": str(provider_name),
+                        "contextWindow": context_length,
+                        "isProviderDefault": model_name == default_model,
+                    }
+                )
+        models.sort(key=lambda model: (model["providerName"].lower(), model["name"].lower()))
+        return models
 
     @staticmethod
     def _read_active_model(hermes_home: Path) -> dict | None:

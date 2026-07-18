@@ -16,6 +16,7 @@ final class AppContainer {
     let settingsStore: SettingsStore
     let talkStore: TalkStore
     let sessionListStore: SessionListStore
+    let modelStore: ModelStore
     let sensorUploadService: SensorUploadService?
     private let apiClient: RelayAPIClient?
     private let notificationService: (any NotificationServiceProtocol)?
@@ -35,6 +36,7 @@ final class AppContainer {
         settingsStore: SettingsStore,
         talkStore: TalkStore,
         sessionListStore: SessionListStore,
+        modelStore: ModelStore? = nil,
         sensorUploadService: SensorUploadService? = nil,
         apiClient: RelayAPIClient? = nil,
         notificationService: (any NotificationServiceProtocol)? = nil
@@ -48,6 +50,10 @@ final class AppContainer {
         self.settingsStore = settingsStore
         self.talkStore = talkStore
         self.sessionListStore = sessionListStore
+        self.modelStore = modelStore ?? ModelStore(
+            apiClient: apiClient,
+            accessTokenProvider: { await sessionStore.currentAccessToken() }
+        )
         self.sensorUploadService = sensorUploadService
         self.apiClient = apiClient
         self.notificationService = notificationService
@@ -343,6 +349,7 @@ final class AppContainer {
         chatStore.reset()
         inboxStore.reset()
         sessionListStore.reset()
+        modelStore.reset()
         await initialize()
 
         // Start sensor data pipeline
@@ -620,6 +627,7 @@ final class AppContainer {
         chatStore.reset()
         inboxStore.reset()
         sessionListStore.reset()
+        modelStore.reset()
         hostStore.reset()
         lastKnownHostOnline = false
         lastCommandCatalogRefreshAt = nil
