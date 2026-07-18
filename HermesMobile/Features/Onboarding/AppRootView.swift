@@ -13,7 +13,7 @@ struct AppRootView: View {
                 } else if container.pairingStore.needsPermissionsOnboarding {
                     PermissionsOnboardingScreen()
                 } else {
-                    MainTabView()
+                    AdaptiveRootView()
                 }
             }
 
