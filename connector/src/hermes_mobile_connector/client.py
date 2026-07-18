@@ -576,32 +576,58 @@ class HermesMobileConnector:
             state.last_error = None
             self.state_store.save(state)
 
-            while True:
-                try:
-                    raw_message = await asyncio.wait_for(
-                        websocket.recv(),
-                        timeout=self.heartbeat_interval_seconds,
-                    )
-                except asyncio.TimeoutError:
-                    await websocket.send(json.dumps({"type": "heartbeat"}))
-                    continue
+            send_queue: asyncio.Queue[str | None] = asyncio.Queue()
+            active_jobs: dict[str, asyncio.Task] = {}
 
-                message = json.loads(raw_message)
-                message_type = message.get("type")
-                if message_type == "job.execute":
-                    await self._handle_job(websocket, message["job"])
+            async def send_worker() -> None:
+                """Serialize all outbound WebSocket messages through a single coroutine."""
+                while True:
+                    payload = await send_queue.get()
+                    if payload is None:
+                        break
+                    await websocket.send(payload)
+
+            send_task = asyncio.create_task(send_worker())
+
+            def enqueue(payload: dict) -> None:
+                send_queue.put_nowait(json.dumps(payload))
+
+            try:
+                while True:
+                    try:
+                        raw_message = await asyncio.wait_for(
+                            websocket.recv(),
+                            timeout=self.heartbeat_interval_seconds,
+                        )
+                    except asyncio.TimeoutError:
+                        send_queue.put_nowait(json.dumps({"type": "heartbeat"}))
+                        continue
+
+                    message = json.loads(raw_message)
+                    message_type = message.get("type")
+                    logger.debug("Received relay message type: %s", message_type)
+                    if message_type == "job.execute":
+                        job = message["job"]
+                        job_id = job.get("id", "unknown")
+                        task = asyncio.create_task(self._handle_job_enqueue(job, enqueue))
+                        active_jobs[job_id] = task
+                        task.add_done_callback(lambda _t, jid=job_id: active_jobs.pop(jid, None))
+                        continue
+                    if message_type == "rpc.request":
+                        response = await self._handle_rpc_request(message)
+                        enqueue(response)
+                        continue
+                    if message_type == "ready":
+                        continue
+                    sensor_ack = self._handle_sensor_message(message)
+                    if sensor_ack is not None:
+                        enqueue(sensor_ack)
+                        continue
+                    logger.warning("Ignoring unknown relay message type: %s", message_type)
                     continue
-                if message_type == "rpc.request":
-                    await websocket.send(json.dumps(await self._handle_rpc_request(message)))
-                    continue
-                if message_type == "ready":
-                    continue
-                sensor_ack = self._handle_sensor_message(message)
-                if sensor_ack is not None:
-                    await websocket.send(json.dumps(sensor_ack))
-                    continue
-                logger.warning("Ignoring unknown relay message type: %s", message_type)
-                continue
+            finally:
+                send_queue.put_nowait(None)
+                await send_task
 
     def _handle_sensor_message(self, message: dict) -> dict | None:
         """Store a sensor message locally and return an ACK payload when handled."""
@@ -658,6 +684,14 @@ class HermesMobileConnector:
                     "error": str(error),
                 }
         return None
+
+    async def _handle_job_enqueue(self, job: dict, enqueue) -> None:
+        """Run a job using the shared send queue instead of a direct websocket."""
+        # Build a thin wrapper so _handle_job / _handle_job_* can call .send()
+        class _WS:
+            async def send(self, payload):
+                enqueue(json.loads(payload) if isinstance(payload, str) else payload)
+        await self._handle_job(_WS(), job)
 
     async def _handle_job(self, websocket, job: dict) -> None:
         state = self.state_store.load()
@@ -917,6 +951,7 @@ class HermesMobileConnector:
         request_id = message.get("requestId") or str(uuid.uuid4())
         method = message.get("method")
         params = message.get("params") or {}
+        logger.info("RPC request: method=%s, requestId=%s", method, request_id)
 
         try:
             if method == "talk.prewarm":
@@ -1046,9 +1081,11 @@ class HermesMobileConnector:
         command, so this RPC is read-only.
         """
         hermes_home = self._resolve_hermes_home()
+        models = self._read_available_models(hermes_home)
+        logger.info("models.list RPC: hermes_home=%s, models_count=%d", hermes_home, len(models))
         return {
             "activeModel": self._read_active_model(hermes_home),
-            "models": self._read_available_models(hermes_home),
+            "models": models,
         }
 
     @staticmethod
