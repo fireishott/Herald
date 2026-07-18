@@ -187,10 +187,11 @@ Or start a fresh Hermes chat/session if you prefer.
 Hermes iOS adapts to iPad with a native sidebar layout:
 
 - **NavigationSplitView** with a persistent sidebar on the left
+- **Session browser**: search, pinned, recent, and platform-grouped sessions with swipe actions (pin, archive) and context menus (rename, delete)
+- **Right-side inspector panel**: three tabs — Logs (scrollable feed with level filters), Terminal (console output), Tools (token usage breakdown). Toggle via `sidebar.right` button in sidebar or detail toolbar
 - Sections: Chat, Inbox, Talk, Settings
-- Offline indicator (orange dot) next to Chat when Hermes is disconnected
-- Sidebar selection drives the detail pane
-- iPhone keeps the existing tab bar layout unchanged
+- Offline indicator (orange dot) in sidebar
+- iPhone gets a **slide-out session drawer** with drag-from-edge gesture and hamburger toggle — same session browser, mobile-optimized
 
 The root view auto-detects the device class and renders the appropriate layout. No configuration needed.
 

@@ -161,6 +161,8 @@
 		5393804BA3F854675CAB22A0 /* DeviceClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFB4BB0C83830F9878C9F93E /* DeviceClass.swift */; };
 		B8840F5AB9A57D1A838C3752 /* iPadSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94CB0AD5C03F66F996E75F07 /* iPadSidebarView.swift */; };
 		F76429E00694970425072495 /* AdaptiveRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C3C9E21DD78E5C8B060255 /* AdaptiveRootView.swift */; };
+		73FD7F5930AF5FD8548EB06F /* iPhoneSessionDrawer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F6DD2B3DA1B595128580B36 /* iPhoneSessionDrawer.swift */; };
+		CC8A40DB418A4F7E4AF275F2 /* iPadRightPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2A1CCA571779985BCCDF0E /* iPadRightPanelView.swift */; };
 		959986260A7643E498B7398D /* SessionSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CC15CC5A2014C9A9B2A0FB2 /* SessionSummary.swift */; };
 		428DB64AE67E4D98BB9A1DCC /* SessionListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0FE0DDCA294F4EAE5260A3 /* SessionListStore.swift */; };
 /* End PBXBuildFile section */
@@ -352,6 +354,8 @@
 		EFB4BB0C83830F9878C9F93E /* DeviceClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceClass.swift; sourceTree = "<group>"; };
 		94CB0AD5C03F66F996E75F07 /* iPadSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPadSidebarView.swift; sourceTree = "<group>"; };
 		91C3C9E21DD78E5C8B060255 /* AdaptiveRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveRootView.swift; sourceTree = "<group>"; };
+		5F6DD2B3DA1B595128580B36 /* iPhoneSessionDrawer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPhoneSessionDrawer.swift; sourceTree = "<group>"; };
+		BE2A1CCA571779985BCCDF0E /* iPadRightPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPadRightPanelView.swift; sourceTree = "<group>"; };
 		7CC15CC5A2014C9A9B2A0FB2 /* SessionSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSummary.swift; sourceTree = "<group>"; };
 		1A0FE0DDCA294F4EAE5260A3 /* SessionListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -746,6 +750,8 @@
 			children = (
 				94CB0AD5C03F66F996E75F07 /* iPadSidebarView.swift */,
 				91C3C9E21DD78E5C8B060255 /* AdaptiveRootView.swift */,
+				5F6DD2B3DA1B595128580B36 /* iPhoneSessionDrawer.swift */,
+				BE2A1CCA571779985BCCDF0E /* iPadRightPanelView.swift */,
 			);
 			path = Sidebar;
 			sourceTree = "<group>";
@@ -1048,6 +1054,8 @@
 							5393804BA3F854675CAB22A0 /* DeviceClass.swift in Sources */,
 				B8840F5AB9A57D1A838C3752 /* iPadSidebarView.swift in Sources */,
 				F76429E00694970425072495 /* AdaptiveRootView.swift in Sources */,
+				73FD7F5930AF5FD8548EB06F /* iPhoneSessionDrawer.swift in Sources */,
+				CC8A40DB418A4F7E4AF275F2 /* iPadRightPanelView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

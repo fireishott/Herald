@@ -925,16 +925,29 @@ def default_action_titles(kind: str) -> tuple[str | None, str | None]:
     return None, "Dismiss"
 
 
-def get_or_create_current_conversation(db: Session, *, user_id: str) -> Conversation:
-    conversation = db.scalar(
-        select(Conversation).where(
-            Conversation.user_id == user_id,
-            Conversation.is_archived.is_(False),
-        )
+def get_or_create_current_conversation(db: Session, *, user_id: str, device_id: str | None = None) -> Conversation:
+    """Get or create the current non-archived conversation for a user (and optionally device).
+
+    When device_id is provided, the conversation is device-scoped — it only appears
+    for that specific device. When device_id is None, the conversation is user-scoped
+    (shared across all devices).
+    """
+    query = select(Conversation).where(
+        Conversation.user_id == user_id,
+        Conversation.is_archived.is_(False),
     )
+    if device_id is not None:
+        query = query.where(Conversation.device_id == device_id)
+
+    conversation = db.scalar(query)
 
     if conversation is None:
-        conversation = Conversation(user_id=user_id, title="Hermes")
+        conversation = Conversation(
+            user_id=user_id,
+            device_id=device_id,
+            title="Hermes",
+            source="hermes" if device_id is None else "ios",
+        )
         db.add(conversation)
         db.commit()
         db.refresh(conversation)
@@ -942,13 +955,15 @@ def get_or_create_current_conversation(db: Session, *, user_id: str) -> Conversa
     return conversation
 
 
-def archive_current_conversation(db: Session, *, user_id: str) -> Conversation | None:
-    conversation = db.scalar(
-        select(Conversation).where(
-            Conversation.user_id == user_id,
-            Conversation.is_archived.is_(False),
-        )
+def archive_current_conversation(db: Session, *, user_id: str, device_id: str | None = None) -> Conversation | None:
+    query = select(Conversation).where(
+        Conversation.user_id == user_id,
+        Conversation.is_archived.is_(False),
     )
+    if device_id is not None:
+        query = query.where(Conversation.device_id == device_id)
+
+    conversation = db.scalar(query)
 
     if conversation is None:
         return None
@@ -1390,6 +1405,10 @@ def serialize_conversation(conversation: Conversation, messages: list[Message], 
         "id": conversation.id,
         "title": conversation.title,
         "updatedAt": conversation.updated_at,
+        "source": conversation.source,
+        "isPinned": conversation.is_pinned,
+        "isArchived": conversation.is_archived,
+        "previewText": conversation.preview_text or "",
         "messages": [
             serialize_message(message, job=jobs_by_message_id.get(message.id))
             for message in messages
@@ -1398,6 +1417,143 @@ def serialize_conversation(conversation: Conversation, messages: list[Message], 
     if latest_usage:
         result["latestUsage"] = latest_usage
     return result
+
+
+# ---------------------------------------------------------------------------
+# Session Management
+# ---------------------------------------------------------------------------
+
+
+def list_sessions(
+    db: Session,
+    *,
+    user_id: str,
+    device_id: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[Conversation], int]:
+    """List non-archived conversations for a user.
+
+    Sessions scoped to the given device_id OR with no device_id (user-scoped)
+    are included. Device-scoped sessions belonging to OTHER devices are excluded.
+    """
+    from sqlalchemy import func as sqlfunc
+
+    base = select(Conversation).where(
+        Conversation.user_id == user_id,
+        Conversation.is_archived.is_(False),
+    )
+    if device_id is not None:
+        base = base.where(
+            (Conversation.device_id == device_id) | (Conversation.device_id.is_(None))
+        )
+
+    # Count total matching sessions
+    count_stmt = select(sqlfunc.count()).select_from(base.subquery())
+    total_count = db.scalar(count_stmt) or 0
+
+    # Fetch paginated results
+    sessions = list(
+        db.scalars(
+            base
+            .order_by(Conversation.is_pinned.desc(), Conversation.last_message_at.desc().nullslast())
+            .offset(offset)
+            .limit(limit)
+        ).all()
+    )
+
+    return sessions, total_count
+
+
+def search_sessions(db: Session, *, user_id: str, query: str, device_id: str | None = None) -> list[Conversation]:
+    """Search non-archived conversations by title."""
+    base = select(Conversation).where(
+        Conversation.user_id == user_id,
+        Conversation.is_archived.is_(False),
+        Conversation.title.ilike(f"%{query}%"),
+    )
+    if device_id is not None:
+        base = base.where(
+            (Conversation.device_id == device_id) | (Conversation.device_id.is_(None))
+        )
+    return list(
+        db.scalars(
+            base.order_by(Conversation.last_message_at.desc().nullslast()).limit(20)
+        ).all()
+    )
+
+
+def create_session(db: Session, *, user_id: str, device_id: str, title: str = "New Chat") -> Conversation:
+    """Create a new device-scoped session."""
+    conversation = Conversation(
+        user_id=user_id,
+        device_id=device_id,
+        title=title,
+        source="ios",
+    )
+    db.add(conversation)
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+def get_session(db: Session, *, session_id: str) -> Conversation | None:
+    return db.get(Conversation, session_id)
+
+
+def delete_session(db: Session, *, session_id: str) -> bool:
+    conversation = db.get(Conversation, session_id)
+    if conversation is None:
+        return False
+    db.delete(conversation)
+    db.commit()
+    return True
+
+
+def archive_session(db: Session, *, session_id: str) -> Conversation | None:
+    conversation = db.get(Conversation, session_id)
+    if conversation is None:
+        return None
+    conversation.is_archived = True
+    conversation.updated_at = utcnow()
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+def toggle_pin_session(db: Session, *, session_id: str) -> Conversation | None:
+    conversation = db.get(Conversation, session_id)
+    if conversation is None:
+        return None
+    conversation.is_pinned = not conversation.is_pinned
+    conversation.updated_at = utcnow()
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+def rename_session(db: Session, *, session_id: str, title: str) -> Conversation | None:
+    conversation = db.get(Conversation, session_id)
+    if conversation is None:
+        return None
+    conversation.title = title
+    conversation.updated_at = utcnow()
+    db.commit()
+    db.refresh(conversation)
+    return conversation
+
+
+def serialize_session_summary(conversation: Conversation) -> dict:
+    """Lightweight session summary for sidebar listing (no messages)."""
+    return {
+        "id": conversation.id,
+        "title": conversation.title,
+        "previewText": conversation.preview_text or "",
+        "updatedAt": conversation.last_message_at or conversation.updated_at,
+        "source": conversation.source,
+        "isPinned": conversation.is_pinned,
+        "isArchived": conversation.is_archived,
+    }
 
 
 def serialize_inbox_item(item: InboxItem) -> dict:

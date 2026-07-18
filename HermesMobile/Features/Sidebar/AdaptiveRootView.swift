@@ -1,10 +1,12 @@
 import SwiftUI
 
 /// Root view that adapts to device class:
-/// - iPad: NavigationSplitView with sidebar + detail
-/// - iPhone: existing MainTabView
+/// - iPad: NavigationSplitView with sidebar + detail + optional right panel
+/// - iPhone: NavigationStack with slide-out session drawer
 struct AdaptiveRootView: View {
     @State private var selectedSection: SidebarSection = .chat
+    @State private var isRightPanelOpen = false
+    @State private var rightPanelTab: RightPanelTab = .logs
 
     var body: some View {
         if DeviceClass.isPad {
@@ -17,10 +19,23 @@ struct AdaptiveRootView: View {
     // MARK: - iPad Layout
 
     private var iPadLayout: some View {
-        NavigationSplitView {
-            iPadSidebarView(selectedSection: $selectedSection)
-        } detail: {
-            detailContent
+        HStack(spacing: 0) {
+            NavigationSplitView {
+                iPadSidebarView(
+                    selectedSection: $selectedSection,
+                    isRightPanelOpen: $isRightPanelOpen
+                )
+            } detail: {
+                detailContent
+            }
+
+            // Right-side inspector panel
+            if isRightPanelOpen {
+                iPadRightPanelView(
+                    isOpen: $isRightPanelOpen,
+                    selectedTab: $rightPanelTab
+                )
+            }
         }
     }
 
@@ -29,11 +44,21 @@ struct AdaptiveRootView: View {
         switch selectedSection {
         case .chat:
             NavigationStack {
-                ChatScreen()
+                ChatScreen(isSessionDrawerOpen: .constant(false))
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            rightPanelToggle
+                        }
+                    }
             }
         case .inbox:
             NavigationStack {
                 InboxScreen()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            rightPanelToggle
+                        }
+                    }
             }
         case .talk:
             NavigationStack {
@@ -44,5 +69,20 @@ struct AdaptiveRootView: View {
                 SettingsScreen()
             }
         }
+    }
+
+    private var rightPanelToggle: some View {
+        Button {
+            withAnimation(Design.Motion.standard) {
+                isRightPanelOpen.toggle()
+            }
+        } label: {
+            Image(systemName: "sidebar.right")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(
+                    isRightPanelOpen ? Design.Brand.accent : Design.Colors.secondaryForeground
+                )
+        }
+        .buttonStyle(.plain)
     }
 }
