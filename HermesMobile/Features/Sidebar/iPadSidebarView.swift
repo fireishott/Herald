@@ -36,13 +36,11 @@ enum SidebarSection: String, CaseIterable, Identifiable {
 /// Selecting a section updates the router; the detail pane observes the
 /// router's `selectedTab` to show the matching screen.
 struct iPadSidebarView: View {
-    @Environment(TabRouter.self) private var router
+    @Binding var selectedSection: SidebarSection
     @Environment(HermesHostStore.self) private var hostStore
 
     var body: some View {
-        @Bindable var router = router
-
-        List(SidebarSection.allCases, selection: $router.selectedTab) { section in
+        List(SidebarSection.allCases, selection: $selectedSection) { section in
             sidebarRow(for: section)
         }
         .listStyle(.sidebar)
