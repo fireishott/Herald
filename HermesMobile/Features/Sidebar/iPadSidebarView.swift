@@ -122,7 +122,7 @@ struct iPadSidebarView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(Design.Colors.secondaryForeground)
                 .font(.system(size: Design.Size.iconSmall))
-            TextField("Search sessions\u{2026}", text: $sessionStore.searchQuery)
+            TextField("Search sessions\u{2026}", text: Bindable(sessionStore).searchQuery)
                 .font(Design.Typography.callout)
                 .foregroundStyle(Design.Colors.foreground)
                 .textFieldStyle(.plain)

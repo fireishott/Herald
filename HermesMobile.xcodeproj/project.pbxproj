@@ -161,6 +161,8 @@
 		5393804BA3F854675CAB22A0 /* DeviceClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFB4BB0C83830F9878C9F93E /* DeviceClass.swift */; };
 		B8840F5AB9A57D1A838C3752 /* iPadSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94CB0AD5C03F66F996E75F07 /* iPadSidebarView.swift */; };
 		F76429E00694970425072495 /* AdaptiveRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C3C9E21DD78E5C8B060255 /* AdaptiveRootView.swift */; };
+		959986260A7643E498B7398D /* SessionSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CC15CC5A2014C9A9B2A0FB2 /* SessionSummary.swift */; };
+		428DB64AE67E4D98BB9A1DCC /* SessionListStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0FE0DDCA294F4EAE5260A3 /* SessionListStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -350,6 +352,8 @@
 		EFB4BB0C83830F9878C9F93E /* DeviceClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceClass.swift; sourceTree = "<group>"; };
 		94CB0AD5C03F66F996E75F07 /* iPadSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPadSidebarView.swift; sourceTree = "<group>"; };
 		91C3C9E21DD78E5C8B060255 /* AdaptiveRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveRootView.swift; sourceTree = "<group>"; };
+		7CC15CC5A2014C9A9B2A0FB2 /* SessionSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionSummary.swift; sourceTree = "<group>"; };
+		1A0FE0DDCA294F4EAE5260A3 /* SessionListStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -404,6 +408,7 @@
 				CA93F2699F9EC40320913207 /* AppContainer.swift */,
 				60595DBB84195D18930C1EA4 /* AppSessionStore.swift */,
 				0220D103178EF414928CFCA7 /* ChatStore.swift */,
+					1A0FE0DDCA294F4EAE5260A3 /* SessionListStore.swift */,
 				099D088C14950F66C936628A /* HermesHostStore.swift */,
 				36500DDDD7B917A3A3C1A3FC /* InboxStore.swift */,
 				F07B14E26F36BD2CD9778781 /* PairingStore.swift */,
@@ -701,6 +706,7 @@
 				B930D429179DCD2E18B056CF /* CodeDiff.swift */,
 				31A754F555998852844790A8 /* ConnectionStatus.swift */,
 				6063F0C3EB257DC070FFBAC3 /* Conversation.swift */,
+					7CC15CC5A2014C9A9B2A0FB2 /* SessionSummary.swift */,
 				A20870910260860BA2EF0F2D /* DeviceCapability.swift */,
 				43EABB109930DF9870A27636 /* DeviceRegistrationRequest.swift */,
 				078C83E5060FEBACAC22F2F2 /* HermesActivityAttributes.swift */,
@@ -923,6 +929,8 @@
 				126F6AF7FCA856CFDF39421F /* ConnectionStatus.swift in Sources */,
 				4CDD8580F03823A1A9ABD9A5 /* ContentView.swift in Sources */,
 				C877C77B3DB9D162B70F6E80 /* Conversation.swift in Sources */,
+				959986260A7643E498B7398D /* SessionSummary.swift in Sources */,
+				428DB64AE67E4D98BB9A1DCC /* SessionListStore.swift in Sources */,
 				8B995CDE1CECBA332A9984BD /* DemoData.swift in Sources */,
 				0FABB63592F7BD36617CFD00 /* Design.swift in Sources */,
 				6E62879A59CA5F4B11AA2011 /* DeviceCapability.swift in Sources */,
