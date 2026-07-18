@@ -158,6 +158,9 @@
 		FC8CA757C10C10EFF9152E1D /* InlineDiffView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C0C759CDC6D4A2C62DFBE6B /* InlineDiffView.swift */; };
 		FE7522860C6E4CDA2A7AEB11 /* VoiceOrb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C0CE3739DE97A0EED8BF86C /* VoiceOrb.swift */; };
 		FF1CE050B0F7CC3E16212121 /* ChatScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB61078198CA1379D8F50ED /* ChatScreen.swift */; };
+		5393804BA3F854675CAB22A0 /* DeviceClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFB4BB0C83830F9878C9F93E /* DeviceClass.swift */; };
+		B8840F5AB9A57D1A838C3752 /* iPadSidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94CB0AD5C03F66F996E75F07 /* iPadSidebarView.swift */; };
+		F76429E00694970425072495 /* AdaptiveRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91C3C9E21DD78E5C8B060255 /* AdaptiveRootView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -355,6 +358,9 @@
 		F6071829304152637485961A /* HermesHealthWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesHealthWidget.swift; sourceTree = "<group>"; };
 		F77FB3058B069312B9716844 /* CodeBlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodeBlockView.swift; sourceTree = "<group>"; };
 		F9AAD43838EF351D00563C90 /* DemoData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoData.swift; sourceTree = "<group>"; };
+		EFB4BB0C83830F9878C9F93E /* DeviceClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceClass.swift; sourceTree = "<group>"; };
+		94CB0AD5C03F66F996E75F07 /* iPadSidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iPadSidebarView.swift; sourceTree = "<group>"; };
+		91C3C9E21DD78E5C8B060255 /* AdaptiveRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveRootView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -379,6 +385,7 @@
 				519C0DC56DB49FF9585F8C02 /* Permissions */,
 				D6A1379DF0671EEBA650BA12 /* Settings */,
 				9EF58353FEB7F490A19CDF47 /* Talk */,
+							63CED1F39EB9CD06D301C691 /* Sidebar */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -657,6 +664,7 @@
 				A2B04B5A213133A77C0982DE /* HapticEngine.swift */,
 				070BFE52E0723E54873A512C /* MarkdownParser.swift */,
 				AB1880E820004460E87BD27B /* Router.swift */,
+							EFB4BB0C83830F9878C9F93E /* DeviceClass.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -737,6 +745,15 @@
 				25563E39F08D0F19F538ADD8 /* VoiceState.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		63CED1F39EB9CD06D301C691 /* Sidebar */ = {
+			isa = PBXGroup;
+			children = (
+				94CB0AD5C03F66F996E75F07 /* iPadSidebarView.swift */,
+				91C3C9E21DD78E5C8B060255 /* AdaptiveRootView.swift */,
+			);
+			path = Sidebar;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -888,7 +905,7 @@
 				9A071829304152A1B2C3D4E5 /* HermesTimelineProvider.swift in Sources */,
 				9E292D04C207E3FF0AA3E16A /* HermesWidgetBundle.swift in Sources */,
 				AB182930415263A1B2C3D4E5 /* HermesWidgetData.swift in Sources */,
-			);
+							);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		875859A820D217566513DE85 /* Sources */ = {
@@ -1050,6 +1067,9 @@
 				928BB6D639DB244C9ABDAF6C /* VoiceSessionBanner.swift in Sources */,
 				28954832D2F8292FE2718C35 /* VoiceSessionServiceProtocol.swift in Sources */,
 				02426814A334E68AC2EB077D /* VoiceState.swift in Sources */,
+							5393804BA3F854675CAB22A0 /* DeviceClass.swift in Sources */,
+				B8840F5AB9A57D1A838C3752 /* iPadSidebarView.swift in Sources */,
+				F76429E00694970425072495 /* AdaptiveRootView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
