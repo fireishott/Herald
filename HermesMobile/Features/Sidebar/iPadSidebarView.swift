@@ -32,45 +32,45 @@ enum SidebarSection: String, CaseIterable, Identifiable {
 
 // MARK: - iPad Sidebar View
 
-/// Sidebar navigation used on iPad as the primary content switcher.
-/// Selecting a section updates the router; the detail pane observes the
-/// router's `selectedTab` to show the matching screen.
 struct iPadSidebarView: View {
     @Binding var selectedSection: SidebarSection
     @Environment(HermesHostStore.self) private var hostStore
 
     var body: some View {
-        List(SidebarSection.allCases, selection: $selectedSection) { section in
-            sidebarRow(for: section)
+        List {
+            ForEach(SidebarSection.allCases) { section in
+                Button {
+                    selectedSection = section
+                } label: {
+                    HStack(spacing: Design.Spacing.sm) {
+                        Image(systemName: section.icon)
+                            .font(.system(size: Design.Size.iconSmall))
+                            .foregroundStyle(selectedSection == section ? Design.Brand.accent : Design.Colors.secondaryForeground)
+                            .frame(width: 24)
+                        Text(section.title)
+                            .font(Design.Typography.body)
+                            .foregroundStyle(Design.Colors.foreground)
+                        Spacer()
+                        if section == .chat && hostStore.connectionState != .online {
+                            Circle()
+                                .fill(.orange)
+                                .frame(width: 8, height: 8)
+                        }
+                    }
+                    .padding(.vertical, Design.Spacing.xs)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(
+                    selectedSection == section
+                        ? Design.Brand.accent.opacity(0.12)
+                        : Color.clear
+                )
+            }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(Design.Colors.background)
         .navigationTitle("Hermes")
-    }
-
-    // MARK: - Row Builder
-
-    @ViewBuilder
-    private func sidebarRow(for section: SidebarSection) -> some View {
-        Label {
-            HStack(spacing: Design.Spacing.xs) {
-                Text(section.title)
-                    .font(Design.Typography.body)
-
-                // Show a warning dot next to Chat when the host is offline
-                if section == .chat && hostStore.connectionState != .online {
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 8, height: 8)
-                        .accessibilityLabel("Host offline")
-                }
-            }
-        } icon: {
-            Image(systemName: section.icon)
-                .font(.system(size: Design.Size.iconSmall))
-                .foregroundStyle(Design.Colors.foreground)
-        }
-        .tag(section)
     }
 }
