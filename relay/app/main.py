@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -14,7 +15,7 @@ import json
 
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -1649,6 +1650,51 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found.")
         updated = rename_session(db, session_id=session_id, title=body.title)
         return success({"session": serialize_session_summary(updated) if updated else None})
+
+    @app.get("/v1/messages/{message_id}/attachments/{index}")
+    def message_attachment_bytes(
+        message_id: str,
+        index: int,
+        auth: AuthContext = Depends(get_auth_context),
+        db: Session = Depends(get_db),
+    ):
+        """Return the raw bytes of a single message attachment.
+
+        Conversation loads only carry attachment metadata (and small
+        thumbnails); the heavy base64 payload lives in `attachments_data`.
+        The app fetches full-resolution images and file bodies here on demand
+        for inline display, full-screen viewing, and opening/saving files.
+        """
+        message = db.get(Message, message_id)
+        if message is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")
+        conversation = db.get(Conversation, message.conversation_id)
+        if conversation is None or conversation.user_id != auth.user.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found.")
+
+        attachments = message.attachments_data or []
+        if index < 0 or index >= len(attachments):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found.")
+
+        attachment = attachments[index]
+        raw = attachment.get("data")
+        if not raw:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment has no stored data.")
+        try:
+            payload = base64.b64decode(raw)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Attachment data is corrupt.")
+
+        filename = attachment.get("filename", "attachment")
+        mime_type = attachment.get("mimeType", "application/octet-stream")
+        return Response(
+            content=payload,
+            media_type=mime_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{filename}"',
+                "Cache-Control": "private, max-age=86400",
+            },
+        )
 
     # ── Messages ────────────────────────────────────────────────────
     @app.post("/v1/messages")

@@ -26,7 +26,7 @@ READ_TIMEOUT = 300.0  # 5 minutes — long enough for Claude thinking, catches d
 class StreamEvent:
     """A single event from the streaming chat completions endpoint."""
 
-    type: str  # "text_delta" | "tool_activity" | "finish"
+    type: str  # "text_delta" | "reasoning_delta" | "tool_activity" | "finish"
     data: str = ""
     label: str = ""
     session_id: str | None = None
@@ -272,6 +272,18 @@ class HermesAPIExecutor:
                     chunk_usage = chunk.get("usage")
                     if chunk_usage:
                         accumulated_usage = chunk_usage
+
+                    # Reasoning delta — models like mimo/deepseek/qwen/glm expose
+                    # chain-of-thought under `reasoning_content` (vLLM/DeepSeek
+                    # convention) or `reasoning` (OpenRouter). Stream it on a
+                    # separate channel so the app can show it dimmed and collapse
+                    # it once the final answer arrives.
+                    reasoning = delta.get("reasoning_content") or delta.get("reasoning")
+                    if reasoning:
+                        yield StreamEvent(
+                            type="reasoning_delta",
+                            data=reasoning,
+                        )
 
                     # Content delta
                     content = delta.get("content")
