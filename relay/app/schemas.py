@@ -162,3 +162,16 @@ class InternalInboxCreateRequest(BaseModel):
     priority: str = "normal"
     payload: dict[str, str] | None = None
     expiresAt: datetime | None = None
+
+
+class CronCreateRequest(BaseModel):
+    name: str
+    schedule: str
+    prompt: str
+
+
+class CronUpdateRequest(BaseModel):
+    name: str | None = None
+    schedule: str | None = None
+    prompt: str | None = None
+    enabled: bool | None = None
