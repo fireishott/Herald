@@ -220,6 +220,33 @@ class PhonePairingDetails:
     expires_at: str | None
 
 
+def _context_length_from_config(config: dict, model_name: str, provider: str | None) -> int | None:
+    """Look up context_length for *model_name* from the config's provider sections."""
+    sections: list[dict] = []
+    providers = config.get("providers")
+    if isinstance(providers, dict):
+        sections.extend(providers.values())
+    custom_providers = config.get("custom_providers")
+    if isinstance(custom_providers, list):
+        sections.extend(custom_providers)
+
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        models = section.get("models")
+        if not isinstance(models, dict):
+            continue
+        entry = models.get(model_name)
+        if isinstance(entry, dict):
+            try:
+                raw = entry.get("context_length")
+                if raw is not None:
+                    return int(raw)
+            except (TypeError, ValueError):
+                pass
+    return None
+
+
 class HermesMobileConnector:
     def __init__(
         self,
@@ -1088,9 +1115,15 @@ class HermesMobileConnector:
             "models": models,
         }
 
+
     @staticmethod
     def _read_available_models(hermes_home: Path) -> list[dict]:
-        """Read every provider's configured models from ~/.hermes/config.yaml."""
+        """Read every provider's configured models from ~/.hermes/config.yaml.
+
+        Reads from both the ``providers`` top-level key and the legacy
+        ``custom_providers`` list so that every model the user has configured
+        appears in the iOS model selector.
+        """
         config_path = hermes_home / "config.yaml"
         if not config_path.is_file():
             return []
@@ -1106,18 +1139,15 @@ class HermesMobileConnector:
                     config = YAML(typ="safe").load(f) or {}
         except Exception:
             return []
-        providers = config.get("providers")
-        if not isinstance(providers, dict):
-            return []
+
         models: list[dict] = []
-        for provider_key, provider in providers.items():
-            if not isinstance(provider, dict):
-                continue
+
+        def _collect(provider_key: str, provider: dict) -> None:
             provider_models = provider.get("models")
             if not isinstance(provider_models, dict):
-                continue
+                return
             provider_name = provider.get("name") or str(provider_key)
-            default_model = provider.get("default_model")
+            default_model = provider.get("default_model") or provider.get("model")
             for model_name, model_config in provider_models.items():
                 context_length = None
                 if isinstance(model_config, dict):
@@ -1135,6 +1165,21 @@ class HermesMobileConnector:
                         "isProviderDefault": model_name == default_model,
                     }
                 )
+
+        # Main providers dict
+        providers = config.get("providers")
+        if isinstance(providers, dict):
+            for provider_key, provider in providers.items():
+                if isinstance(provider, dict):
+                    _collect(provider_key, provider)
+
+        # Legacy custom_providers list (items have "name" used as both display and key)
+        custom_providers = config.get("custom_providers")
+        if isinstance(custom_providers, list):
+            for provider in custom_providers:
+                if isinstance(provider, dict) and provider.get("name"):
+                    _collect(provider["name"], provider)
+
         models.sort(key=lambda model: (model["providerName"].lower(), model["name"].lower()))
         return models
 
@@ -1147,58 +1192,38 @@ class HermesMobileConnector:
         try:
             import yaml
         except ImportError:
-            # Fall back to basic parsing if PyYAML isn't available
             try:
-                text = config_path.read_text(encoding="utf-8")
-                model_name = None
-                provider = None
-                context_length = None
-                base_url = None
-                for line in text.splitlines():
-                    stripped = line.strip()
-                    if stripped.startswith("default:") and model_name is None:
-                        model_name = stripped.split(":", 1)[1].strip()
-                    if stripped.startswith("provider:") and provider is None:
-                        provider = stripped.split(":", 1)[1].strip()
-                    if stripped.startswith("context_length:") and context_length is None:
-                        try:
-                            context_length = int(stripped.split(":", 1)[1].strip())
-                        except ValueError:
-                            context_length = None
-                    if stripped.startswith("base_url:") and base_url is None:
-                        base_url = stripped.split(":", 1)[1].strip()
-                if model_name:
-                    resolved_context = (
-                        context_length
-                        or _cached_context_window(hermes_home, model_name, base_url)
-                        or _context_window_for(model_name, hermes_home=hermes_home)
-                    )
-                    return {"name": model_name, "provider": provider, "contextWindow": resolved_context}
+                from ruamel.yaml import YAML
+
+                config = YAML(typ="safe").load(config_path) or {}
             except Exception:
-                pass
+                return None
+        else:
+            try:
+                with open(config_path, "r", encoding="utf-8") as f:
+                    config = yaml.safe_load(f) or {}
+            except Exception:
+                return None
+
+        model_section = config.get("model", {})
+        model_name = model_section.get("default")
+        provider = model_section.get("provider")
+        base_url = model_section.get("base_url")
+
+        if not model_name:
             return None
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f)
-            model_section = config.get("model", {})
-            model_name = model_section.get("default")
-            provider = model_section.get("provider")
-            base_url = model_section.get("base_url")
-            context_length = model_section.get("context_length")
-            if model_name:
-                try:
-                    resolved_context = int(context_length) if context_length is not None else None
-                except (TypeError, ValueError):
-                    resolved_context = None
-                resolved_context = (
-                    resolved_context
-                    or _cached_context_window(hermes_home, model_name, base_url)
-                    or _context_window_for(model_name)
-                )
-                return {"name": model_name, "provider": provider, "contextWindow": resolved_context}
-        except Exception:
-            pass
-        return None
+
+        # Look up context_length from the provider's model list in config
+        context_length = _context_length_from_config(config, model_name, provider)
+
+        # Fall back to cached / metadata only if config didn't specify one
+        if context_length is None:
+            context_length = (
+                _cached_context_window(hermes_home, model_name, base_url)
+                or _context_window_for(model_name, hermes_home=hermes_home)
+            )
+
+        return {"name": model_name, "provider": provider, "contextWindow": context_length}
 
     def _resolve_hermes_home(self) -> Path:
         try:
