@@ -17,6 +17,7 @@ final class AppContainer {
     let talkStore: TalkStore
     let sessionListStore: SessionListStore
     let modelStore: ModelStore
+    let attachmentService: AttachmentService
     let sensorUploadService: SensorUploadService?
     private let apiClient: RelayAPIClient?
     private let notificationService: (any NotificationServiceProtocol)?
@@ -37,6 +38,7 @@ final class AppContainer {
         talkStore: TalkStore,
         sessionListStore: SessionListStore,
         modelStore: ModelStore? = nil,
+        attachmentService: AttachmentService? = nil,
         sensorUploadService: SensorUploadService? = nil,
         apiClient: RelayAPIClient? = nil,
         notificationService: (any NotificationServiceProtocol)? = nil
@@ -53,6 +55,14 @@ final class AppContainer {
         self.modelStore = modelStore ?? ModelStore(
             apiClient: apiClient,
             accessTokenProvider: { await sessionStore.currentAccessToken() }
+        )
+        self.attachmentService = attachmentService ?? AttachmentService(
+            apiClient: apiClient,
+            accessTokenProvider: { await sessionStore.currentAccessToken() },
+            accessTokenRefresher: {
+                await sessionStore.refreshAccessTokenIfNeeded()
+                return await sessionStore.currentAccessToken()
+            }
         )
         self.sensorUploadService = sensorUploadService
         self.apiClient = apiClient

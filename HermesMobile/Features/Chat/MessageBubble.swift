@@ -59,7 +59,7 @@ struct MessageBubble: View {
                 VStack(alignment: .trailing, spacing: Design.Spacing.xxs) {
                     // Attachment thumbnails
                     if !message.attachments.isEmpty {
-                        attachmentGrid(message.attachments)
+                        MessageAttachmentsView(attachments: message.attachments, alignment: .trailing)
                     }
 
                     // Text content (skip if it's just the auto-generated attachment placeholder)
@@ -108,12 +108,20 @@ struct MessageBubble: View {
                     .padding(.vertical, Design.Spacing.xxs)
 
                 voiceModeLabel
-            } else if message.isStreaming && message.content.isEmpty && message.toolActivities.isEmpty {
+            } else if message.isStreaming && message.content.isEmpty && message.toolActivities.isEmpty && message.reasoning.isEmpty {
                 streamingPlaceholder
             } else {
+                if !message.reasoning.isEmpty {
+                    ReasoningView(
+                        reasoning: message.reasoning,
+                        isStreaming: message.isStreaming && message.content.isEmpty,
+                        duration: message.reasoningDuration
+                    )
+                }
+
                 if !message.content.isEmpty {
                     streamingText
-                } else if message.isStreaming {
+                } else if message.isStreaming && message.reasoning.isEmpty {
                     // Content still empty but tool activities exist — show a subtle placeholder
                     streamingPlaceholder
                 }
@@ -129,6 +137,10 @@ struct MessageBubble: View {
 
                 if let diff = message.codeDiff, !diff.isEmpty {
                     InlineDiffView(diff: diff)
+                }
+
+                if !message.attachments.isEmpty {
+                    MessageAttachmentsView(attachments: message.attachments, alignment: .leading)
                 }
 
                 if !message.isStreaming {
@@ -195,63 +207,6 @@ struct MessageBubble: View {
             .padding(.vertical, Design.Spacing.xxs)
             .background(Design.Colors.surface)
             .clipShape(Capsule())
-    }
-
-    // MARK: - Attachment Grid
-
-    @ViewBuilder
-    private func attachmentGrid(_ attachments: [MessageAttachment]) -> some View {
-        let columns = attachments.count == 1
-            ? [GridItem(.flexible())]
-            : [GridItem(.flexible()), GridItem(.flexible())]
-
-        LazyVGrid(columns: columns, spacing: Design.Spacing.xxs) {
-            ForEach(attachments) { attachment in
-                attachmentCell(attachment)
-            }
-        }
-        .frame(maxWidth: 140)
-    }
-
-    @ViewBuilder
-    private func attachmentCell(_ attachment: MessageAttachment) -> some View {
-        let thumbnailImage: UIImage? = {
-            if let base64 = attachment.thumbnailBase64,
-               let data = Data(base64Encoded: base64),
-               let image = UIImage(data: data) {
-                return image
-            }
-            if let localStoragePath = attachment.localStoragePath,
-               let data = try? Data(contentsOf: URL(fileURLWithPath: localStoragePath)),
-               let image = UIImage(data: data) {
-                return image
-            }
-            return nil
-        }()
-
-        if attachment.kind == "image",
-           let uiImage = thumbnailImage {
-            Image(uiImage: uiImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: 120, maxHeight: 120)
-                .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.md))
-        } else {
-            HStack(spacing: Design.Spacing.xxs) {
-                Image(systemName: "doc")
-                    .font(.system(size: Design.Size.iconSmall))
-                    .foregroundStyle(Design.Colors.secondaryForeground)
-                Text(attachment.fileName)
-                    .font(Design.Typography.caption)
-                    .foregroundStyle(Design.Colors.secondaryForeground)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            .padding(.horizontal, Design.Spacing.sm)
-            .padding(.vertical, Design.Spacing.xs)
-            .background(Design.Colors.surface)
-            .clipShape(RoundedRectangle(cornerRadius: Design.CornerRadius.md))
-        }
     }
 
     // MARK: - Context Compaction Banner

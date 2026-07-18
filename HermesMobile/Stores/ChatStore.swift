@@ -110,6 +110,7 @@ final class ChatStore {
         let stream = hermesClient.sendStreaming(message: trimmedContent, attachments: attachments, clientMessageID: clientMessageID)
         var acceptedJobID: UUID?
         var needsPollingFallback = false
+        var reasoningStartedAt: Date?
 
         streamingTask = Task { [weak self] in
             guard let self else { return }
@@ -130,6 +131,14 @@ final class ChatStore {
                         self.conversation = conv
                     }
 
+                case .reasoningDelta(let delta):
+                    if reasoningStartedAt == nil { reasoningStartedAt = .now }
+                    if var conv = self.conversation,
+                       let idx = conv.messages.firstIndex(where: { $0.id == placeholderID }) {
+                        conv.messages[idx].reasoning += delta
+                        self.conversation = conv
+                    }
+
                 case .toolActivity(let label):
                     if var conv = self.conversation,
                        let idx = conv.messages.firstIndex(where: { $0.id == placeholderID }) {
@@ -147,10 +156,21 @@ final class ChatStore {
 
                 case .finished(let finalMessage, let usage, let diff):
                     if let idx = self.conversation?.messages.firstIndex(where: { $0.id == placeholderID }) {
-                        let activities = self.conversation?.messages[idx].toolActivities ?? []
+                        let placeholder = self.conversation?.messages[idx]
+                        let activities = placeholder?.toolActivities ?? []
+                        let streamedReasoning = placeholder?.reasoning ?? ""
                         var resolved = finalMessage
                         resolved.toolActivities = activities
                         resolved.codeDiff = diff
+                        // The reloaded server message has no reasoning — carry over
+                        // what streamed and freeze its duration so the collapsed
+                        // "Thought for Xs" summary survives.
+                        if !streamedReasoning.isEmpty {
+                            resolved.reasoning = streamedReasoning
+                            if let startedAt = reasoningStartedAt {
+                                resolved.reasoningDuration = Date().timeIntervalSince(startedAt)
+                            }
+                        }
                         self.conversation?.messages[idx] = resolved
                     }
                     // Mark user message as delivered if it's still in sending state

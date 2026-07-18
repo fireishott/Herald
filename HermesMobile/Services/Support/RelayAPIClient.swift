@@ -305,4 +305,25 @@ extension RelayAPIClient {
         )
         return try await send(request)
     }
+
+    /// Fetches a raw (non-JSON) response body — used for attachment bytes.
+    /// Returns the data along with the response's MIME type.
+    func getRawData(
+        path: String,
+        accessToken: String? = nil
+    ) async throws -> (data: Data, mimeType: String?) {
+        var request = try makeRequest(path: path, method: "GET", accessToken: accessToken, body: nil)
+        request.setValue("*/*", forHTTPHeaderField: "Accept")
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ClientError.requestFailed("Relay returned an invalid response.")
+        }
+        guard (200 ..< 300).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                throw ClientError.unauthorized("Unauthorized")
+            }
+            throw ClientError.requestFailed("Attachment request failed with status \(httpResponse.statusCode).")
+        }
+        return (data, httpResponse.mimeType)
+    }
 }

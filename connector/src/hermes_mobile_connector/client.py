@@ -735,6 +735,15 @@ class HermesMobileConnector:
                         "kind": "text_delta",
                         "delta": event.data,
                     }))
+                elif event.type == "reasoning_delta":
+                    # Reasoning is transient — streamed for display but not part of
+                    # the persisted answer text, so we don't accumulate it here.
+                    await websocket.send(json.dumps({
+                        "type": "job.progress",
+                        "jobId": job["id"],
+                        "kind": "reasoning_delta",
+                        "delta": event.data,
+                    }))
                 elif event.type == "tool_activity":
                     await websocket.send(json.dumps({
                         "type": "job.progress",

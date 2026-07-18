@@ -9,6 +9,14 @@ struct MessageAttachment: Codable, Identifiable, Hashable, Sendable {
     /// Base64-encoded thumbnail (for images) — small enough to cache/persist.
     let thumbnailBase64: String?
     let localStoragePath: String?
+    /// Server message this attachment belongs to, and its position in that
+    /// message's attachment list. Together they address the relay endpoint
+    /// `messages/{messageID}/attachments/{remoteIndex}` for full-resolution
+    /// bytes. Nil for locally-composed (not-yet-sent) attachments.
+    let messageID: UUID?
+    let remoteIndex: Int?
+
+    var isImage: Bool { kind == "image" || mimeType.hasPrefix("image/") }
 
     init(
         id: UUID = UUID(),
@@ -16,7 +24,9 @@ struct MessageAttachment: Codable, Identifiable, Hashable, Sendable {
         fileName: String,
         mimeType: String,
         thumbnailBase64: String? = nil,
-        localStoragePath: String? = nil
+        localStoragePath: String? = nil,
+        messageID: UUID? = nil,
+        remoteIndex: Int? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -24,6 +34,8 @@ struct MessageAttachment: Codable, Identifiable, Hashable, Sendable {
         self.mimeType = mimeType
         self.thumbnailBase64 = thumbnailBase64
         self.localStoragePath = localStoragePath
+        self.messageID = messageID
+        self.remoteIndex = remoteIndex
     }
 
     init(from pending: PendingAttachment) {
@@ -33,6 +45,8 @@ struct MessageAttachment: Codable, Identifiable, Hashable, Sendable {
         self.mimeType = pending.mimeType
         self.thumbnailBase64 = pending.thumbnailBase64
         self.localStoragePath = pending.localStoragePath
+        self.messageID = nil
+        self.remoteIndex = nil
     }
 }
 
@@ -50,6 +64,12 @@ struct Message: Codable, Identifiable, Hashable, Sendable {
     var isStreaming: Bool
     var voiceSessionDuration: TimeInterval?
     var attachments: [MessageAttachment]
+    /// Streamed chain-of-thought / reasoning text, shown dimmed while the answer
+    /// is being generated and collapsed to a summary once it completes.
+    var reasoning: String
+    /// How long reasoning streamed for, in seconds — used for the collapsed
+    /// "Thought for Xs" label. Set when the final answer arrives.
+    var reasoningDuration: TimeInterval?
 
     /// Whether this message was transcribed from a voice session.
     var isVoiceTranscript: Bool {
@@ -69,7 +89,9 @@ struct Message: Codable, Identifiable, Hashable, Sendable {
         codeDiff: CodeDiff? = nil,
         isStreaming: Bool = false,
         voiceSessionDuration: TimeInterval? = nil,
-        attachments: [MessageAttachment] = []
+        attachments: [MessageAttachment] = [],
+        reasoning: String = "",
+        reasoningDuration: TimeInterval? = nil
     ) {
         self.id = id
         self.clientMessageID = clientMessageID
@@ -84,10 +106,13 @@ struct Message: Codable, Identifiable, Hashable, Sendable {
         self.isStreaming = isStreaming
         self.voiceSessionDuration = voiceSessionDuration
         self.attachments = attachments
+        self.reasoning = reasoning
+        self.reasoningDuration = reasoningDuration
     }
 
     enum CodingKeys: String, CodingKey {
         case id, clientMessageID, sender, content, timestamp, jobID, status, attachments
+        case reasoning, reasoningDuration
     }
 
     init(from decoder: Decoder) throws {
@@ -100,6 +125,8 @@ struct Message: Codable, Identifiable, Hashable, Sendable {
         jobID = try container.decodeIfPresent(UUID.self, forKey: .jobID)
         status = try container.decode(MessageStatus.self, forKey: .status)
         attachments = try container.decodeIfPresent([MessageAttachment].self, forKey: .attachments) ?? []
+        reasoning = try container.decodeIfPresent(String.self, forKey: .reasoning) ?? ""
+        reasoningDuration = try container.decodeIfPresent(TimeInterval.self, forKey: .reasoningDuration)
         toolActivity = nil
         toolActivities = []
         codeDiff = nil
@@ -119,5 +146,9 @@ struct Message: Codable, Identifiable, Hashable, Sendable {
         if !attachments.isEmpty {
             try container.encode(attachments, forKey: .attachments)
         }
+        if !reasoning.isEmpty {
+            try container.encode(reasoning, forKey: .reasoning)
+        }
+        try container.encodeIfPresent(reasoningDuration, forKey: .reasoningDuration)
     }
 }
