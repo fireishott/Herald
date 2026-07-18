@@ -1631,6 +1631,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return success({"session": serialize_session_summary(updated) if updated else None})
 
     # ── Messages ────────────────────────────────────────────────────
+    @app.post("/v1/messages")
     async def create_message(
         payload: MessageCreateRequest,
         auth: AuthContext = Depends(get_auth_context),
