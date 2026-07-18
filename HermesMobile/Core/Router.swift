@@ -24,6 +24,35 @@ enum SheetDestination: Identifiable {
     }
 }
 
+// MARK: - iPad Sidebar Sections
+
+enum SidebarSection: String, CaseIterable, Identifiable {
+    case chat
+    case inbox
+    case talk
+    case settings
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .chat: "Chat"
+        case .inbox: "Inbox"
+        case .talk: "Talk"
+        case .settings: "Settings"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .chat: "bubble.left.and.bubble.right"
+        case .inbox: "tray"
+        case .talk: "mic"
+        case .settings: "gear"
+        }
+    }
+}
+
 // MARK: - App Tab (kept for backward compatibility during transition)
 
 enum AppTab: String, CaseIterable, Identifiable {
@@ -53,6 +82,11 @@ final class TabRouter {
     var activeSheet: SheetDestination?
     var isVoiceOverlayPresented = false
     private var navigationPath: [Route] = []
+
+    // MARK: iPad section binding
+    /// When set (by AdaptiveRootView on iPad), the router calls this instead of
+    /// presenting a sheet for sections that have a dedicated sidebar destination.
+    var oniPadSectionSwitch: ((SidebarSection) -> Void)?
 
     func path() -> [Route] {
         navigationPath
@@ -85,6 +119,12 @@ final class TabRouter {
     }
 
     func presentSheet(_ sheet: SheetDestination) {
+        // On iPad, settings is shown via sidebar section switch, not as a sheet.
+        // Other sheets (attachments, newChat) and iPhone fallback use the sheet.
+        if sheet == .settings, let switcher = oniPadSectionSwitch {
+            switcher(.settings)
+            return
+        }
         activeSheet = sheet
     }
 
