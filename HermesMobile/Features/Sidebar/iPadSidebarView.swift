@@ -34,6 +34,7 @@ enum SidebarSection: String, CaseIterable, Identifiable {
 
 struct iPadSidebarView: View {
     @Binding var selectedSection: SidebarSection
+    @Binding var isRightPanelOpen: Bool
     @Environment(HermesHostStore.self) private var hostStore
     @Environment(SessionListStore.self) private var sessionStore
     @State private var renamingSession: SessionSummary?
@@ -111,6 +112,21 @@ struct iPadSidebarView: View {
                     .foregroundStyle(Design.Brand.accent)
             }
             .buttonStyle(.plain)
+            .help("New chat session")
+
+            Button {
+                withAnimation(Design.Motion.standard) {
+                    isRightPanelOpen.toggle()
+                }
+            } label: {
+                Image(systemName: "sidebar.right")
+                    .font(.system(size: Design.Size.iconSmall))
+                    .foregroundStyle(
+                        isRightPanelOpen ? Design.Brand.accent : Design.Colors.secondaryForeground
+                    )
+            }
+            .buttonStyle(.plain)
+            .help("Toggle inspector panel")
         }
         .padding(.vertical, Design.Spacing.xs)
     }

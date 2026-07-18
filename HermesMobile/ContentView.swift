@@ -4,31 +4,37 @@ struct MainTabView: View {
     @Environment(TabRouter.self) private var router
     @Environment(TalkStore.self) private var talkStore
     @Environment(ChatStore.self) private var chatStore
+    @State private var isSessionDrawerOpen = false
 
     var body: some View {
         @Bindable var router = router
-        NavigationStack(path: router.pathBinding()) {
-            ChatScreen()
-                .navigationDestination(for: Route.self) { route in
-                    routeDestination(route)
-                }
-        }
-        .sheet(item: $router.activeSheet) { destination in
-            sheetDestination(destination)
-        }
-        .fullScreenCover(isPresented: $router.isVoiceOverlayPresented) {
-            VoiceOverlayScreen()
-        }
-        .onChange(of: talkStore.lastCompletedSession != nil) { _, hasSession in
-            if hasSession, let session = talkStore.lastCompletedSession {
-                Task {
-                    await chatStore.injectVoiceTranscript(
-                        voiceSessionId: session.voiceSessionId,
-                        duration: session.duration
-                    )
-                    talkStore.clearLastCompletedSession()
+        ZStack {
+            NavigationStack(path: router.pathBinding()) {
+                ChatScreen(isSessionDrawerOpen: $isSessionDrawerOpen)
+                    .navigationDestination(for: Route.self) { route in
+                        routeDestination(route)
+                    }
+            }
+            .sheet(item: $router.activeSheet) { destination in
+                sheetDestination(destination)
+            }
+            .fullScreenCover(isPresented: $router.isVoiceOverlayPresented) {
+                VoiceOverlayScreen()
+            }
+            .onChange(of: talkStore.lastCompletedSession != nil) { _, hasSession in
+                if hasSession, let session = talkStore.lastCompletedSession {
+                    Task {
+                        await chatStore.injectVoiceTranscript(
+                            voiceSessionId: session.voiceSessionId,
+                            duration: session.duration
+                        )
+                        talkStore.clearLastCompletedSession()
+                    }
                 }
             }
+
+            // Session drawer overlay
+            iPhoneSessionDrawer(isOpen: $isSessionDrawerOpen)
         }
     }
 
