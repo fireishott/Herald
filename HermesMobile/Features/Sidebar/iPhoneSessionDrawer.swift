@@ -122,8 +122,39 @@ struct iPhoneSessionDrawer: View {
                 if sessionStore.hasMore {
                     loadMoreButton
                 }
+
+                // Bottom nav items (mirrors iPad sidebar)
+                Divider().padding(.vertical, Design.Spacing.sm)
+                drawerNavRow(icon: "tray", title: "Inbox")
+                drawerNavRow(icon: "waveform", title: "Talk")
+                drawerNavRow(icon: "gearshape", title: "Settings") {
+                    close()
+                    router.presentSheet(.settings)
+                }
             }
         }
+    }
+
+    private func drawerNavRow(icon: String, title: String, action: (() -> Void)? = nil) -> some View {
+        Button {
+            close()
+            action?()
+        } label: {
+            HStack(spacing: Design.Spacing.sm) {
+                Image(systemName: icon)
+                    .font(.system(size: Design.Size.iconSmall))
+                    .foregroundStyle(Design.Colors.secondaryForeground)
+                    .frame(width: 24)
+                Text(title)
+                    .font(Design.Typography.body)
+                    .foregroundStyle(Design.Colors.foreground)
+                Spacer()
+            }
+            .padding(.horizontal, Design.Spacing.md)
+            .padding(.vertical, Design.Spacing.sm)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func sectionHeader(_ title: String) -> some View {

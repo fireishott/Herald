@@ -7,6 +7,10 @@ final class ChatStore {
     var isLoading = false
     var pendingMessageSentAt: Date?
     var lastTokenUsage: TokenUsage?
+    /// Live log entries for the inspector panel (logs/tabs).
+    var logEntries: [(timestamp: Date, level: String, message: String)] = []
+    /// When the current session started (for duration display).
+    private(set) var sessionStartedAt: Date?
     private var isPollingEnabled = false
     private var pollingTask: Task<Void, Never>?
     private var streamingTask: Task<Void, Never>?
@@ -55,11 +59,16 @@ final class ChatStore {
     func loadConversation() async {
         isLoading = true
         defer { isLoading = false }
+        if sessionStartedAt == nil { sessionStartedAt = Date() }
         let cachedConversation = conversation ?? persistence.loadConversationCache()
         conversation = mergeConversationMetadata(
             from: cachedConversation,
             into: await hermesClient.loadConversation()
         )
+        // Fallback: restore cached model name
+        if activeModelName == nil {
+            activeModelName = UserDefaults.standard.string(forKey: "hermes.cachedModelName")
+        }
         if let latestUsage = conversation?.latestUsage {
             lastTokenUsage = latestUsage
         }
@@ -369,6 +378,12 @@ final class ChatStore {
         contextWindow = nil
     }
 
+    /// Append a log entry to the live log buffer.
+    func appendLog(level: String, _ message: String) {
+        logEntries.append((timestamp: Date(), level: level, message: message))
+        if logEntries.count > 500 { logEntries.removeFirst(100) }
+    }
+
     func reset() {
         pollingTask?.cancel()
         pollingTask = nil
@@ -378,6 +393,8 @@ final class ChatStore {
         isLoading = false
         pendingMessageSentAt = nil
         lastTokenUsage = nil
+        logEntries = []
+        sessionStartedAt = nil
         persistence.clearConversationCache()
     }
 
@@ -571,6 +588,7 @@ final class ChatStore {
             if let match = text.firstMatch(of: pattern) {
                 let newModel = String(match.1)
                 activeModelName = newModel
+                UserDefaults.standard.set(newModel, forKey: "hermes.cachedModelName")
 
                 // v0.8.0: the /model response includes "Context: N tokens"
                 // — parse it directly instead of relying on a heuristic table.

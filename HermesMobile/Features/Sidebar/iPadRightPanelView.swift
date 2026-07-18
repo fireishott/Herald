@@ -9,8 +9,6 @@ struct iPadRightPanelView: View {
     @Binding var isOpen: Bool
     @Binding var selectedTab: RightPanelTab
 
-    @State private var logEntries: [LogEntry] = []
-
     var body: some View {
         if !isOpen { return AnyView(EmptyView()) }
 
@@ -72,13 +70,13 @@ struct iPadRightPanelView: View {
         VStack(spacing: 0) {
             logFilterBar
 
-            if logEntries.isEmpty {
+            if chatStore.logEntries.isEmpty {
                 emptyState(icon: "terminal", message: "No log entries yet",
                            detail: "Logs appear here when Hermes processes messages, runs tools, or executes commands.")
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(logEntries) { entry in
+                        ForEach(Array(chatStore.logEntries.enumerated()), id: \.offset) { idx, entry in
                             logEntryRow(entry)
                         }
                     }
@@ -98,7 +96,7 @@ struct iPadRightPanelView: View {
                     .clipShape(Capsule())
             }
             Spacer()
-            Button { logEntries.removeAll() } label: {
+            Button { chatStore.logEntries.removeAll() } label: {
                 Image(systemName: "trash")
                     .font(.system(size: 11))
                     .foregroundStyle(Design.Colors.secondaryForeground)
@@ -112,20 +110,33 @@ struct iPadRightPanelView: View {
         }
     }
 
-    private func logEntryRow(_ entry: LogEntry) -> some View {
-        HStack(alignment: .top, spacing: 6) {
+    private func logEntryRow(_ entry: (timestamp: Date, level: String, message: String)) -> some View {
+        let color = logLevelColor(entry.level)
+        let isLast = entry.timestamp == chatStore.logEntries.last?.timestamp
+            && entry.message == chatStore.logEntries.last?.message
+        return HStack(alignment: .top, spacing: 6) {
             Text(entry.timestamp, style: .time)
                 .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.6))
-            Circle().fill(entry.level.color).frame(width: 6, height: 6).padding(.top, 4)
+            Circle().fill(color).frame(width: 6, height: 6).padding(.top, 4)
             Text(entry.message)
                 .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(entry.level.color)
+                .foregroundStyle(color)
                 .textSelection(.enabled)
         }
         .padding(.horizontal, Design.Spacing.sm)
         .padding(.vertical, 3)
-        .background(entry.id == logEntries.last?.id ? Design.Brand.accent.opacity(0.06) : Color.clear)
+        .background(isLast ? Design.Brand.accent.opacity(0.06) : Color.clear)
+    }
+
+    private func logLevelColor(_ level: String) -> Color {
+        switch level.uppercased() {
+        case "WARN": return .orange
+        case "ERR", "ERROR": return .red
+        case "DBG", "DEBUG": return Design.Colors.secondaryForeground
+        case "TOOL": return Design.Brand.accent
+        default: return Design.Colors.foreground
+        }
     }
 
     // MARK: - Terminal
@@ -180,6 +191,21 @@ struct iPadRightPanelView: View {
                 .padding(.vertical, Design.Spacing.xs)
             Divider().background(Design.Colors.divider)
 
+            if let startedAt = chatStore.sessionStartedAt {
+                VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+                    Text("SESSION").font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                    usageRow("Duration", value: formatDuration(Date().timeIntervalSince(startedAt)))
+                    if let model = chatStore.activeModelName {
+                        usageRow("Model", value: model)
+                    }
+                    if let ctx = chatStore.contextWindow {
+                        usageRow("Context Window", value: formatTokenCount(ctx))
+                    }
+                }
+                .padding(Design.Spacing.sm)
+                Divider().background(Design.Colors.divider).padding(.horizontal, Design.Spacing.sm)
+            }
             if chatStore.conversation?.latestUsage == nil {
                 emptyState(icon: "hammer", message: "No tool activity yet",
                            detail: "Tool calls and execution results from the Hermes agent appear here.")
@@ -220,6 +246,25 @@ struct iPadRightPanelView: View {
                 .padding(.horizontal, Design.Spacing.lg)
             Spacer()
         }
+    }
+    private func formatDuration(_ interval: TimeInterval) -> String {
+        let mins = Int(interval) / 60
+        let secs = Int(interval) % 60
+        if mins >= 60 {
+            let hrs = mins / 60
+            let rem = mins % 60
+            return String(format: "%d:%02d:%02d", hrs, rem, secs)
+        }
+        return String(format: "%d:%02d", mins, secs)
+    }
+
+    private func formatTokenCount(_ count: Int) -> String {
+        if count >= 1_000_000 {
+            return String(format: "%.1fM", Double(count) / 1_000_000)
+        } else if count >= 1_000 {
+            return String(format: "%.0fK", Double(count) / 1_000)
+        }
+        return "\(count)"
     }
 }
 

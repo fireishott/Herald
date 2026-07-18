@@ -282,6 +282,12 @@ final class AppContainer {
         await hostStore.refresh()
         lastKnownHostOnline = hostStore.isHostOnline
         await chatStore.loadConversationIfNeeded()
+        await sessionListStore.loadSessions()
+        // Auto-create first session if none exist yet
+        if sessionListStore.recentSessions.isEmpty && sessionListStore.pinnedSessions.isEmpty {
+            try? await Task.sleep(for: .milliseconds(500))
+            await sessionListStore.createNewSession(title: "New Chat")
+        }
         await inboxStore.loadInbox()
         await refreshCommandCatalog(force: true)
         await registerStoredPushTokenIfNeeded()
@@ -299,6 +305,7 @@ final class AppContainer {
         await permissionsStore.reloadCapabilities()
         await hostStore.refresh()
         lastKnownHostOnline = hostStore.isHostOnline
+        await sessionListStore.loadSessions()
         await refreshCommandCatalog(force: true)
         await registerStoredPushTokenIfNeeded()
         await sensorUploadService?.handleAppDidBecomeActive()
