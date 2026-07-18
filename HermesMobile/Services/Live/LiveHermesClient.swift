@@ -314,12 +314,14 @@ final class LiveHermesClient: HermesClientProtocol {
     }
 
     private func mapMessage(_ relayMessage: RelayMessage) -> Message {
-        let attachments: [MessageAttachment] = (relayMessage.attachments ?? []).map { att in
+        let attachments: [MessageAttachment] = (relayMessage.attachments ?? []).enumerated().map { index, att in
             MessageAttachment(
                 kind: att.type,
                 fileName: att.filename,
                 mimeType: att.mimeType,
-                thumbnailBase64: att.thumbnailData
+                thumbnailBase64: att.thumbnailData,
+                messageID: relayMessage.id,
+                remoteIndex: index
             )
         }
         return Message(
@@ -391,6 +393,12 @@ final class LiveHermesClient: HermesClientProtocol {
                            let delta = payload.delta,
                            !delta.isEmpty {
                             continuation.yield(.textDelta(delta))
+                        }
+                    case "reasoning_delta":
+                        if let payload = decode(StreamProgressPayload.self, from: sseEvent.data),
+                           let delta = payload.delta,
+                           !delta.isEmpty {
+                            continuation.yield(.reasoningDelta(delta))
                         }
                     case "tool_activity":
                         if let payload = decode(StreamProgressPayload.self, from: sseEvent.data),
