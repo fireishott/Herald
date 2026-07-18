@@ -995,6 +995,8 @@ class HermesMobileConnector:
                 result = self._rpc_models_list()
             elif method == "profiles.list":
                 result = await self._rpc_profiles_list()
+            elif method == "skills.list":
+                result = await self._rpc_skills_list()
             else:
                 raise RuntimeError(f"Unsupported RPC method: {method}")
             return {
@@ -1184,6 +1186,46 @@ class HermesMobileConnector:
 
         models.sort(key=lambda model: (model["providerName"].lower(), model["name"].lower()))
         return models
+
+    async def _rpc_skills_list(self) -> dict:
+        hermes_home = self._resolve_hermes_home()
+        skills_dir = hermes_home / "skills"
+        if not skills_dir.is_dir():
+            return {"skills": []}
+
+        skills = []
+        for entry in sorted(skills_dir.iterdir()):
+            skill_md: Path | None = None
+            if entry.is_dir():
+                skill_md = entry / "SKILL.md"
+            elif entry.suffix == ".md":
+                skill_md = entry
+
+            if skill_md is None or not skill_md.is_file():
+                continue
+
+            name = entry.stem
+            description = ""
+            try:
+                content = skill_md.read_text(encoding="utf-8")
+                if content.startswith("---"):
+                    parts = content.split("---", 2)
+                    if len(parts) >= 3:
+                        import yaml
+
+                        fm = yaml.safe_load(parts[1]) or {}
+                        name = fm.get("name", name)
+                        description = fm.get("description", "")
+            except Exception:  # noqa: BLE001
+                pass
+
+            skills.append({
+                "name": name,
+                "description": description,
+                "path": str(skill_md),
+            })
+
+        return {"skills": skills}
 
     async def _rpc_profiles_list(self) -> dict:
         hermes_home = self._resolve_hermes_home()
