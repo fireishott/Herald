@@ -14,7 +14,7 @@ enum SharedWidgetDataStore {
         }
         return "group.com.freemancurtis.HeraldApp"
     }()
-    private static let dataKey = "hermes.widget.data"
+    private static let dataKey = "herald.widget.data"
 
     // Coalesce bursts of reloads. During chat streaming the caller can write
     // widget data dozens of times per second; `reloadAllTimelines` is an
