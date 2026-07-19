@@ -8,6 +8,7 @@ struct ChatScreen: View {
     @Environment(PairingStore.self) private var pairingStore
     @Environment(AppSessionStore.self) private var sessionStore
     @Environment(SettingsStore.self) private var settingsStore
+    @Environment(ThemeManager.self) private var themeManager
     @Environment(TabRouter.self) private var router
     @Binding var isSessionDrawerOpen: Bool
 
@@ -23,8 +24,22 @@ struct ChatScreen: View {
 
     var body: some View {
         ZStack {
-            Design.Colors.background
-                .ignoresSafeArea()
+            ChatWallpaperBackground(
+                wallpaper: settingsStore.settings.chatWallpaper,
+                tint: themeManager.preset.accent
+            )
+            .ignoresSafeArea()
+
+            // Scrim: Hermes messages render as plain text with no bubble background,
+            // and user bubbles use a near-transparent surface tint (Design.Colors.surface),
+            // so busy wallpapers (gradients/textures/photos) need dimming here to keep
+            // text legible. `.default` is already a near-flat system background, so it's
+            // left unscrimmed.
+            if wallpaperScrimOpacity > 0 {
+                Design.Colors.background
+                    .opacity(wallpaperScrimOpacity)
+                    .ignoresSafeArea()
+            }
 
             VStack(spacing: 0) {
                 if pairingStore.isPaired, hostStore.connectionState != .online {
@@ -102,6 +117,21 @@ struct ChatScreen: View {
                 switchModel(model, setAsDefault: setAsDefault)
             }
             .presentationDetents([.medium, .large])
+        }
+    }
+
+    // MARK: - Wallpaper
+
+    /// Dimming applied between the wallpaper and the chat content for legibility.
+    /// `.default` renders as a near-flat system background already, so it's left
+    /// unscrimmed; every other style (gradients, textures, solid tint, custom photo)
+    /// gets a theme-aware scrim since message content has little to no opaque backing.
+    private var wallpaperScrimOpacity: Double {
+        switch settingsStore.settings.chatWallpaper {
+        case .default:
+            0
+        default:
+            0.35
         }
     }
 
