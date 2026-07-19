@@ -146,6 +146,7 @@
 		D02499D26D05C42DD36C9595 /* ReasoningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2712B9E2F46FF51B25998A3 /* ReasoningView.swift */; };
 		D3B1A0F9E8D7C6B5A4F3E2D2 /* ProfileSelectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F3D1A4B5C6D7E8F9A0B1C3 /* ProfileSelectorSheet.swift */; };
 		C2B1A0F9E8D7C6B5A4F3E2D1 /* ProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A4B5C6D7E8F9A0B1C2 /* ProfileStore.swift */; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* SkillsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* SkillsStore.swift */; };
 		D43AED1BDA4C8A924220E310 /* LiveCameraOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA50CBA8A24483611C2F528 /* LiveCameraOverlay.swift */; };
 		D4459E9B350994A6B0C4D284 /* MockLocationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164FC29A86F0762768A9E444 /* MockLocationService.swift */; };
 		D5F972289540E4C859061FC1 /* SlashCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FF6C9CA515F8316F3CC8DDF /* SlashCommand.swift */; };
@@ -371,6 +372,7 @@
 		E6D300D8D0E2E28C8BC68615 /* InboxItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxItem.swift; sourceTree = "<group>"; };
 		E6E7BD8BFC1E7C7EA74F264D /* ModelSelectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSelectorSheet.swift; sourceTree = "<group>"; };
 		D1E2F3A4B5C6D7E8F9A0B1C2 /* ProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStore.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* SkillsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsStore.swift; sourceTree = "<group>"; };
 		E2F3D1A4B5C6D7E8F9A0B1C3 /* ProfileSelectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSelectorSheet.swift; sourceTree = "<group>"; };
 		E7429591D4750B1CB9002073 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E7FFDDBF96B625F71573F9D5 /* PairedRelayConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairedRelayConfiguration.swift; sourceTree = "<group>"; };
@@ -443,6 +445,7 @@
 				3D7BFFA880F6EEAE102BEC2E /* ModelStore.swift */,
 				F07B14E26F36BD2CD9778781 /* PairingStore.swift */,
 				D1E2F3A4B5C6D7E8F9A0B1C2 /* ProfileStore.swift */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* SkillsStore.swift */,
 				ACB3C95563F41E3B154C3DF3 /* PermissionsStore.swift */,
 				4508A7DDEA80A11E70C02267 /* SessionListStore.swift */,
 				41F982E7FF317AD2BDA8879C /* SettingsStore.swift */,
@@ -1065,6 +1068,7 @@
 				4623F2B0A173132A5E8F5B6F /* PairingStore.swift in Sources */,
 				CD1A4152969628A536D82F08 /* PendingAttachment.swift in Sources */,
 				C2B1A0F9E8D7C6B5A4F3E2D1 /* ProfileStore.swift in Sources */,
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* SkillsStore.swift in Sources */,
 				D3B1A0F9E8D7C6B5A4F3E2D2 /* ProfileSelectorSheet.swift in Sources */,
 				A6654988BF2FDD648D831974 /* PermissionCard.swift in Sources */,
 				407CFBF26B282A2960795CE6 /* PermissionStatus.swift in Sources */,
