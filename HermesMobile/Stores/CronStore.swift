@@ -23,6 +23,18 @@ final class CronStore {
         let job: CronJob
     }
 
+    private struct CronCreateBody: Encodable {
+        let name: String
+        let schedule: String
+        let prompt: String
+    }
+
+    private struct CronUpdateBody: Encodable {
+        let enabled: Bool
+    }
+
+    private struct EmptyResponse: Decodable {}
+
     private(set) var jobs: [CronJob] = []
     private(set) var isLoading = false
     private(set) var errorMessage: String?
@@ -59,7 +71,7 @@ final class CronStore {
             errorMessage = "Not connected to a relay."
             return
         }
-        let body: [String: Any] = ["name": name, "schedule": schedule, "prompt": prompt]
+        let body = CronCreateBody(name: name, schedule: schedule, prompt: prompt)
         let response: CronJobResponse = try await apiClient.post(
             path: "cron", body: body, accessToken: token
         )
@@ -71,7 +83,7 @@ final class CronStore {
             errorMessage = "Not connected to a relay."
             return
         }
-        let body: [String: Any] = ["enabled": !job.enabled]
+        let body = CronUpdateBody(enabled: !job.enabled)
         let response: CronJobResponse = try await apiClient.patch(
             path: "cron/\(job.id)", body: body, accessToken: token
         )
