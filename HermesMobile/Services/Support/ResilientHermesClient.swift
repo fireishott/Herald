@@ -68,21 +68,21 @@ final class ResilientHermesClient: HermesClientProtocol {
 // MARK: - Session Management
 
 extension ResilientHermesClient {
-    func listSessions(limit: Int, offset: Int) async throws -> SessionListResponse {
+    func listSessions(limit: Int, offset: Int, allDevices: Bool = false) async throws -> SessionListResponse {
         do {
-            return try await primary.listSessions(limit: limit, offset: offset)
+            return try await primary.listSessions(limit: limit, offset: offset, allDevices: allDevices)
         } catch {
             guard allowsFallback() else { throw error }
-            return try await fallback.listSessions(limit: limit, offset: offset)
+            return try await fallback.listSessions(limit: limit, offset: offset, allDevices: allDevices)
         }
     }
 
-    func searchSessions(query: String) async throws -> [SessionSummary] {
+    func searchSessions(query: String, allDevices: Bool = false) async throws -> [SessionSummary] {
         do {
-            return try await primary.searchSessions(query: query)
+            return try await primary.searchSessions(query: query, allDevices: allDevices)
         } catch {
             guard allowsFallback() else { throw error }
-            return try await fallback.searchSessions(query: query)
+            return try await fallback.searchSessions(query: query, allDevices: allDevices)
         }
     }
 

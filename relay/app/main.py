@@ -1658,13 +1658,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def list_user_sessions(
         limit: int = 50,
         offset: int = 0,
+        allDevices: bool = False,
         auth: AuthContext = Depends(get_auth_context),
         db: Session = Depends(get_db),
     ) -> dict:
         sessions, total = list_sessions(
             db,
             user_id=auth.user.id,
-            device_id=auth.device.id,
+            device_id=None if allDevices else auth.device.id,
             limit=limit,
             offset=offset,
         )
@@ -1676,10 +1677,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/v1/sessions/search")
     def search_user_sessions(
         q: str,
+        allDevices: bool = False,
         auth: AuthContext = Depends(get_auth_context),
         db: Session = Depends(get_db),
     ) -> dict:
-        sessions = search_sessions(db, user_id=auth.user.id, query=q, device_id=auth.device.id)
+        sessions = search_sessions(
+            db,
+            user_id=auth.user.id,
+            query=q,
+            device_id=None if allDevices else auth.device.id,
+        )
         return success({
             "sessions": [serialize_session_summary(s) for s in sessions],
             "total": len(sessions),

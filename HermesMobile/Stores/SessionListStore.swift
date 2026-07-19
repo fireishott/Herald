@@ -50,14 +50,28 @@ final class SessionListStore {
     /// Whether more sessions are available to load.
     var hasMore: Bool { currentOffset < totalCount }
 
+    /// Whether to include sessions from every device on the account rather than
+    /// just this device's (+ user-scoped) sessions. Backed by `UserSettings` via
+    /// `settingsStore` so the preference persists across launches.
+    var showAllDevices: Bool {
+        get { settingsStore.settings.showAllDevices }
+        set {
+            guard newValue != settingsStore.settings.showAllDevices else { return }
+            settingsStore.settings.showAllDevices = newValue
+            Task { await loadSessions() }
+        }
+    }
+
     private let hermesClient: any HermesClientProtocol
     private let chatStore: ChatStore
+    private let settingsStore: SettingsStore
     private var searchTask: Task<Void, Never>?
     private var searchObservationTask: Task<Void, Never>?
 
-    init(hermesClient: any HermesClientProtocol, chatStore: ChatStore) {
+    init(hermesClient: any HermesClientProtocol, chatStore: ChatStore, settingsStore: SettingsStore) {
         self.hermesClient = hermesClient
         self.chatStore = chatStore
+        self.settingsStore = settingsStore
         observeSearchQuery()
     }
 
@@ -69,7 +83,7 @@ final class SessionListStore {
         defer { isLoading = false }
 
         do {
-            let response = try await hermesClient.listSessions(limit: pageSize, offset: 0)
+            let response = try await hermesClient.listSessions(limit: pageSize, offset: 0, allDevices: showAllDevices)
             currentOffset = response.sessions.count
             totalCount = response.total
             splitSessions(response.sessions)
@@ -84,7 +98,7 @@ final class SessionListStore {
         defer { isLoading = false }
 
         do {
-            let response = try await hermesClient.listSessions(limit: pageSize, offset: currentOffset)
+            let response = try await hermesClient.listSessions(limit: pageSize, offset: currentOffset, allDevices: showAllDevices)
             currentOffset += response.sessions.count
             // Merge new sessions and re-split
             let allSessions = pinnedSessions + recentSessions + response.sessions
@@ -104,7 +118,7 @@ final class SessionListStore {
         }
 
         do {
-            let results = try await hermesClient.searchSessions(query: query)
+            let results = try await hermesClient.searchSessions(query: query, allDevices: showAllDevices)
             searchResults = results
         } catch {
             errorMessage = error.localizedDescription

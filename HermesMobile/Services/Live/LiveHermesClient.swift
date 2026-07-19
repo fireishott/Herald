@@ -544,10 +544,10 @@ extension LiveHermesClient {
         let session: SessionAPIEntry
     }
 
-    func listSessions(limit: Int, offset: Int) async throws -> SessionListResponse {
+    func listSessions(limit: Int, offset: Int, allDevices: Bool = false) async throws -> SessionListResponse {
         let response: SessionListAPIResponse = try await performAuthorizedRequest { [self] token in
             try await self.apiClient.get(
-                path: "sessions?limit=\(limit)&offset=\(offset)",
+                path: "sessions?limit=\(limit)&offset=\(offset)&allDevices=\(allDevices)",
                 accessToken: token
             )
         }
@@ -565,11 +565,11 @@ extension LiveHermesClient {
         return SessionListResponse(sessions: sessions, total: response.total)
     }
 
-    func searchSessions(query: String) async throws -> [SessionSummary] {
+    func searchSessions(query: String, allDevices: Bool = false) async throws -> [SessionSummary] {
         let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
         let response: SessionListAPIResponse = try await performAuthorizedRequest { [self] token in
             try await self.apiClient.get(
-                path: "sessions/search?q=\(encoded)",
+                path: "sessions/search?q=\(encoded)&allDevices=\(allDevices)",
                 accessToken: token
             )
         }
