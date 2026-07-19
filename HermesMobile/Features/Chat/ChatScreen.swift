@@ -3,6 +3,7 @@ import SwiftUI
 struct ChatScreen: View {
     @Environment(ChatStore.self) private var chatStore
     @Environment(ModelStore.self) private var modelStore
+    @Environment(ProfileStore.self) private var profileStore
     @Environment(HermesHostStore.self) private var hostStore
     @Environment(PairingStore.self) private var pairingStore
     @Environment(AppSessionStore.self) private var sessionStore
@@ -49,6 +50,7 @@ struct ChatScreen: View {
             chatStore.setPollingEnabled(true)
             await hostStore.refresh()
             await chatStore.loadConversationIfNeeded()
+            await profileStore.loadProfiles()
         }
         .task {
             while !Task.isCancelled {
@@ -135,6 +137,7 @@ struct ChatScreen: View {
                     }
                     .buttonStyle(.plain)
                 }
+                profileChip
                 modelStatusChip
             }
         }
@@ -147,6 +150,7 @@ struct ChatScreen: View {
 
     @State private var showContextPopover = false
     @State private var showModelSelector = false
+    @State private var showProfileSelector = false
 
     private var displayedModelName: String? {
         chatStore.activeModelName ?? hostStore.currentHost?.hermesModel
@@ -166,6 +170,37 @@ struct ChatScreen: View {
               let maxCtx = effectiveContextWindow, maxCtx > 0
         else { return 0 }
         return min(Double(usedTokens) / Double(maxCtx), 1.0)
+    }
+
+    // MARK: - Profile chip
+
+    private var profileChip: some View {
+        Group {
+            if profileStore.activeProfile != nil {
+                Button {
+                    showProfileSelector = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "brain.head.profile")
+                        Text(profileStore.activeProfileName ?? "Profile")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.ultraThinMaterial, in: Capsule())
+                }
+                .popover(isPresented: $showProfileSelector) {
+                    ProfileSelectorSheet(
+                        profiles: profileStore.profiles,
+                        activeProfileName: profileStore.activeProfileName
+                    ) { name in
+                        profileStore.markActive(name)
+                        Task { await chatStore.sendMessage("/profile \(name)") }
+                    }
+                    .presentationDetents([.medium])
+                }
+            }
+        }
     }
 
     // MARK: - Compact chip: 🟢 model-name [ring%]

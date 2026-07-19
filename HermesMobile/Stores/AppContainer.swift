@@ -244,6 +244,8 @@ final class AppContainer {
             notificationService: notificationService
         )
 
+        chatStore.profileStore = container.profileStore
+
         let refreshUnpairedRelayContext: @MainActor () async -> Void = { [weak sessionStore, weak container] in
             guard container?.pairingStore.isPaired == false else { return }
             await sessionStore?.clearSession()
