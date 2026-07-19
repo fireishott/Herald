@@ -233,6 +233,8 @@ struct UserSettings: Codable, Hashable, Sendable {
     var relayConfiguration: RelayConfiguration
     var autoConnectOnLaunch: Bool
     var locationSyncPreference: LocationSyncPreference
+    var themePreset: ThemePreset
+    var colorSchemePreference: ColorSchemePreference
 
     init(
         userName: String = "User",
@@ -242,7 +244,9 @@ struct UserSettings: Codable, Hashable, Sendable {
         environment: AppEnvironment = AppEnvironmentPolicy.currentBuild.defaultEnvironment,
         relayConfiguration: RelayConfiguration = RelayConfiguration.defaultValue(),
         autoConnectOnLaunch: Bool = true,
-        locationSyncPreference: LocationSyncPreference = .foregroundOnly
+        locationSyncPreference: LocationSyncPreference = .foregroundOnly,
+        themePreset: ThemePreset = .nous,
+        colorSchemePreference: ColorSchemePreference = .system
     ) {
         self.userName = userName
         self.avatarInitials = avatarInitials
@@ -252,6 +256,8 @@ struct UserSettings: Codable, Hashable, Sendable {
         self.relayConfiguration = relayConfiguration
         self.autoConnectOnLaunch = autoConnectOnLaunch
         self.locationSyncPreference = locationSyncPreference
+        self.themePreset = themePreset
+        self.colorSchemePreference = colorSchemePreference
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -263,6 +269,8 @@ struct UserSettings: Codable, Hashable, Sendable {
         case relayConfiguration
         case autoConnectOnLaunch
         case locationSyncPreference
+        case themePreset
+        case colorSchemePreference
     }
 
     init(from decoder: Decoder) throws {
@@ -276,6 +284,8 @@ struct UserSettings: Codable, Hashable, Sendable {
             ?? RelayConfiguration.migratedLegacyValue(environment: environment)
         autoConnectOnLaunch = try container.decodeIfPresent(Bool.self, forKey: .autoConnectOnLaunch) ?? true
         locationSyncPreference = try container.decodeIfPresent(LocationSyncPreference.self, forKey: .locationSyncPreference) ?? .foregroundOnly
+        themePreset = try container.decodeIfPresent(ThemePreset.self, forKey: .themePreset) ?? .nous
+        colorSchemePreference = try container.decodeIfPresent(ColorSchemePreference.self, forKey: .colorSchemePreference) ?? .system
     }
 
     func encode(to encoder: Encoder) throws {
@@ -288,6 +298,8 @@ struct UserSettings: Codable, Hashable, Sendable {
         try container.encode(relayConfiguration, forKey: .relayConfiguration)
         try container.encode(autoConnectOnLaunch, forKey: .autoConnectOnLaunch)
         try container.encode(locationSyncPreference, forKey: .locationSyncPreference)
+        try container.encode(themePreset, forKey: .themePreset)
+        try container.encode(colorSchemePreference, forKey: .colorSchemePreference)
     }
 
     func applyingEnvironmentPolicy(

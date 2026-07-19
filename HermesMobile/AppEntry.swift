@@ -64,6 +64,7 @@ struct HermesMobileApp: App {
             AppRootView()
                 .environment(container)
                 .environment(container.router)
+                .environment(container.themeManager)
                 .environment(container.sessionStore)
                 .environment(container.pairingStore)
                 .environment(container.hostStore)
