@@ -125,13 +125,13 @@ final class MockHermesClient: HermesClientProtocol {
 // MARK: - Session Management (Mock)
 
 extension MockHermesClient {
-    func listSessions(limit: Int, offset: Int) async throws -> SessionListResponse {
+    func listSessions(limit: Int, offset: Int, allDevices: Bool = false) async throws -> SessionListResponse {
         let all = DemoData.sampleSessions
         let page = Array(all.dropFirst(offset).prefix(limit))
         return SessionListResponse(sessions: page, total: all.count)
     }
 
-    func searchSessions(query: String) async throws -> [SessionSummary] {
+    func searchSessions(query: String, allDevices: Bool = false) async throws -> [SessionSummary] {
         let q = query.lowercased()
         return DemoData.sampleSessions.filter {
             $0.title.lowercased().contains(q) || $0.previewText.lowercased().contains(q)

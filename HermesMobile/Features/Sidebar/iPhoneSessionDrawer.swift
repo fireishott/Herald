@@ -103,6 +103,9 @@ struct iPhoneSessionDrawer: View {
             // Filter chips
             filterChipsRow
 
+            // Cross-device toggle
+            allDevicesToggleRow
+
             // Search results or filtered sessions
             if let results = sessionStore.searchResults {
                 searchResultsSection(results)
@@ -175,6 +178,16 @@ struct iPhoneSessionDrawer: View {
         }
         .listRowInsets(EdgeInsets())
         .listRowBackground(Color.clear)
+    }
+
+    // MARK: - All Devices Toggle
+
+    private var allDevicesToggleRow: some View {
+        Toggle("All Devices", isOn: Bindable(sessionStore).showAllDevices)
+            .font(.caption)
+            .tint(Design.Brand.accent)
+            .padding(.horizontal, Design.Spacing.md)
+            .listRowBackground(Color.clear)
     }
 
     // MARK: - Search Results

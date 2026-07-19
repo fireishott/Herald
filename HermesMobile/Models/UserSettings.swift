@@ -284,6 +284,7 @@ struct UserSettings: Codable, Hashable, Sendable {
     var themePreset: ThemePreset
     var colorSchemePreference: ColorSchemePreference
     var chatWallpaper: ChatWallpaper
+    var showAllDevices: Bool
 
     init(
         userName: String = "User",
@@ -296,7 +297,8 @@ struct UserSettings: Codable, Hashable, Sendable {
         locationSyncPreference: LocationSyncPreference = .foregroundOnly,
         themePreset: ThemePreset = .nous,
         colorSchemePreference: ColorSchemePreference = .system,
-        chatWallpaper: ChatWallpaper = .default
+        chatWallpaper: ChatWallpaper = .default,
+        showAllDevices: Bool = false
     ) {
         self.userName = userName
         self.avatarInitials = avatarInitials
@@ -309,6 +311,7 @@ struct UserSettings: Codable, Hashable, Sendable {
         self.themePreset = themePreset
         self.colorSchemePreference = colorSchemePreference
         self.chatWallpaper = chatWallpaper
+        self.showAllDevices = showAllDevices
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -323,6 +326,7 @@ struct UserSettings: Codable, Hashable, Sendable {
         case themePreset
         case colorSchemePreference
         case chatWallpaper
+        case showAllDevices
     }
 
     init(from decoder: Decoder) throws {
@@ -339,6 +343,7 @@ struct UserSettings: Codable, Hashable, Sendable {
         themePreset = try container.decodeIfPresent(ThemePreset.self, forKey: .themePreset) ?? .nous
         colorSchemePreference = try container.decodeIfPresent(ColorSchemePreference.self, forKey: .colorSchemePreference) ?? .system
         chatWallpaper = try container.decodeIfPresent(ChatWallpaper.self, forKey: .chatWallpaper) ?? .default
+        showAllDevices = try container.decodeIfPresent(Bool.self, forKey: .showAllDevices) ?? false
     }
 
     func encode(to encoder: Encoder) throws {
@@ -354,6 +359,7 @@ struct UserSettings: Codable, Hashable, Sendable {
         try container.encode(themePreset, forKey: .themePreset)
         try container.encode(colorSchemePreference, forKey: .colorSchemePreference)
         try container.encode(chatWallpaper, forKey: .chatWallpaper)
+        try container.encode(showAllDevices, forKey: .showAllDevices)
     }
 
     func applyingEnvironmentPolicy(

@@ -21,10 +21,12 @@ protocol HermesClientProtocol {
     // MARK: - Session Management
 
     /// List sessions with pagination.
-    func listSessions(limit: Int, offset: Int) async throws -> SessionListResponse
+    /// - Parameter allDevices: When true, includes sessions from every device on the account
+    ///   instead of just this device's (+ user-scoped) sessions.
+    func listSessions(limit: Int, offset: Int, allDevices: Bool) async throws -> SessionListResponse
 
     /// Search sessions by query string.
-    func searchSessions(query: String) async throws -> [SessionSummary]
+    func searchSessions(query: String, allDevices: Bool) async throws -> [SessionSummary]
 
     /// Create a new session.
     func createSession(title: String) async throws -> SessionSummary

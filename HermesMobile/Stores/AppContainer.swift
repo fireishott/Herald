@@ -258,7 +258,7 @@ final class AppContainer {
             ),
             settingsStore: settingsStore,
             talkStore: TalkStore(voiceService: voiceService),
-            sessionListStore: SessionListStore(hermesClient: hermesClient, chatStore: chatStore),
+            sessionListStore: SessionListStore(hermesClient: hermesClient, chatStore: chatStore, settingsStore: settingsStore),
             sensorUploadService: sensorUploadService,
             apiClient: apiClient,
             notificationService: notificationService
