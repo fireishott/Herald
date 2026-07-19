@@ -19,6 +19,7 @@ final class AppContainer {
     let modelStore: ModelStore
     let profileStore: ProfileStore
     let skillsStore: SkillsStore
+    let cronStore: CronStore
     let attachmentService: AttachmentService
     let sensorUploadService: SensorUploadService?
     private let apiClient: RelayAPIClient?
@@ -42,6 +43,7 @@ final class AppContainer {
         modelStore: ModelStore? = nil,
         profileStore: ProfileStore? = nil,
         skillsStore: SkillsStore? = nil,
+        cronStore: CronStore? = nil,
         attachmentService: AttachmentService? = nil,
         sensorUploadService: SensorUploadService? = nil,
         apiClient: RelayAPIClient? = nil,
@@ -65,6 +67,10 @@ final class AppContainer {
             accessTokenProvider: { await sessionStore.currentAccessToken() }
         )
         self.skillsStore = skillsStore ?? SkillsStore(
+            apiClient: apiClient,
+            accessTokenProvider: { await sessionStore.currentAccessToken() }
+        )
+        self.cronStore = cronStore ?? CronStore(
             apiClient: apiClient,
             accessTokenProvider: { await sessionStore.currentAccessToken() }
         )
@@ -376,6 +382,7 @@ final class AppContainer {
         modelStore.reset()
         profileStore.reset()
         skillsStore.reset()
+        cronStore.reset()
         await initialize()
 
         // Start sensor data pipeline
@@ -656,6 +663,7 @@ final class AppContainer {
         modelStore.reset()
         profileStore.reset()
         skillsStore.reset()
+        cronStore.reset()
         hostStore.reset()
         lastKnownHostOnline = false
         lastCommandCatalogRefreshAt = nil

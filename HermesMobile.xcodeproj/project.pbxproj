@@ -147,6 +147,7 @@
 		D3B1A0F9E8D7C6B5A4F3E2D2 /* ProfileSelectorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F3D1A4B5C6D7E8F9A0B1C3 /* ProfileSelectorSheet.swift */; };
 		C2B1A0F9E8D7C6B5A4F3E2D1 /* ProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A4B5C6D7E8F9A0B1C2 /* ProfileStore.swift */; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* SkillsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* SkillsStore.swift */; };
+		E5F6A7B8C9D0E1F2A3B4C5D6 /* CronStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5E6F7A8B9C0D1E2F3A4B5C6 /* CronStore.swift */; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* SkillDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F4A5B6C7D8E9F0A1B2C3D4 /* SkillDetailView.swift */; };
 		D4E5F6A7B8C9D0E1F2A3B4C5 /* SkillsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C7D8E9F0A1B2C3D4E5 /* SkillsBrowserView.swift */; };
 		D43AED1BDA4C8A924220E310 /* LiveCameraOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA50CBA8A24483611C2F528 /* LiveCameraOverlay.swift */; };
@@ -375,6 +376,7 @@
 		E6E7BD8BFC1E7C7EA74F264D /* ModelSelectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSelectorSheet.swift; sourceTree = "<group>"; };
 		D1E2F3A4B5C6D7E8F9A0B1C2 /* ProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStore.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* SkillsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsStore.swift; sourceTree = "<group>"; };
+		D5E6F7A8B9C0D1E2F3A4B5C6 /* CronStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronStore.swift; sourceTree = "<group>"; };
 		E3F4A5B6C7D8E9F0A1B2C3D4 /* SkillDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillDetailView.swift; sourceTree = "<group>"; };
 		F4A5B6C7D8E9F0A1B2C3D4E5 /* SkillsBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsBrowserView.swift; sourceTree = "<group>"; };
 		E2F3D1A4B5C6D7E8F9A0B1C3 /* ProfileSelectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSelectorSheet.swift; sourceTree = "<group>"; };
@@ -451,6 +453,7 @@
 				F07B14E26F36BD2CD9778781 /* PairingStore.swift */,
 				D1E2F3A4B5C6D7E8F9A0B1C2 /* ProfileStore.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F2 /* SkillsStore.swift */,
+				D5E6F7A8B9C0D1E2F3A4B5C6 /* CronStore.swift */,
 				ACB3C95563F41E3B154C3DF3 /* PermissionsStore.swift */,
 				4508A7DDEA80A11E70C02267 /* SessionListStore.swift */,
 				41F982E7FF317AD2BDA8879C /* SettingsStore.swift */,
@@ -1083,6 +1086,7 @@
 				CD1A4152969628A536D82F08 /* PendingAttachment.swift in Sources */,
 				C2B1A0F9E8D7C6B5A4F3E2D1 /* ProfileStore.swift in Sources */,
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* SkillsStore.swift in Sources */,
+				E5F6A7B8C9D0E1F2A3B4C5D6 /* CronStore.swift in Sources */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* SkillDetailView.swift in Sources */,
 				D4E5F6A7B8C9D0E1F2A3B4C5 /* SkillsBrowserView.swift in Sources */,
 				D3B1A0F9E8D7C6B5A4F3E2D2 /* ProfileSelectorSheet.swift in Sources */,
