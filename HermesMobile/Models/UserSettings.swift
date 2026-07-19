@@ -224,6 +224,54 @@ enum LocationSyncPreference: String, Codable, Hashable, Sendable {
     }
 }
 
+/// The chat background a user has selected.
+///
+/// Every case is rendered procedurally in SwiftUI rather than shipped as a baked
+/// image asset — gradients/textures are `LinearGradient`/`RadialGradient`/`Canvas`
+/// drawing, keyed off this enum. See `ChatWallpaperBackground` in
+/// `Core/Theme.swift`, which is the single rendering primitive later tasks
+/// (chat wallpaper rendering, wallpaper picker) should consume for every case,
+/// at any frame size (full-screen background or a small picker thumbnail).
+///
+/// There is intentionally no `thumbnailName`/asset-name property: nothing here
+/// is backed by a named image in the asset catalog. `.custom` carries the raw
+/// image bytes the user picked from their photo library.
+enum ChatWallpaper: Codable, Equatable, Hashable, Identifiable, Sendable {
+    case `default`
+    case gradient1, gradient2, gradient3, gradient4
+    case texture1, texture2
+    case solid
+    case custom(Data)
+
+    var id: String {
+        switch self {
+        case .default: "default"
+        case .gradient1: "gradient1"
+        case .gradient2: "gradient2"
+        case .gradient3: "gradient3"
+        case .gradient4: "gradient4"
+        case .texture1: "texture1"
+        case .texture2: "texture2"
+        case .solid: "solid"
+        case .custom: "custom"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .default: "Default"
+        case .gradient1: "Sunset"
+        case .gradient2: "Ocean"
+        case .gradient3: "Forest"
+        case .gradient4: "Aurora"
+        case .texture1: "Paper"
+        case .texture2: "Noise"
+        case .solid: "Solid"
+        case .custom: "Photo"
+        }
+    }
+}
+
 struct UserSettings: Codable, Hashable, Sendable {
     var userName: String
     var avatarInitials: String
@@ -235,6 +283,7 @@ struct UserSettings: Codable, Hashable, Sendable {
     var locationSyncPreference: LocationSyncPreference
     var themePreset: ThemePreset
     var colorSchemePreference: ColorSchemePreference
+    var chatWallpaper: ChatWallpaper
 
     init(
         userName: String = "User",
@@ -246,7 +295,8 @@ struct UserSettings: Codable, Hashable, Sendable {
         autoConnectOnLaunch: Bool = true,
         locationSyncPreference: LocationSyncPreference = .foregroundOnly,
         themePreset: ThemePreset = .nous,
-        colorSchemePreference: ColorSchemePreference = .system
+        colorSchemePreference: ColorSchemePreference = .system,
+        chatWallpaper: ChatWallpaper = .default
     ) {
         self.userName = userName
         self.avatarInitials = avatarInitials
@@ -258,6 +308,7 @@ struct UserSettings: Codable, Hashable, Sendable {
         self.locationSyncPreference = locationSyncPreference
         self.themePreset = themePreset
         self.colorSchemePreference = colorSchemePreference
+        self.chatWallpaper = chatWallpaper
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -271,6 +322,7 @@ struct UserSettings: Codable, Hashable, Sendable {
         case locationSyncPreference
         case themePreset
         case colorSchemePreference
+        case chatWallpaper
     }
 
     init(from decoder: Decoder) throws {
@@ -286,6 +338,7 @@ struct UserSettings: Codable, Hashable, Sendable {
         locationSyncPreference = try container.decodeIfPresent(LocationSyncPreference.self, forKey: .locationSyncPreference) ?? .foregroundOnly
         themePreset = try container.decodeIfPresent(ThemePreset.self, forKey: .themePreset) ?? .nous
         colorSchemePreference = try container.decodeIfPresent(ColorSchemePreference.self, forKey: .colorSchemePreference) ?? .system
+        chatWallpaper = try container.decodeIfPresent(ChatWallpaper.self, forKey: .chatWallpaper) ?? .default
     }
 
     func encode(to encoder: Encoder) throws {
@@ -300,6 +353,7 @@ struct UserSettings: Codable, Hashable, Sendable {
         try container.encode(locationSyncPreference, forKey: .locationSyncPreference)
         try container.encode(themePreset, forKey: .themePreset)
         try container.encode(colorSchemePreference, forKey: .colorSchemePreference)
+        try container.encode(chatWallpaper, forKey: .chatWallpaper)
     }
 
     func applyingEnvironmentPolicy(
