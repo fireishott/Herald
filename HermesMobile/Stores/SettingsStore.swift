@@ -12,11 +12,16 @@ final class SettingsStore {
             if oldValue.relayConfiguration != settings.relayConfiguration {
                 Task { await onRelayConfigurationChanged?(settings.relayConfiguration) }
             }
+            if oldValue.themePreset != settings.themePreset
+                || oldValue.colorSchemePreference != settings.colorSchemePreference {
+                Task { await onThemeChanged?(settings) }
+            }
         }
     }
 
     var onEnvironmentChanged: (@MainActor (AppEnvironment) async -> Void)?
     var onRelayConfigurationChanged: (@MainActor (RelayConfiguration) async -> Void)?
+    var onThemeChanged: (@MainActor (UserSettings) async -> Void)?
     var availableEnvironments: [AppEnvironment] {
         environmentPolicy.availableEnvironments
     }

@@ -20,6 +20,8 @@
 		0C26C3D50AEC694EF4DB6CD8 /* LiveHermesClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6900DF147D9EF74F5EF3B1D6 /* LiveHermesClient.swift */; };
 		0CD417A7D4F86CDEE8D563E8 /* PermissionType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FCF8BFBF91DE28E8784BDD0 /* PermissionType.swift */; };
 		0FABB63592F7BD36617CFD00 /* Design.swift in Sources */ = {isa = PBXBuildFile; fileRef = 300F951B7DA86D57FE83BC20 /* Design.swift */; };
+		NU0VA5YQEGHVFNN3P5P7ETZA /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25QCRQR0YXU1OZ9DNWJEJGU0 /* Theme.swift */; };
+		8YYJJGO0N8Y8XIQ8PUC4TQF2 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB080X6297ZH6BTEUTEAV5UT /* ThemeManager.swift */; };
 		110CAA5251E4E079A22CD2A1 /* AppSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922497E60B94B42BEC2AC2D7 /* AppSessionState.swift */; };
 		126F6AF7FCA856CFDF39421F /* ConnectionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A754F555998852844790A8 /* ConnectionStatus.swift */; };
 		13F3013633224BBB7E91FE4C /* LiveSpeechService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20748383C1082575AD5C086C /* LiveSpeechService.swift */; };
@@ -246,6 +248,8 @@
 		2ECACAA86DB09074EAFE915E /* SSEEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SSEEvent.swift; sourceTree = "<group>"; };
 		2F0B373CA9EB377B54B6C9CD /* LiveNotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveNotificationService.swift; sourceTree = "<group>"; };
 		300F951B7DA86D57FE83BC20 /* Design.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Design.swift; sourceTree = "<group>"; };
+		25QCRQR0YXU1OZ9DNWJEJGU0 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		EB080X6297ZH6BTEUTEAV5UT /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		31A754F555998852844790A8 /* ConnectionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionStatus.swift; sourceTree = "<group>"; };
 		324210CDA9855FA02403D143 /* AppTemplateUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTemplateUITests.swift; sourceTree = "<group>"; };
 		3378BC22D9BB239E8E908A2D /* SensorUploadService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorUploadService.swift; sourceTree = "<group>"; };
@@ -733,6 +737,8 @@
 			children = (
 				E87BE8050ED9C648037BD659 /* Extensions */,
 				300F951B7DA86D57FE83BC20 /* Design.swift */,
+				25QCRQR0YXU1OZ9DNWJEJGU0 /* Theme.swift */,
+				EB080X6297ZH6BTEUTEAV5UT /* ThemeManager.swift */,
 				E1D8AA753F66BAD20980025F /* DeviceClass.swift */,
 				A2B04B5A213133A77C0982DE /* HapticEngine.swift */,
 				070BFE52E0723E54873A512C /* MarkdownParser.swift */,
@@ -1029,6 +1035,8 @@
 				C877C77B3DB9D162B70F6E80 /* Conversation.swift in Sources */,
 				8B995CDE1CECBA332A9984BD /* DemoData.swift in Sources */,
 				0FABB63592F7BD36617CFD00 /* Design.swift in Sources */,
+				NU0VA5YQEGHVFNN3P5P7ETZA /* Theme.swift in Sources */,
+				8YYJJGO0N8Y8XIQ8PUC4TQF2 /* ThemeManager.swift in Sources */,
 				6E62879A59CA5F4B11AA2011 /* DeviceCapability.swift in Sources */,
 				446AF781B762FE3127402044 /* DeviceClass.swift in Sources */,
 				F652AE2AEDE94178EEF5235E /* DeviceRegistrationRequest.swift in Sources */,
