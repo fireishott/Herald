@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from urllib.parse import urlparse, urlunparse
 
 from fastapi import HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import exists, select, update
 from sqlalchemy.orm import Session
 
 from .config import Settings
@@ -1466,11 +1466,18 @@ def list_sessions(
 
 
 def search_sessions(db: Session, *, user_id: str, query: str, device_id: str | None = None) -> list[Conversation]:
-    """Search non-archived conversations by title."""
+    """Search non-archived conversations by title or message content."""
+    like_pattern = f"%{query}%"
+    message_match = exists(
+        select(Message.id).where(
+            Message.conversation_id == Conversation.id,
+            Message.text.ilike(like_pattern),
+        )
+    )
     base = select(Conversation).where(
         Conversation.user_id == user_id,
         Conversation.is_archived.is_(False),
-        Conversation.title.ilike(f"%{query}%"),
+        Conversation.title.ilike(like_pattern) | message_match,
     )
     if device_id is not None:
         base = base.where(
