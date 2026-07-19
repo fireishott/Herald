@@ -28,6 +28,10 @@ final class ChatStore {
         lastTokenUsage?.promptTokens
     }
 
+    /// Injected by AppContainer so profile-switch detection can update the
+    /// active profile name on the owning ProfileStore.
+    var profileStore: ProfileStore?
+
     private let hermesClient: any HermesClientProtocol
     private let chatLiveActivity = LiveActivityService()
     let persistence: any AppPersistenceStoreProtocol
@@ -189,6 +193,7 @@ final class ChatStore {
                         self.lastTokenUsage = usage
                     }
                     self.detectModelSwitch(from: finalMessage.content)
+                    self.detectProfileSwitch(in: finalMessage.content)
                     self.streamingMessageID = nil
                     self.pendingMessageSentAt = nil
                     self.chatLiveActivity.endActivity()
@@ -603,6 +608,28 @@ final class ChatStore {
                 }
                 // If context not in response, clear and let next catalog refresh resolve it
                 contextWindow = nil
+                return
+            }
+        }
+    }
+
+    // MARK: - Profile Switch Detection
+
+    /// Detect a profile switch from the agent's response text.
+    /// Updates the active profile name on ProfileStore immediately so the
+    /// toolbar chip reflects the change in the same render frame.
+    private func detectProfileSwitch(in text: String) {
+        let patterns: [Regex<(Substring, Substring)>] = [
+            /[Ss]witched\s+(?:to\s+)?profile\s+["'`]?(\w+)["'`]?/,
+            /[Cc]hanged\s+(?:to\s+)?profile\s+["'`]?(\w+)["'`]?/,
+            /[Aa]ctivated\s+(?:profile\s+)?["'`]?(\w+)["'`]?\s+profile/,
+            /[Pp]rofile\s+switched\s+(?:to\s+)?["'`]?(\w+)["'`]?/,
+            /[Pp]rofile\s+["'`]?(\w+)["'`]?\s+activated/,
+        ]
+        for pattern in patterns {
+            if let match = text.firstMatch(of: pattern) {
+                let profileName = String(match.1)
+                profileStore?.markActive(profileName)
                 return
             }
         }
