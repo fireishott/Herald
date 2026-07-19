@@ -75,6 +75,7 @@ struct HermesMobileApp: App {
                 .environment(container.sessionListStore)
                 .environment(container.modelStore)
                 .environment(container.profileStore)
+                .environment(container.skillsStore)
                 .environment(container.attachmentService)
                 .task { await container.initialize() }
                 .onChange(of: scenePhase) { _, newPhase in

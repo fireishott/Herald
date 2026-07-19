@@ -454,6 +454,22 @@ struct iPadSidebarView: View {
                         : Color.clear
                 )
             }
+
+            // ── Skills browser ──
+            NavigationLink {
+                SkillsBrowserView()
+            } label: {
+                HStack(spacing: Design.Spacing.sm) {
+                    Image(systemName: "wrench.and.screwdriver")
+                        .font(.system(size: Design.Size.iconSmall))
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                        .frame(width: 24)
+                    Text("Skills")
+                        .font(Design.Typography.body)
+                        .foregroundStyle(Design.Colors.foreground)
+                }
+                .padding(.vertical, Design.Spacing.xs)
+            }
         }
     }
 }
