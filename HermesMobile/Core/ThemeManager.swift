@@ -3,8 +3,11 @@ import SwiftUI
 @MainActor
 @Observable
 final class ThemeManager {
+    static let shared = ThemeManager()
+
     var preset: ThemePreset = .nous
     var colorSchemePreference: ColorSchemePreference = .system
+    var currentScheme: ColorScheme = .dark
 
     func resolvedColorScheme(for systemScheme: ColorScheme) -> ColorScheme {
         switch colorSchemePreference {
@@ -17,6 +20,10 @@ final class ThemeManager {
     func currentPalette(for systemScheme: ColorScheme) -> ThemePalette {
         let resolved = resolvedColorScheme(for: systemScheme)
         return preset.colors(for: resolved)
+    }
+
+    var currentPalette: ThemePalette {
+        preset.colors(for: currentScheme)
     }
 
     func load(from settings: UserSettings) {

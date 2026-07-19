@@ -60,8 +60,10 @@ final class AppContainer {
         self.talkStore = talkStore
         self.sessionListStore = sessionListStore
 
-        // Initialize ThemeManager and load persisted preferences
-        let loadedThemeManager = ThemeManager()
+        // Use the shared ThemeManager instance so static Design.Colors lookups
+        // (which read ThemeManager.shared) reflect the same state the
+        // environment-injected instance exposes to views.
+        let loadedThemeManager = ThemeManager.shared
         loadedThemeManager.load(from: settingsStore.settings)
         self.themeManager = loadedThemeManager
         self.modelStore = modelStore ?? ModelStore(
