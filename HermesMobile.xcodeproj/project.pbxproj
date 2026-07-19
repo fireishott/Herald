@@ -148,6 +148,9 @@
 		C2B1A0F9E8D7C6B5A4F3E2D1 /* ProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A4B5C6D7E8F9A0B1C2 /* ProfileStore.swift */; };
 		B2C3D4E5F6A7B8C9D0E1F2A3 /* SkillsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* SkillsStore.swift */; };
 		E5F6A7B8C9D0E1F2A3B4C5D6 /* CronStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5E6F7A8B9C0D1E2F3A4B5C6 /* CronStore.swift */; };
+		F6A7B8C9D0E1F2A3B4C5D6E7 /* CronJobDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C4D5E6F7A8B9C0D1E2F3A4 /* CronJobDetailView.swift */; };
+		A7B8C9D0E1F2A3B4C5D6E7F8 /* CreateCronJobSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4D5E6F7A8B9C0D1E2F3A4B5 /* CreateCronJobSheet.swift */; };
+		B8C9D0E1F2A3B4C5D6E7F8A9 /* CronManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5E6F7A8B9C0D1E2F3A4B5C7 /* CronManagerView.swift */; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* SkillDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F4A5B6C7D8E9F0A1B2C3D4 /* SkillDetailView.swift */; };
 		D4E5F6A7B8C9D0E1F2A3B4C5 /* SkillsBrowserView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C7D8E9F0A1B2C3D4E5 /* SkillsBrowserView.swift */; };
 		D43AED1BDA4C8A924220E310 /* LiveCameraOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEA50CBA8A24483611C2F528 /* LiveCameraOverlay.swift */; };
@@ -377,6 +380,9 @@
 		D1E2F3A4B5C6D7E8F9A0B1C2 /* ProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileStore.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F2 /* SkillsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsStore.swift; sourceTree = "<group>"; };
 		D5E6F7A8B9C0D1E2F3A4B5C6 /* CronStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronStore.swift; sourceTree = "<group>"; };
+		B3C4D5E6F7A8B9C0D1E2F3A4 /* CronJobDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronJobDetailView.swift; sourceTree = "<group>"; };
+		C4D5E6F7A8B9C0D1E2F3A4B5 /* CreateCronJobSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateCronJobSheet.swift; sourceTree = "<group>"; };
+		D5E6F7A8B9C0D1E2F3A4B5C7 /* CronManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CronManagerView.swift; sourceTree = "<group>"; };
 		E3F4A5B6C7D8E9F0A1B2C3D4 /* SkillDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillDetailView.swift; sourceTree = "<group>"; };
 		F4A5B6C7D8E9F0A1B2C3D4E5 /* SkillsBrowserView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkillsBrowserView.swift; sourceTree = "<group>"; };
 		E2F3D1A4B5C6D7E8F9A0B1C3 /* ProfileSelectorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSelectorSheet.swift; sourceTree = "<group>"; };
@@ -417,6 +423,7 @@
 				D6A1379DF0671EEBA650BA12 /* Settings */,
 				8E92AA3AB35A31EE205E70A7 /* Sidebar */,
 				F1A2B3C4D5E6F7A8B9C0D1E2 /* Skills */,
+				A2B3C4D5E6F7A8B9C0D1E2F3 /* Cron */,
 				9EF58353FEB7F490A19CDF47 /* Talk */,
 			);
 			path = Features;
@@ -693,6 +700,16 @@
 				F4A5B6C7D8E9F0A1B2C3D4E5 /* SkillsBrowserView.swift */,
 			);
 			path = Skills;
+			sourceTree = "<group>";
+		};
+		A2B3C4D5E6F7A8B9C0D1E2F3 /* Cron */ = {
+			isa = PBXGroup;
+			children = (
+				B3C4D5E6F7A8B9C0D1E2F3A4 /* CronJobDetailView.swift */,
+				C4D5E6F7A8B9C0D1E2F3A4B5 /* CreateCronJobSheet.swift */,
+				D5E6F7A8B9C0D1E2F3A4B5C6 /* CronManagerView.swift */,
+			);
+			path = Cron;
 			sourceTree = "<group>";
 		};
 		D39F61251933889F9F6E8EEE /* HermesMobileWidgets */ = {
@@ -1087,6 +1104,9 @@
 				C2B1A0F9E8D7C6B5A4F3E2D1 /* ProfileStore.swift in Sources */,
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* SkillsStore.swift in Sources */,
 				E5F6A7B8C9D0E1F2A3B4C5D6 /* CronStore.swift in Sources */,
+				F6A7B8C9D0E1F2A3B4C5D6E7 /* CronJobDetailView.swift in Sources */,
+				A7B8C9D0E1F2A3B4C5D6E7F8 /* CreateCronJobSheet.swift in Sources */,
+				B8C9D0E1F2A3B4C5D6E7F8A9 /* CronManagerView.swift in Sources */,
 				C3D4E5F6A7B8C9D0E1F2A3B4 /* SkillDetailView.swift in Sources */,
 				D4E5F6A7B8C9D0E1F2A3B4C5 /* SkillsBrowserView.swift in Sources */,
 				D3B1A0F9E8D7C6B5A4F3E2D2 /* ProfileSelectorSheet.swift in Sources */,
