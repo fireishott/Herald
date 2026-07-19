@@ -9,27 +9,36 @@ enum Design {
 
     enum Brand {
         /// Hermes warm terracotta accent.
-        static let accent = Color(hex: 0xFFBF00)
-        static let accentGradient = LinearGradient(
-            colors: [accent, accent.opacity(0.8)],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        @MainActor
+        static var accent: Color { ThemeManager.shared.preset.accent }
+        @MainActor
+        static var accentGradient: LinearGradient {
+            LinearGradient(
+                colors: [accent, accent.opacity(0.8)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
     }
 
     // MARK: - Colors
 
     enum Colors {
         /// Deep charcoal background.
-        static let background = Color(hex: 0x2D2D2B)
+        @MainActor
+        static var background: Color { ThemeManager.shared.currentPalette.background }
         /// Warm off-white foreground text.
-        static let foreground = Color(hex: 0xF9F9F7)
+        @MainActor
+        static var foreground: Color { ThemeManager.shared.currentPalette.foreground }
         /// Muted foreground at 80% contrast.
-        static let secondaryForeground = foreground.opacity(0.6)
+        @MainActor
+        static var secondaryForeground: Color { ThemeManager.shared.currentPalette.secondaryForeground }
         /// Subtle surface for cards and elevated elements.
-        static let surface = Color.white.opacity(0.08)
+        @MainActor
+        static var surface: Color { ThemeManager.shared.currentPalette.surface }
         /// Border/divider at low opacity.
-        static let divider = Color.white.opacity(0.1)
+        @MainActor
+        static var divider: Color { ThemeManager.shared.currentPalette.divider }
     }
 
     // MARK: - Spacing (4pt base grid)

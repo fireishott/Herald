@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AppRootView: View {
     @Environment(AppContainer.self) private var container
+    @Environment(ThemeManager.self) private var themeManager
+    @Environment(\.colorScheme) private var systemColorScheme
     @State private var hasSatisfiedMinimumSplashTime = false
     private static let minimumSplashDuration: Duration = .milliseconds(250)
 
@@ -28,6 +30,12 @@ struct AppRootView: View {
         .task {
             try? await Task.sleep(for: Self.minimumSplashDuration)
             hasSatisfiedMinimumSplashTime = true
+        }
+        .onAppear {
+            themeManager.currentScheme = themeManager.resolvedColorScheme(for: systemColorScheme)
+        }
+        .onChange(of: systemColorScheme) { _, newValue in
+            themeManager.currentScheme = themeManager.resolvedColorScheme(for: newValue)
         }
     }
 
