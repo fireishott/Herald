@@ -1,14 +1,44 @@
 import Foundation
 import Combine
 
+// MARK: - Session Filter
+
+enum SessionFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case pinned = "Pinned"
+    case archived = "Archived"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .all:      "line.3.horizontal.decrease.circle"
+        case .pinned:   "pin"
+        case .archived: "archivebox"
+        }
+    }
+}
+
+// MARK: - Session Section
+
+struct SessionSection: Identifiable {
+    let id: String
+    let title: String
+    let sessions: [SessionSummary]
+}
+
+// MARK: - Session List Store
+
 @MainActor
 @Observable
 final class SessionListStore {
     var pinnedSessions: [SessionSummary] = []
     var recentSessions: [SessionSummary] = []
+    var archivedSessions: [SessionSummary] = []
     var searchResults: [SessionSummary]?
     var isLoading = false
     var searchQuery = ""
+    var activeFilter: SessionFilter = .all
     var errorMessage: String?
 
     /// Total session count from last fetch (for pagination).
@@ -112,6 +142,7 @@ final class SessionListStore {
             try await hermesClient.deleteSession(id: session.id)
             pinnedSessions.removeAll { $0.id == session.id }
             recentSessions.removeAll { $0.id == session.id }
+            archivedSessions.removeAll { $0.id == session.id }
             searchResults?.removeAll { $0.id == session.id }
         } catch {
             errorMessage = error.localizedDescription
@@ -124,6 +155,10 @@ final class SessionListStore {
             pinnedSessions.removeAll { $0.id == session.id }
             recentSessions.removeAll { $0.id == session.id }
             searchResults?.removeAll { $0.id == session.id }
+            // Move to archived list
+            var archivedCopy = session
+            archivedCopy.isArchived = true
+            archivedSessions.insert(archivedCopy, at: 0)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -185,12 +220,48 @@ final class SessionListStore {
             .map { (source: $0.key, sessions: $0.value) }
     }
 
+    /// Sessions matching the active filter.
+    var filteredSessions: [SessionSummary] {
+        switch activeFilter {
+        case .all:
+            return pinnedSessions + recentSessions
+        case .pinned:
+            return pinnedSessions
+        case .archived:
+            return archivedSessions
+        }
+    }
+
+    /// Sessions grouped into date-based sections for display.
+    var sessionSections: [SessionSection] {
+        let calendar = Calendar.current
+        let sessions = filteredSessions
+
+        guard !sessions.isEmpty else { return [] }
+
+        let grouped = Dictionary(grouping: sessions) { session -> String in
+            if calendar.isDateInToday(session.lastActivity) { return "Today" }
+            if calendar.isDateInYesterday(session.lastActivity) { return "Yesterday" }
+            if calendar.isDate(session.lastActivity, equalTo: Date(), toGranularity: .weekOfYear) { return "This Week" }
+            return "Older"
+        }
+
+        let order = ["Today", "Yesterday", "This Week", "Older"]
+        return order.compactMap { key in
+            guard let sectionSessions = grouped[key], !sectionSessions.isEmpty else { return nil }
+            let sorted = sectionSessions.sorted { $0.lastActivity > $1.lastActivity }
+            return SessionSection(id: key, title: key, sessions: sorted)
+        }
+    }
+
     func reset() {
         pinnedSessions = []
         recentSessions = []
+        archivedSessions = []
         searchResults = nil
         isLoading = false
         searchQuery = ""
+        activeFilter = .all
         errorMessage = nil
         totalCount = 0
         currentOffset = 0
@@ -204,6 +275,7 @@ final class SessionListStore {
         let nonArchived = sessions.filter { !$0.isArchived }
         pinnedSessions = nonArchived.filter(\.isPinned).sorted { $0.lastActivity > $1.lastActivity }
         recentSessions = nonArchived.filter { !$0.isPinned }.sorted { $0.lastActivity > $1.lastActivity }
+        archivedSessions = sessions.filter(\.isArchived).sorted { $0.lastActivity > $1.lastActivity }
     }
 
     private func observeSearchQuery() {

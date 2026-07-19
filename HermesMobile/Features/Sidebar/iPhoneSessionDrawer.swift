@@ -99,42 +99,101 @@ struct iPhoneSessionDrawer: View {
     // MARK: - Session List
 
     private var sessionList: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                if !sessionStore.pinnedSessions.isEmpty {
-                    sectionHeader("PINNED")
-                    ForEach(sessionStore.pinnedSessions) { session in
-                        sessionRow(session, showPin: true)
+        List {
+            // Filter chips
+            filterChipsRow
+
+            // Search results or filtered sessions
+            if let results = sessionStore.searchResults {
+                searchResultsSection(results)
+            } else if sessionStore.filteredSessions.isEmpty {
+                emptyStateSection
+            } else {
+                ForEach(sessionStore.sessionSections) { section in
+                    Section(section.title.uppercased()) {
+                        ForEach(section.sessions) { session in
+                            sessionRow(session, showPin: session.isPinned)
+                        }
                     }
                 }
+            }
 
-                if !sessionStore.recentSessions.isEmpty {
-                    sectionHeader("RECENT")
-                    ForEach(sessionStore.recentSessions.prefix(20)) { session in
-                        sessionRow(session)
+            // Load more
+            if sessionStore.hasMore {
+                loadMoreSection
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Design.Colors.background)
+    }
+
+    // MARK: - Filter Chips
+
+    private var filterChipsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Design.Spacing.xs) {
+                ForEach(SessionFilter.allCases) { filter in
+                    Button {
+                        withAnimation(Design.Motion.standard) {
+                            sessionStore.activeFilter = filter
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: filter.icon)
+                                .font(.system(size: 10))
+                            Text(filter.rawValue)
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .foregroundStyle(
+                            sessionStore.activeFilter == filter
+                                ? Design.Brand.accent
+                                : Design.Colors.secondaryForeground
+                        )
+                        .background(
+                            sessionStore.activeFilter == filter
+                                ? Design.Brand.accent.opacity(0.12)
+                                : Color.clear
+                        )
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(
+                                sessionStore.activeFilter == filter
+                                    ? Design.Brand.accent.opacity(0.3)
+                                    : Design.Colors.secondaryForeground.opacity(0.2),
+                                lineWidth: 1
+                            )
+                        )
                     }
+                    .buttonStyle(.plain)
                 }
+            }
+            .padding(.horizontal, Design.Spacing.md)
+            .padding(.vertical, Design.Spacing.xs)
+        }
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
+    }
 
-                if sessionStore.pinnedSessions.isEmpty && sessionStore.recentSessions.isEmpty {
-                    emptyState
-                }
+    // MARK: - Search Results
 
-                if sessionStore.hasMore {
-                    loadMoreButton
+    private func searchResultsSection(_ results: [SessionSummary]) -> some View {
+        Section("SEARCH RESULTS") {
+            if results.isEmpty {
+                Text("No results")
+                    .font(Design.Typography.callout)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
+            } else {
+                ForEach(results) { session in
+                    sessionRow(session)
                 }
             }
         }
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Design.Colors.secondaryForeground)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Design.Spacing.md)
-            .padding(.top, Design.Spacing.md)
-            .padding(.bottom, Design.Spacing.xs)
-    }
+    // MARK: - Session Row
 
     private func sessionRow(_ session: SessionSummary, showPin: Bool = false) -> some View {
         Button {
@@ -180,16 +239,36 @@ struct iPhoneSessionDrawer: View {
                     .font(Design.Typography.caption2)
                     .foregroundStyle(Design.Colors.secondaryForeground)
             }
-            .padding(.horizontal, Design.Spacing.md)
-            .padding(.vertical, Design.Spacing.sm)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(
+        .listRowBackground(
             sessionStore.activeSessionID == session.id
                 ? Design.Brand.accent.opacity(0.12)
                 : Color.clear
         )
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                Task { await sessionStore.togglePin(session) }
+            } label: {
+                Label(session.isPinned ? "Unpin" : "Pin",
+                      systemImage: session.isPinned ? "pin.slash" : "pin")
+            }
+            .tint(Design.Brand.accent)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button {
+                Task { await sessionStore.archiveSession(session) }
+            } label: {
+                Label("Archive", systemImage: "archivebox")
+            }
+            .tint(.orange)
+            Button(role: .destructive) {
+                Task { await sessionStore.deleteSession(session) }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
         .contextMenu {
             Button {
                 Task { await sessionStore.togglePin(session) }
@@ -210,23 +289,31 @@ struct iPhoneSessionDrawer: View {
         }
     }
 
-    private var emptyState: some View {
+    // MARK: - Empty State
+
+    private var emptyStateSection: some View {
         VStack(spacing: Design.Spacing.md) {
-            Spacer().frame(height: 40)
-            Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 32))
-                .foregroundStyle(Design.Colors.secondaryForeground)
-            Text("No sessions yet")
+            Spacer().frame(height: 32)
+            Image(systemName: sessionStore.activeFilter == .archived ? "archivebox" : "bubble.left.and.bubble.right")
+                .font(.system(size: 28))
+                .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.5))
+            Text(sessionStore.activeFilter == .archived ? "No Archived Sessions" : "No Sessions Yet")
                 .font(Design.Typography.callout)
                 .foregroundStyle(Design.Colors.secondaryForeground)
-            Text("Start a new chat to create a session.")
+            Text(sessionStore.activeFilter == .archived
+                 ? "Archived sessions will appear here."
+                 : "Start a conversation to create your first session.")
                 .font(Design.Typography.caption)
                 .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.7))
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
+        .listRowBackground(Color.clear)
     }
 
-    private var loadMoreButton: some View {
+    // MARK: - Load More
+
+    private var loadMoreSection: some View {
         Button {
             Task { await sessionStore.loadMore() }
         } label: {

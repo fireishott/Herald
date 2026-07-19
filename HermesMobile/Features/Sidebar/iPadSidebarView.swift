@@ -56,16 +56,22 @@ struct iPadSidebarView: View {
                 if let results = sessionStore.searchResults {
                     searchResultsSection(results)
                 } else {
-                    // Pinned sessions
-                    if !sessionStore.pinnedSessions.isEmpty {
-                        pinnedSection
+                    // Filter chips
+                    filterChipsRow
+
+                    // Date-sectioned sessions
+                    if sessionStore.filteredSessions.isEmpty {
+                        emptyStateRow
+                    } else {
+                        ForEach(sessionStore.sessionSections) { section in
+                            sessionDateSection(section)
+                        }
                     }
 
-                    // Recent sessions
-                    recentSection
-
-                    // Platform sub-sections
-                    platformSections
+                    // Platform sub-sections (only in "All" filter)
+                    if sessionStore.activeFilter == .all {
+                        platformSections
+                    }
 
                     // Load more
                     if sessionStore.hasMore {
@@ -173,30 +179,85 @@ struct iPadSidebarView: View {
         }
     }
 
-    // MARK: - Pinned Section
+    // MARK: - Filter Chips
 
-    private var pinnedSection: some View {
-        Section("PINNED") {
-            ForEach(sessionStore.pinnedSessions) { session in
-                sessionRow(session, showPinIndicator: true)
+    private var filterChipsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Design.Spacing.xs) {
+                ForEach(SessionFilter.allCases) { filter in
+                    Button {
+                        withAnimation(Design.Motion.standard) {
+                            sessionStore.activeFilter = filter
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: filter.icon)
+                                .font(.system(size: 10))
+                            Text(filter.rawValue)
+                                .font(.system(size: 12, weight: .medium))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .foregroundStyle(
+                            sessionStore.activeFilter == filter
+                                ? Design.Brand.accent
+                                : Design.Colors.secondaryForeground
+                        )
+                        .background(
+                            sessionStore.activeFilter == filter
+                                ? Design.Brand.accent.opacity(0.12)
+                                : Color.clear
+                        )
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule().stroke(
+                                sessionStore.activeFilter == filter
+                                    ? Design.Brand.accent.opacity(0.3)
+                                    : Design.Colors.secondaryForeground.opacity(0.2),
+                                lineWidth: 1
+                            )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, Design.Spacing.md)
+            .padding(.vertical, Design.Spacing.xs)
+        }
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
+    }
+
+    // MARK: - Date Section
+
+    private func sessionDateSection(_ section: SessionSection) -> some View {
+        Section(section.title.uppercased()) {
+            ForEach(section.sessions) { session in
+                sessionRow(session, showPinIndicator: session.isPinned)
             }
         }
     }
 
-    // MARK: - Recent Section
+    // MARK: - Empty State
 
-    private var recentSection: some View {
-        Section("RECENT") {
-            if sessionStore.recentSessions.isEmpty && sessionStore.pinnedSessions.isEmpty {
-                Text("No sessions yet")
-                    .font(Design.Typography.callout)
-                    .foregroundStyle(Design.Colors.secondaryForeground)
-            } else {
-                ForEach(sessionStore.recentSessions.prefix(10)) { session in
-                    sessionRow(session)
-                }
-            }
+    private var emptyStateRow: some View {
+        VStack(spacing: Design.Spacing.md) {
+            Spacer().frame(height: 32)
+            Image(systemName: sessionStore.activeFilter == .archived ? "archivebox" : "bubble.left.and.bubble.right")
+                .font(.system(size: 28))
+                .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.5))
+            Text(sessionStore.activeFilter == .archived ? "No Archived Sessions" : "No Sessions Yet")
+                .font(Design.Typography.callout)
+                .foregroundStyle(Design.Colors.secondaryForeground)
+            Text(sessionStore.activeFilter == .archived
+                 ? "Archived sessions will appear here."
+                 : "Start a conversation to create your first session.")
+                .font(Design.Typography.caption)
+                .foregroundStyle(Design.Colors.secondaryForeground.opacity(0.7))
+                .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
+        .listRowBackground(Color.clear)
     }
 
     // MARK: - Platform Sub-Sections
@@ -318,6 +379,11 @@ struct iPadSidebarView: View {
                 Label("Archive", systemImage: "archivebox")
             }
             .tint(.orange)
+            Button(role: .destructive) {
+                Task { await sessionStore.deleteSession(session) }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
         }
     }
 
