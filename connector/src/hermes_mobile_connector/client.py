@@ -1005,6 +1005,10 @@ class HermesMobileConnector:
                 result = await self._rpc_cron_update(params)
             elif method == "cron.delete":
                 result = await self._rpc_cron_delete(params)
+            elif method == "memories.list":
+                result = await self._rpc_memories_list()
+            elif method == "tools.list":
+                result = await self._rpc_tools_list()
             else:
                 raise RuntimeError(f"Unsupported RPC method: {method}")
             return {
@@ -1393,6 +1397,50 @@ class HermesMobileConnector:
         except Exception:  # noqa: BLE001
             pass
         raise RuntimeError("Failed to delete cron job")
+
+    async def _rpc_memories_list(self) -> dict:
+        hermes_home = self._resolve_hermes_home()
+        memory_file = hermes_home / "memories" / "MEMORY.md"
+        if not memory_file.is_file():
+            return {"memories": []}
+        memories = []
+        try:
+            with open(memory_file) as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("- ["):
+                        # Format: - [Title](file.md) — description
+                        parts = line.split("]", 1)
+                        if len(parts) >= 2:
+                            title = parts[0].replace("- [", "")
+                            rest = parts[1]
+                            desc = rest.split("—", 1)[-1].strip() if "—" in rest else ""
+                            memories.append({"name": title, "description": desc})
+        except Exception:  # noqa: BLE001
+            pass
+        return {"memories": memories}
+
+    async def _rpc_tools_list(self) -> dict:
+        """List available MCP tools from Hermes config."""
+        hermes_home = self._resolve_hermes_home()
+        config_path = hermes_home / "config.yaml"
+        if not config_path.is_file():
+            return {"tools": []}
+        try:
+            import yaml
+            with open(config_path) as f:
+                config = yaml.safe_load(f) or {}
+            mcp_servers = config.get("mcp_servers", [])
+            tools = []
+            for server in mcp_servers:
+                if isinstance(server, dict):
+                    tools.append({
+                        "name": server.get("name", "unknown"),
+                        "command": server.get("command", ""),
+                    })
+            return {"tools": tools}
+        except Exception:  # noqa: BLE001
+            return {"tools": []}
 
     @staticmethod
     def _read_active_model(hermes_home: Path) -> dict | None:
