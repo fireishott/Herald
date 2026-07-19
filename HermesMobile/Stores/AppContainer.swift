@@ -17,6 +17,7 @@ final class AppContainer {
     let talkStore: TalkStore
     let sessionListStore: SessionListStore
     let modelStore: ModelStore
+    let profileStore: ProfileStore
     let attachmentService: AttachmentService
     let sensorUploadService: SensorUploadService?
     private let apiClient: RelayAPIClient?
@@ -38,6 +39,7 @@ final class AppContainer {
         talkStore: TalkStore,
         sessionListStore: SessionListStore,
         modelStore: ModelStore? = nil,
+        profileStore: ProfileStore? = nil,
         attachmentService: AttachmentService? = nil,
         sensorUploadService: SensorUploadService? = nil,
         apiClient: RelayAPIClient? = nil,
@@ -53,6 +55,10 @@ final class AppContainer {
         self.talkStore = talkStore
         self.sessionListStore = sessionListStore
         self.modelStore = modelStore ?? ModelStore(
+            apiClient: apiClient,
+            accessTokenProvider: { await sessionStore.currentAccessToken() }
+        )
+        self.profileStore = profileStore ?? ProfileStore(
             apiClient: apiClient,
             accessTokenProvider: { await sessionStore.currentAccessToken() }
         )
@@ -360,6 +366,7 @@ final class AppContainer {
         inboxStore.reset()
         sessionListStore.reset()
         modelStore.reset()
+        profileStore.reset()
         await initialize()
 
         // Start sensor data pipeline
@@ -638,6 +645,7 @@ final class AppContainer {
         inboxStore.reset()
         sessionListStore.reset()
         modelStore.reset()
+        profileStore.reset()
         hostStore.reset()
         lastKnownHostOnline = false
         lastCommandCatalogRefreshAt = nil
