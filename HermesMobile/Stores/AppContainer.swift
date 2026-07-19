@@ -22,6 +22,7 @@ final class AppContainer {
     let cronStore: CronStore
     let attachmentService: AttachmentService
     let sensorUploadService: SensorUploadService?
+    let themeManager: ThemeManager
     private let apiClient: RelayAPIClient?
     private let notificationService: (any NotificationServiceProtocol)?
     private var isInitialized = false
@@ -58,6 +59,11 @@ final class AppContainer {
         self.settingsStore = settingsStore
         self.talkStore = talkStore
         self.sessionListStore = sessionListStore
+
+        // Initialize ThemeManager and load persisted preferences
+        let loadedThemeManager = ThemeManager()
+        loadedThemeManager.load(from: settingsStore.settings)
+        self.themeManager = loadedThemeManager
         self.modelStore = modelStore ?? ModelStore(
             apiClient: apiClient,
             accessTokenProvider: { await sessionStore.currentAccessToken() }
@@ -273,6 +279,10 @@ final class AppContainer {
         }
         settingsStore.onRelayConfigurationChanged = { _ in
             await refreshUnpairedRelayContext()
+        }
+        settingsStore.onThemeChanged = { [weak container] _ in
+            guard let container else { return }
+            container.themeManager.load(from: container.settingsStore.settings)
         }
 
         runtimePairingStore.onPairingChanged = { [weak container] isPaired in
