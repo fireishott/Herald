@@ -261,6 +261,7 @@ enum LogLevel: String, CaseIterable {
         }
     }
 
+    @MainActor
     var color: Color {
         switch self {
         case .info:  Design.Colors.foreground
