@@ -32,7 +32,7 @@ struct HeraldTimelineProvider: TimelineProvider {
         }
         return "group.com.freemancurtis.Herald"
     }()
-    private static let dataKey = "hermes.widget.data"
+    private static let dataKey = "herald.widget.data"
 
     func placeholder(in context: Context) -> HeraldWidgetEntry {
         .placeholder
