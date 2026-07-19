@@ -470,6 +470,22 @@ struct iPadSidebarView: View {
                 }
                 .padding(.vertical, Design.Spacing.xs)
             }
+
+            // ── Cron jobs ──
+            NavigationLink {
+                CronManagerView()
+            } label: {
+                HStack(spacing: Design.Spacing.sm) {
+                    Image(systemName: "clock.badge")
+                        .font(.system(size: Design.Size.iconSmall))
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                        .frame(width: 24)
+                    Text("Cron Jobs")
+                        .font(Design.Typography.body)
+                        .foregroundStyle(Design.Colors.foreground)
+                }
+                .padding(.vertical, Design.Spacing.xs)
+            }
         }
     }
 }
