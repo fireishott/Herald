@@ -262,6 +262,37 @@ struct SettingsScreen: View {
                     }
                     .pickerStyle(.segmented)
                 }
+
+                Divider()
+                    .overlay(Design.Colors.divider)
+
+                // Chat wallpaper entry point
+                NavigationLink {
+                    WallpaperPickerSheet()
+                } label: {
+                    HStack(spacing: Design.Spacing.sm) {
+                        Image(systemName: "photo.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Design.Brand.accent)
+                            .frame(width: 20, alignment: .center)
+
+                        Text("Chat Wallpaper")
+                            .font(Design.Typography.callout)
+                            .foregroundStyle(Design.Colors.foreground)
+
+                        Spacer()
+
+                        Text(settingsStore.settings.chatWallpaper.label)
+                            .font(Design.Typography.callout)
+                            .foregroundStyle(Design.Colors.secondaryForeground)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Design.Colors.secondaryForeground)
+                    }
+                    .frame(minHeight: Design.Size.minTapTarget)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
