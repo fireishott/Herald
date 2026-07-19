@@ -997,6 +997,14 @@ class HermesMobileConnector:
                 result = await self._rpc_profiles_list()
             elif method == "skills.list":
                 result = await self._rpc_skills_list()
+            elif method == "cron.list":
+                result = await self._rpc_cron_list()
+            elif method == "cron.create":
+                result = await self._rpc_cron_create(params)
+            elif method == "cron.update":
+                result = await self._rpc_cron_update(params)
+            elif method == "cron.delete":
+                result = await self._rpc_cron_delete(params)
             else:
                 raise RuntimeError(f"Unsupported RPC method: {method}")
             return {
@@ -1286,6 +1294,105 @@ class HermesMobileConnector:
                     break
 
         return {"activeProfile": active_profile, "profiles": profiles}
+
+    # ------------------------------------------------------------------
+    # Cron RPC handlers — thin wrappers around `hermes cron` CLI subcommands.
+    # ------------------------------------------------------------------
+
+    def _resolve_hermes_command(self) -> str:
+        """Return the best-guess hermes CLI command path."""
+        resolved = self.executor.resolved_command_path()
+        if resolved:
+            return resolved
+        try:
+            state = self.state_store.load()
+            if state.runtime_config and state.runtime_config.hermes_command:
+                return state.runtime_config.hermes_command
+        except Exception:
+            pass
+        return self.executor.settings.hermes_command
+
+    async def _rpc_cron_list(self) -> dict:
+        """List scheduled cron jobs from Hermes."""
+        hermes_cmd = self._resolve_hermes_command()
+        try:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                [hermes_cmd, "cron", "list", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return {"jobs": json.loads(result.stdout)}
+        except Exception:  # noqa: BLE001
+            pass
+        return {"jobs": []}
+
+    async def _rpc_cron_create(self, params: dict) -> dict:
+        """Create a new cron job."""
+        hermes_cmd = self._resolve_hermes_command()
+        name = params.get("name", "")
+        schedule = params.get("schedule", "")
+        prompt = params.get("prompt", "")
+        try:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                [hermes_cmd, "cron", "add", "--name", name, "--schedule", schedule, "--prompt", prompt, "--json"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return {"job": json.loads(result.stdout)}
+        except Exception:  # noqa: BLE001
+            pass
+        raise RuntimeError("Failed to create cron job")
+
+    async def _rpc_cron_update(self, params: dict) -> dict:
+        """Update an existing cron job."""
+        hermes_cmd = self._resolve_hermes_command()
+        job_id = params.get("id", "")
+        args = [hermes_cmd, "cron", "update", job_id, "--json"]
+        if params.get("name"):
+            args.extend(["--name", params["name"]])
+        if params.get("schedule"):
+            args.extend(["--schedule", params["schedule"]])
+        if params.get("prompt"):
+            args.extend(["--prompt", params["prompt"]])
+        if params.get("enabled") is not None:
+            args.extend(["--enabled", str(params["enabled"]).lower()])
+        try:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                args,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return {"job": json.loads(result.stdout)}
+        except Exception:  # noqa: BLE001
+            pass
+        raise RuntimeError("Failed to update cron job")
+
+    async def _rpc_cron_delete(self, params: dict) -> dict:
+        """Delete a cron job."""
+        hermes_cmd = self._resolve_hermes_command()
+        job_id = params.get("id", "")
+        try:
+            result = await asyncio.to_thread(
+                subprocess.run,
+                [hermes_cmd, "cron", "remove", job_id],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                return {"deleted": True}
+        except Exception:  # noqa: BLE001
+            pass
+        raise RuntimeError("Failed to delete cron job")
 
     @staticmethod
     def _read_active_model(hermes_home: Path) -> dict | None:
