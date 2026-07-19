@@ -9,6 +9,7 @@ struct SettingsScreen: View {
     @Environment(PermissionsStore.self) private var permissionsStore
     @Environment(SettingsStore.self) private var settingsStore
     @Environment(TabRouter.self) private var router
+    @Environment(ThemeManager.self) private var themeManager
 
     var body: some View {
         ZStack {
@@ -22,6 +23,7 @@ struct SettingsScreen: View {
                     if settingsStore.availableEnvironments.count > 1 {
                         environmentSection
                     }
+                    appearanceSection
                     preferencesSection
                     locationSection
                     privacySection
@@ -224,6 +226,80 @@ struct SettingsScreen: View {
                 }
             }
         }
+    }
+
+    // MARK: - Appearance
+
+    private var appearanceSection: some View {
+        SettingsSectionView(title: "Appearance") {
+            VStack(alignment: .leading, spacing: Design.Spacing.sm) {
+                // Theme preset picker
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Theme")
+                        .font(Design.Typography.footnote)
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(ThemePreset.allCases) { theme in
+                                themeSwatch(theme)
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+                    .overlay(Design.Colors.divider)
+
+                // Light/Dark/System toggle
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Appearance")
+                        .font(Design.Typography.footnote)
+                        .foregroundStyle(Design.Colors.secondaryForeground)
+                    Picker("Appearance", selection: colorSchemePreferenceBinding) {
+                        ForEach(ColorSchemePreference.allCases) { pref in
+                            Text(pref.label).tag(pref)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+        }
+    }
+
+    private func themeSwatch(_ theme: ThemePreset) -> some View {
+        Button {
+            withAnimation(Design.Motion.quickResponse) {
+                themeManager.preset = theme
+            }
+            settingsStore.settings.themePreset = theme
+        } label: {
+            VStack(spacing: 4) {
+                Circle()
+                    .fill(theme.accent)
+                    .frame(width: 32, height: 32)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(
+                                themeManager.preset == theme ? Color.white : Color.clear,
+                                lineWidth: 2
+                            )
+                    )
+                Text(theme.label)
+                    .font(.caption2)
+                    .foregroundStyle(Design.Colors.secondaryForeground)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var colorSchemePreferenceBinding: Binding<ColorSchemePreference> {
+        Binding(
+            get: { themeManager.colorSchemePreference },
+            set: { newValue in
+                themeManager.colorSchemePreference = newValue
+                settingsStore.settings.colorSchemePreference = newValue
+            }
+        )
     }
 
     // MARK: - Preferences
