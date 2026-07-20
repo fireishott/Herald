@@ -125,6 +125,9 @@ targets:
           - group.com.freemancurtis.Herald
     info:
       path: HeraldWidgets/Info.plist
+      properties:
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.freemancurtis.Herald.Widgets
