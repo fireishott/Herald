@@ -3,7 +3,7 @@ import os
 
 @MainActor
 final class LiveHeraldClient: HeraldClientProtocol {
-    private static let logger = Logger(subsystem: "com.freemancurtis.Herald", category: "LiveHeraldClient")
+    private static let logger = Logger(subsystem: "net.fihonline.herald", category: "LiveHeraldClient")
     private static let maxRequestBodyBytes = 1_000_000
     private struct ConversationResponse: Decodable {
         let conversation: RelayConversation

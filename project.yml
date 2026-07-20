@@ -2,9 +2,9 @@ name: Herald
 options:
   # Public-safe defaults. Replace locally if you regenerate the project
   # for a private deployment with your own signing/bundle identifiers.
-  bundleIdPrefix: com.freemancurtis
+  bundleIdPrefix: net.fihonline
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "18.0"
   xcodeVersion: "26.3"
   defaultConfig: Debug
   generateEmptyDirectories: true
@@ -15,7 +15,7 @@ settings:
   base:
     SWIFT_VERSION: "6.2"
     SWIFT_STRICT_CONCURRENCY: complete
-    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     INFOPLIST_KEY_UILaunchScreen_Generation: true
     INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
@@ -62,7 +62,7 @@ targets:
         com.apple.developer.healthkit.access: []
         com.apple.developer.healthkit.background-delivery: true
         com.apple.security.application-groups:
-          - group.com.freemancurtis.Herald
+          - group.net.fihonline.herald
     sources:
       - path: Herald
         excludes:
@@ -75,10 +75,10 @@ targets:
       - target: HeraldWidgets
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.freemancurtis.Herald
+        PRODUCT_BUNDLE_IDENTIFIER: net.fihonline.herald
         PRODUCT_NAME: Herald
         MARKETING_VERSION: "1.2.1"
-        CURRENT_PROJECT_VERSION: "7"
+        CURRENT_PROJECT_VERSION: "8"
         DEVELOPMENT_TEAM: 58U7UPFS53
         CODE_SIGN_STYLE: Automatic
         INFOPLIST_KEY_CFBundleDisplayName: Herald
@@ -122,7 +122,7 @@ targets:
       path: HeraldWidgets/HeraldWidgets.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.com.freemancurtis.Herald
+          - group.net.fihonline.herald
     info:
       path: HeraldWidgets/Info.plist
       properties:
@@ -132,10 +132,10 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.freemancurtis.Herald.Widgets
+        PRODUCT_BUNDLE_IDENTIFIER: net.fihonline.herald.Widgets
         PRODUCT_NAME: HeraldWidgets
         MARKETING_VERSION: "1.2.1"
-        CURRENT_PROJECT_VERSION: "7"
+        CURRENT_PROJECT_VERSION: "8"
         SWIFT_VERSION: "6.2"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 58U7UPFS53
@@ -150,7 +150,7 @@ targets:
       - target: Herald
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.freemancurtis.Herald.tests
+        PRODUCT_BUNDLE_IDENTIFIER: net.fihonline.herald.tests
         TEST_TARGET_NAME: Herald
         GENERATE_INFOPLIST_FILE: true
 
@@ -163,6 +163,6 @@ targets:
       - target: Herald
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.freemancurtis.Herald.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: net.fihonline.herald.uitests
         TEST_TARGET_NAME: Herald
         GENERATE_INFOPLIST_FILE: true
