@@ -139,7 +139,7 @@ final class AppContainer {
         let persistence = UserDefaultsAppPersistenceStore(defaults: resolvedDefaults)
         let buildConfiguration = AppBuildConfiguration.current()
         let secureStore = KeychainSecureStore(
-            serviceName: processEnvironment["UITEST_KEYCHAIN_SERVICE"] ?? "com.freemancurtis.Herald.session"
+            serviceName: processEnvironment["UITEST_KEYCHAIN_SERVICE"] ?? "net.fihonline.herald.session"
         )
         let settingsStore = SettingsStore(
             persistence: persistence,
@@ -493,7 +493,7 @@ final class AppContainer {
                 accessToken: accessToken,
                 deviceID: deviceID,
                 installationID: sessionStore.state.installationID,
-                bundleID: Bundle.main.bundleIdentifier ?? "com.freemancurtis.Herald",
+                bundleID: Bundle.main.bundleIdentifier ?? "net.fihonline.herald",
                 appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0",
                 pushEnvironment: pushEnvironment
             )
