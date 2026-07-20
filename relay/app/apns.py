@@ -8,7 +8,7 @@ Environment variables:
     APNS_KEY_CONTENTS     — raw .p8 key text (alternative to KEY_PATH for Docker/Fly)
     APNS_KEY_ID           — 10-char key identifier from Apple
     APNS_TEAM_ID          — 10-char team identifier from Apple
-    APNS_BUNDLE_ID        — default app bundle identifier (com.freemancurtis.Herald)
+    APNS_BUNDLE_ID        — default app bundle identifier (net.fihonline.herald)
     APNS_ENVIRONMENT      — default environment: "development" or "production"
 """
 
@@ -54,8 +54,8 @@ class APNsClient:
         key_path: str,
         key_id: str,
         team_id: str,
-        default_bundle_id: str = "com.freemancurtis.Herald",
-        default_environment: str = "development",
+        default_bundle_id: str = "net.fihonline.herald",
+        default_environment: str = "production",
     ):
         self.key_id = key_id
         self.team_id = team_id
