@@ -2,7 +2,40 @@
 
 Execute in order. Each step blocks the next.
 
-## Ops-1: Relay redeploy (F1)
+## Ops-0: Field freeze (run first)
+
+Before any changes, capture the current field state:
+
+```bash
+ssh fihadmin@<host>
+cd ~/Hermes-iOS
+bash deploy/scripts/field-freeze.sh
+# Artifacts saved to ~/herald-field-freeze-<timestamp>/
+```
+
+## Ops-0.5: Schema audit
+
+Check what's missing in production Postgres:
+
+```bash
+docker exec hermes-relay-postgres-1 psql -U relay -d relay -f /dev/stdin < deploy/scripts/field-schema-audit.sql
+```
+
+Expected: `attempt` and `reasoning_effort` columns may be missing; `job_events` table likely missing.
+
+## Ops-1: Schema migration (before relay deploy)
+
+```bash
+# Apply the migration
+docker exec -i hermes-relay-postgres-1 psql -U relay -d relay < deploy/migrations/001_job_events.sql
+
+# Verify
+docker exec hermes-relay-postgres-1 psql -U relay -d relay -c '\d message_jobs' | grep -E 'attempt|reasoning_effort'
+docker exec hermes-relay-postgres-1 psql -U relay -d relay -c '\d job_events'
+docker exec hermes-relay-postgres-1 psql -U relay -d relay -c 'SELECT * FROM schema_migrations;'
+```
+
+## Ops-2: Relay redeploy (F1)
 
 ### Step 1: Reconcile host checkout
 
