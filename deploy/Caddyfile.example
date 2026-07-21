@@ -1,0 +1,25 @@
+# Caddy reverse proxy for Hermes Relay
+# Usage: cp Caddyfile.example /etc/caddy/Caddyfile && systemctl reload caddy
+
+relay.example.com {
+	# Relay API + SSE + WebSocket
+	reverse_proxy localhost:8010 {
+		# WebSocket upgrade
+		header_up Connection {>Connection}
+		header_up Upgrade {>Upgrade}
+
+		# SSE keep-alive
+		transport http {
+			response_header_timeout 0
+		}
+	}
+
+	# TLS is automatic with Caddy (ACME/Let's Encrypt)
+	# Adjust if you need specific email or DNS challenge:
+	# tls you@example.com
+}
+
+# Optional: connector direct endpoint (if exposing separately)
+# connector.example.com {
+# 	reverse_proxy localhost:8011
+# }

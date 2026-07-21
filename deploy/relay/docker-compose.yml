@@ -1,0 +1,41 @@
+# Hermes Relay deployment — relay + Postgres sidecar
+# Usage:
+#   cd deploy/relay
+#   cp .env.example .env   # edit with real values
+#   docker compose up -d
+
+name: hermes-relay
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: herald
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  relay:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/herald
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8010:8000"
+
+volumes:
+  postgres_data:
