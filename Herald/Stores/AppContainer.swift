@@ -158,7 +158,7 @@ final class AppContainer {
         )
         self.sensorUploadService = sensorUploadService
         self.dashboardLogService = dashboardLogService ?? DashboardLogService(
-            baseURLProvider: { "http://192.168.10.118:9119" },
+            baseURLProvider: { "http://localhost:9119" },
             credentialsProvider: { nil }
         )
         self.apiClient = apiClient
@@ -238,7 +238,7 @@ final class AppContainer {
             let relayBase = activePairingStore?.pairedRelayConfiguration?.baseURLString
                 ?? settingsStore.settings.relayConfiguration.activeBaseURLString
                 ?? ""
-            // ws://192.168.10.118:8765 -> http://192.168.10.118:8767
+            // ws://host:8765 -> http://host:8767 (MCP port = WS port + 2)
             guard var components = URLComponents(string: relayBase) else { return nil }
             components.scheme = "http"
             if let port = components.port {
@@ -339,7 +339,7 @@ final class AppContainer {
             motionService: liveMotionService
         )
         let dashboardLogService = DashboardLogService(
-            baseURLProvider: { settingsStore.settings.dashboardURL ?? "http://192.168.10.118:9119" },
+            baseURLProvider: { settingsStore.settings.dashboardURL ?? "http://localhost:9119" },
             credentialsProvider: {
                 guard let user = settingsStore.settings.dashboardUsername,
                       let pass = settingsStore.settings.dashboardPassword else { return nil }

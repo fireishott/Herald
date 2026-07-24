@@ -10,11 +10,11 @@
 
 ### MBP (Build Host)
 ```
-Host:     192.168.10.121
+Host:     YOUR_BUILD_MAC_IP
 User:     curtisfreeman
-Password: 11aaxx2wR
+Password: YOUR_SSH_PASSWORD
 Project:  ~/Herald/
-SSH:      sshpass -p '11aaxx2wR' ssh -o StrictHostKeyChecking=no curtisfreeman@192.168.10.121
+SSH:      sshpass -p 'YOUR_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no curtisfreeman@YOUR_BUILD_MAC_IP
 ```
 
 ### GitHub
@@ -22,7 +22,7 @@ SSH:      sshpass -p '11aaxx2wR' ssh -o StrictHostKeyChecking=no curtisfreeman@1
 Repo:     https://github.com/fireishott/Herald
 Username: fireishott
 Token:    Stored in macOS keychain. Extract with:
-          security unlock-keychain -p '11aaxx2wR' ~/Library/Keychains/login.keychain-db 2>/dev/null
+          security unlock-keychain -p 'YOUR_SSH_PASSWORD' ~/Library/Keychains/login.keychain-db 2>/dev/null
           security find-internet-password -s github.com -a fireishott -w 2>/dev/null
 
 Fallback: Token also in Flynt Hermes profile at fih-ai-host:
@@ -48,11 +48,11 @@ Account:   djkurttsaynomore@gmail.com
 Identity:  Apple Development: C Freeman (UU4BX97G8J)
 Team:      58U7UPFS53
 Keychain:  ~/Library/Keychains/login.keychain-db
-Password:  11aaxx2wR
+Password:  YOUR_SSH_PASSWORD
 
 Unlock (required before any archive/export):
-  security unlock-keychain -p '11aaxx2wR' ~/Library/Keychains/login.keychain-db
-  security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k '11aaxx2wR' ~/Library/Keychains/login.keychain-db
+  security unlock-keychain -p 'YOUR_SSH_PASSWORD' ~/Library/Keychains/login.keychain-db
+  security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k 'YOUR_SSH_PASSWORD' ~/Library/Keychains/login.keychain-db
 ```
 
 ---
@@ -63,7 +63,7 @@ Run these BEFORE starting any build:
 
 ```bash
 # 1. Verify MBP is reachable
-sshpass -p '11aaxx2wR' ssh curtisfreeman@192.168.10.121 "echo connected"
+sshpass -p 'YOUR_SSH_PASSWORD' ssh curtisfreeman@YOUR_BUILD_MAC_IP "echo connected"
 
 # 2. Check GitHub for latest commits — local clone may be behind
 curl -s "https://api.github.com/repos/fireishott/Herald/commits?per_page=5" | python3 -c "
@@ -204,8 +204,8 @@ set -e
 
 # Unlock keychain (suppress dump noise)
 exec 2>/dev/null
-security unlock-keychain -p '11aaxx2wR' ~/Library/Keychains/login.keychain-db
-security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k '11aaxx2wR' ~/Library/Keychains/login.keychain-db
+security unlock-keychain -p 'YOUR_SSH_PASSWORD' ~/Library/Keychains/login.keychain-db
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k 'YOUR_SSH_PASSWORD' ~/Library/Keychains/login.keychain-db
 exec 2>&1
 
 cd ~/Herald
@@ -235,8 +235,8 @@ codesign -d --entitlements - ~/Hermes-iOS-Builds/exports/Herald.ipa 2>/dev/null 
 SCRIPT
 
 # SCP and run
-sshpass -p '11aaxx2wR' scp /tmp/herald_build.sh curtisfreeman@192.168.10.121:~/Hermes-iOS-Builds/
-sshpass -p '11aaxx2wR' ssh -o StrictHostKeyChecking=no curtisfreeman@192.168.10.121 \
+sshpass -p 'YOUR_SSH_PASSWORD' scp /tmp/herald_build.sh curtisfreeman@YOUR_BUILD_MAC_IP:~/Hermes-iOS-Builds/
+sshpass -p 'YOUR_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no curtisfreeman@YOUR_BUILD_MAC_IP \
   'bash ~/Hermes-iOS-Builds/herald_build.sh'
 ```
 
@@ -253,7 +253,7 @@ ssh MBP "cd ~/Herald && git checkout -- Herald/Herald.entitlements HeraldWidgets
 ### Method: altool (CLI — RECOMMENDED)
 
 ```bash
-sshpass -p '11aaxx2wR' ssh -o StrictHostKeyChecking=no curtisfreeman@192.168.10.121 \
+sshpass -p 'YOUR_SSH_PASSWORD' ssh -o StrictHostKeyChecking=no curtisfreeman@YOUR_BUILD_MAC_IP \
   "xcrun altool --upload-app \
     --type ios \
     --file ~/Hermes-iOS-Builds/exports/Herald.ipa \
@@ -415,7 +415,7 @@ Brief summary paragraph.
 ┌─────────────────────────────────────────────────────────┐
 │                 HERALD TESTFLIGHT PIPELINE               │
 ├─────────────────────────────────────────────────────────┤
-│ MBP SSH:    curtisfreeman@192.168.10.121 / 11aaxx2wR    │
+│ MBP SSH:    curtisfreeman@YOUR_BUILD_MAC_IP / YOUR_SSH_PASSWORD    │
 │ Project:    ~/Herald/                                    │
 │ GitHub:     fireishott/Herald                            │
 │ ASC App:    Herald Companion (6792659019)                │

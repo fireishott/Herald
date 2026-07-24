@@ -4,7 +4,7 @@
 #   cp .env.example .env   # edit with real values
 #   docker compose up -d
 
-name: hermes-relay
+name: herald-relay
 
 services:
   postgres:

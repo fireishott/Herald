@@ -506,7 +506,7 @@ Confirm the `@MainActor` annotation directly above `var color: Color` (on the `L
 Build on the MBP with the standard entitlements-strip + keychain-unlock pattern:
 
 ```bash
-# On MBP (curtisfreeman@192.168.10.121):
+# On MBP (curtisfreeman@INTERNAL_HOST):
 cp HermesMobile/HermesMobile.entitlements HermesMobile/HermesMobile.entitlements.bak
 echo '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict></dict></plist>' > HermesMobile/HermesMobile.entitlements
 security unlock-keychain -p '<password>' ~/Library/Keychains/login.keychain-db
@@ -546,9 +546,9 @@ cd ~/Hermes-iOS && git push origin master
 - [ ] **Step 2: Sync and rebuild relay**
 
 ```bash
-ssh fihadmin@192.168.10.118 "cd /home/fihadmin/hermes-ios-work && git pull origin master"
-ssh fihadmin@192.168.10.118 "cp /home/fihadmin/hermes-ios-work/relay/app/services.py /home/fihadmin/hermes-ios-work/relay/app/main.py /home/fihadmin/Hermes-iOS/relay/app/"
-ssh fihadmin@192.168.10.118 "cd /home/fihadmin/deploy/hermes-relay && docker compose down && docker compose up -d --build"
+ssh fihadmin@INTERNAL_HOST "cd /home/fihadmin/hermes-ios-work && git pull origin master"
+ssh fihadmin@INTERNAL_HOST "cp /home/fihadmin/hermes-ios-work/relay/app/services.py /home/fihadmin/hermes-ios-work/relay/app/main.py /home/fihadmin/Hermes-iOS/relay/app/"
+ssh fihadmin@INTERNAL_HOST "cd /home/fihadmin/deploy/hermes-relay && docker compose down && docker compose up -d --build"
 ```
 
 Verify: `curl -s http://localhost:8010/v1/health` from the ignyte host returns `{"data":{"status":"ok"}...}`.
@@ -561,7 +561,7 @@ Create a new session through the app (or via `POST /v1/messages` directly) and c
 
 This plan doesn't touch the connector, but confirm:
 ```bash
-ssh fihadmin@192.168.10.118 "systemctl --user status hermes-mobile-connector.service --no-pager | head -8"
+ssh fihadmin@INTERNAL_HOST "systemctl --user status hermes-mobile-connector.service --no-pager | head -8"
 ```
 Expected: still `active (running)` from the prior session — no restart needed unless it has stopped.
 
@@ -573,7 +573,7 @@ Follow the standard build/export/install pattern (entitlements-strip, archive, e
 
 If either device needs re-pairing (shouldn't, since this isn't a fresh install):
 ```bash
-ssh fihadmin@192.168.10.118 "CREDS=\$(cat /home/fihadmin/.hermes/profiles/ignyte/home/.hermes-mobile/state.json | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"connector_credential\"])') && curl -s http://localhost:8010/v1/connector/phone-pairing-codes -X POST -H \"Authorization: Bearer \$CREDS\""
+ssh fihadmin@INTERNAL_HOST "CREDS=\$(cat /home/fihadmin/.hermes/profiles/ignyte/home/.hermes-mobile/state.json | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"connector_credential\"])') && curl -s http://localhost:8010/v1/connector/phone-pairing-codes -X POST -H \"Authorization: Bearer \$CREDS\""
 ```
 
 - [ ] **Step 7: Manual verification checklist on-device**

@@ -590,9 +590,9 @@ cd ~/Hermes-iOS && git push origin master
 - [ ] **Step 2: Sync and rebuild relay**
 
 ```bash
-ssh fihadmin@192.168.10.118 "cd /home/fihadmin/hermes-ios-work && git pull origin master"
-ssh fihadmin@192.168.10.118 "cp /home/fihadmin/hermes-ios-work/relay/app/main.py /home/fihadmin/Hermes-iOS/relay/app/main.py && cp /home/fihadmin/hermes-ios-work/relay/app/schemas.py /home/fihadmin/Hermes-iOS/relay/app/schemas.py"
-ssh fihadmin@192.168.10.118 "cd /home/fihadmin/deploy/hermes-relay && docker compose down && docker compose up -d --build"
+ssh fihadmin@INTERNAL_HOST "cd /home/fihadmin/hermes-ios-work && git pull origin master"
+ssh fihadmin@INTERNAL_HOST "cp /home/fihadmin/hermes-ios-work/relay/app/main.py /home/fihadmin/Hermes-iOS/relay/app/main.py && cp /home/fihadmin/hermes-ios-work/relay/app/schemas.py /home/fihadmin/Hermes-iOS/relay/app/schemas.py"
+ssh fihadmin@INTERNAL_HOST "cd /home/fihadmin/deploy/hermes-relay && docker compose down && docker compose up -d --build"
 ```
 
 Verify: `curl -s http://localhost:8010/v1/health` from the ignyte host.
@@ -600,8 +600,8 @@ Verify: `curl -s http://localhost:8010/v1/health` from the ignyte host.
 - [ ] **Step 3: Restart connector**
 
 ```bash
-ssh fihadmin@192.168.10.118 "cp -r /home/fihadmin/hermes-ios-work/connector/src /home/fihadmin/Hermes-iOS/connector/"
-ssh fihadmin@192.168.10.118 "systemctl --user restart hermes-mobile-connector.service"
+ssh fihadmin@INTERNAL_HOST "cp -r /home/fihadmin/hermes-ios-work/connector/src /home/fihadmin/Hermes-iOS/connector/"
+ssh fihadmin@INTERNAL_HOST "systemctl --user restart hermes-mobile-connector.service"
 ```
 
 Verify: `systemctl --user status hermes-mobile-connector.service` shows active/running.
@@ -609,7 +609,7 @@ Verify: `systemctl --user status hermes-mobile-connector.service` shows active/r
 - [ ] **Step 4: Manual RPC smoke test**
 
 ```bash
-ssh fihadmin@192.168.10.118 "CREDS=\$(cat /home/fihadmin/.hermes/profiles/ignyte/home/.hermes-mobile/state.json | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"connector_credential\"])') && curl -s http://localhost:8010/v1/models -H \"Authorization: Bearer \$CREDS\""
+ssh fihadmin@INTERNAL_HOST "CREDS=\$(cat /home/fihadmin/.hermes/profiles/ignyte/home/.hermes-mobile/state.json | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"connector_credential\"])') && curl -s http://localhost:8010/v1/models -H \"Authorization: Bearer \$CREDS\""
 ```
 
 Expected: response includes models from config.yaml AND dynamic catalog (should now be non-empty for the active provider).
