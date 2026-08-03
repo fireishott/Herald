@@ -158,6 +158,7 @@ RelayEvent = Union[
 EVENT_TYPE_TO_MODEL: dict[str, type[_EnvelopeBase]] = {
     "run.started": RunStartedEvent,
     "text.delta": TextDeltaEvent,
+    "text_delta": TextDeltaEvent,
     "reasoning.delta": ReasoningDeltaEvent,
     "tool.started": ToolStartedEvent,
     "tool.progress": ToolProgressEvent,

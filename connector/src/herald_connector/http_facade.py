@@ -247,6 +247,11 @@ async def _auto_title(handler, text: str, hermes_sid: str, app_uuid: str) -> str
         logger.debug("_auto_title: LLM path failed, falling back to truncation")
 
     # Fallback: first line, first 80 chars
+    # Strip [System context: ...] prefix before fallback truncation
+    import re
+    text = re.sub(r"^\[System context:.*?\]\s*", "", text, count=1)
+    text = re.sub(r"^\[Timezone:.*?\]\s*", "", text, count=1)
+
     first_line = text.strip().split("\n")[0].strip()
     if first_line:
         return first_line[:80]
